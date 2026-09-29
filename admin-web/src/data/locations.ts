@@ -1,0 +1,35 @@
+import type { TransitLocation } from '../types/transit';
+
+export const locations: TransitLocation[] = [
+  // Terminals
+  { id: 'T01', kind: 'terminal', name: 'Agora Integrated Terminal', address: 'C.M. Recto Ave, Lapasan', barangay: 'Lapasan', lat: 8.4857, lng: 124.6589, routeIds: ['R02', 'R03', 'R04'], status: 'Active', notes: 'Eastbound hub. Bugo-bound units load at Bay 4.', lastUpdated: '2026-09-21T09:00:00' },
+  { id: 'T02', kind: 'terminal', name: 'Bulua Integrated Bus & Jeepney Terminal', address: 'Iligan–CDO Highway, Bulua', barangay: 'Bulua', lat: 8.504, lng: 124.6115, routeIds: ['R01', 'R10'], status: 'Active', notes: 'Westbound hub shared with provincial buses.', lastUpdated: '2026-09-14T10:20:00' },
+  { id: 'T03', kind: 'terminal', name: 'Cogon Market Jeepney Terminal', address: 'Osmeña St, Cogon', barangay: 'Brgy. 34 (Cogon)', lat: 8.4735, lng: 124.6497, routeIds: ['R01', 'R02', 'R03', 'R05', 'R07', 'R08', 'R09', 'R10', 'R11'], status: 'Active', notes: 'Busiest downtown terminal.', lastUpdated: '2026-09-20T08:10:00' },
+  { id: 'T04', kind: 'terminal', name: 'Divisoria Terminal (Tirso Neri St)', address: 'Tirso Neri St, Poblacion', barangay: 'Brgy. 1 (Poblacion)', lat: 8.4777, lng: 124.6452, routeIds: ['R01', 'R05', 'R06', 'R09', 'R12'], status: 'Active', notes: '', lastUpdated: '2026-09-02T13:30:00' },
+  { id: 'T05', kind: 'terminal', name: 'Carmen Market Terminal', address: 'Vamenta Blvd, Carmen', barangay: 'Carmen', lat: 8.4845, lng: 124.6335, routeIds: ['R01', 'R05', 'R10'], status: 'Active', notes: '', lastUpdated: '2026-08-29T11:00:00' },
+  { id: 'T06', kind: 'terminal', name: 'Puerto Terminal', address: 'Butuan–CDO Highway, Puerto', barangay: 'Puerto', lat: 8.499, lng: 124.742, routeIds: ['R04'], status: 'Active', notes: '', lastUpdated: '2026-08-18T15:45:00' },
+  { id: 'T07', kind: 'terminal', name: 'Bugo Terminal', address: 'Butuan–CDO Highway, Bugo', barangay: 'Bugo', lat: 8.507, lng: 124.756, routeIds: ['R04'], status: 'Under Review', notes: 'Relocation proposal under review by RTA.', lastUpdated: '2026-09-23T16:00:00' },
+  // Loading points
+  { id: 'L01', kind: 'loading', name: 'Limketkai Center Loading Bay', address: 'Limketkai Drive, Lapasan', barangay: 'Lapasan', lat: 8.4838, lng: 124.653, routeIds: ['R02', 'R03'], status: 'Active', notes: '', lastUpdated: '2026-09-19T10:00:00' },
+  { id: 'L02', kind: 'loading', name: 'Xavier University – Corrales Ave', address: 'Corrales Ave, Brgy. 13', barangay: 'Brgy. 13 (Poblacion)', lat: 8.479, lng: 124.646, routeIds: ['R01', 'R05'], status: 'Active', notes: 'Heavy student volume 6–8 AM.', lastUpdated: '2026-09-11T07:45:00' },
+  { id: 'L03', kind: 'loading', name: 'SM CDO Downtown Premier Bay', address: 'Claro M. Recto Ave, Lapasan', barangay: 'Lapasan', lat: 8.4868, lng: 124.6557, routeIds: ['R02', 'R03', 'R04'], status: 'Active', notes: '', lastUpdated: '2026-09-08T12:00:00' },
+  { id: 'L04', kind: 'loading', name: 'Capitol University Loading Zone', address: 'Corrales Ext., Gusa', barangay: 'Gusa', lat: 8.4815, lng: 124.6655, routeIds: ['R03', 'R04'], status: 'Under Review', notes: 'Reported as informal stop — validating with RTA.', lastUpdated: '2026-09-26T11:30:00' },
+  { id: 'L05', kind: 'loading', name: 'Liceo de Cagayan University', address: 'Rodolfo N. Pelaez Blvd, Kauswagan', barangay: 'Kauswagan', lat: 8.487, lng: 124.638, routeIds: ['R06'], status: 'Active', notes: '', lastUpdated: '2026-09-01T09:15:00' },
+  { id: 'L06', kind: 'loading', name: 'Centrio Mall – C.M. Recto', address: 'C.M. Recto Ave, Brgy. 13', barangay: 'Brgy. 13 (Poblacion)', lat: 8.48, lng: 124.6448, routeIds: ['R01', 'R05'], status: 'Inactive', notes: 'Suspended during sidewalk works.', lastUpdated: '2026-09-17T14:20:00' },
+  { id: 'L07', kind: 'loading', name: 'USTP Lapasan Gate', address: 'C.M. Recto Ave, Lapasan', barangay: 'Lapasan', lat: 8.4852, lng: 124.6572, routeIds: ['R02', 'R03', 'R04'], status: 'Active', notes: '', lastUpdated: '2026-08-27T08:00:00' },
+  // Unloading points
+  { id: 'U01', kind: 'unloading', name: 'Cogon Market – Osmeña St Drop-off', address: 'Osmeña St, Cogon', barangay: 'Brgy. 34 (Cogon)', lat: 8.474, lng: 124.649, routeIds: ['R02', 'R07', 'R08'], status: 'Active', notes: '', lastUpdated: '2026-09-15T10:10:00' },
+  { id: 'U02', kind: 'unloading', name: 'Velez St near Gaisano Main', address: 'Velez St, Poblacion', barangay: 'Brgy. 25 (Poblacion)', lat: 8.477, lng: 124.6445, routeIds: ['R01', 'R05'], status: 'Active', notes: '', lastUpdated: '2026-09-09T16:40:00' },
+  { id: 'U03', kind: 'unloading', name: 'Carmen Public Market Drop-off', address: 'Vamenta Blvd, Carmen', barangay: 'Carmen', lat: 8.485, lng: 124.633, routeIds: ['R01', 'R05', 'R10'], status: 'Active', notes: '', lastUpdated: '2026-08-31T09:30:00' },
+  { id: 'U04', kind: 'unloading', name: 'SM CDO Uptown – Masterson Ave', address: 'Masterson Ave, Upper Carmen', barangay: 'Upper Carmen', lat: 8.457, lng: 124.6305, routeIds: ['R08'], status: 'Under Review', notes: '', lastUpdated: '2026-09-22T13:00:00' },
+  { id: 'U05', kind: 'unloading', name: 'Gaisano City – Lapasan', address: 'C.M. Recto Ave, Lapasan', barangay: 'Lapasan', lat: 8.485, lng: 124.6555, routeIds: ['R02', 'R03'], status: 'Active', notes: 'New zone effective Sept 20.', lastUpdated: '2026-09-20T09:00:00' },
+  { id: 'U06', kind: 'unloading', name: 'Macasandig Barangay Hall', address: 'Macasandig Road', barangay: 'Macasandig', lat: 8.4625, lng: 124.6505, routeIds: ['R07'], status: 'Active', notes: '', lastUpdated: '2026-08-22T11:10:00' },
+  // Transfer points
+  { id: 'X01', kind: 'transfer', name: 'Cogon Rotunda Transfer Hub', address: 'Osmeña St × Capistrano St', barangay: 'Brgy. 34 (Cogon)', lat: 8.4738, lng: 124.6493, routeIds: ['R01', 'R02', 'R03', 'R05', 'R07', 'R08', 'R09'], status: 'Active', notes: '', lastUpdated: '2026-09-16T08:30:00' },
+  { id: 'X02', kind: 'transfer', name: 'Agora Transfer Point', address: 'C.M. Recto Ave, Lapasan', barangay: 'Lapasan', lat: 8.4859, lng: 124.6592, routeIds: ['R02', 'R03', 'R04'], status: 'Active', notes: '', lastUpdated: '2026-09-21T09:05:00' },
+  { id: 'X03', kind: 'transfer', name: 'Carmen Crossing', address: 'Vamenta Blvd × Max Suniel St', barangay: 'Carmen', lat: 8.4842, lng: 124.6338, routeIds: ['R01', 'R05', 'R10'], status: 'Active', notes: '', lastUpdated: '2026-09-03T12:00:00' },
+  { id: 'X04', kind: 'transfer', name: 'Limketkai Rotunda', address: 'Limketkai Drive × C.M. Recto', barangay: 'Lapasan', lat: 8.4835, lng: 124.6527, routeIds: ['R02', 'R03'], status: 'Active', notes: '', lastUpdated: '2026-08-25T10:00:00' },
+  { id: 'X05', kind: 'transfer', name: 'Gusa Crossing', address: 'C.M. Recto Highway, Gusa', barangay: 'Gusa', lat: 8.4775, lng: 124.683, routeIds: ['R03', 'R04'], status: 'Active', notes: '', lastUpdated: '2026-08-19T14:00:00' },
+  { id: 'X06', kind: 'transfer', name: 'Bulua Crossing', address: 'Iligan–CDO Highway, Bulua', barangay: 'Bulua', lat: 8.5036, lng: 124.612, routeIds: ['R01', 'R10'], status: 'Inactive', notes: 'Closed for flyover construction.', lastUpdated: '2026-09-12T17:00:00' },
+];
+

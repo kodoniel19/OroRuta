@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OroRuta</string>
+    <string name="google_maps_key">AIzaSyA4ng7IyKcf47FumHW2xvkT4btXcEX5PgQ</string>
+
+    <!-- App core -->
+    <string name="tagline">Your Guide to Jeepney Routes in Cagayan de Oro</string>
+    <string name="no_account_needed">No account needed</string>
+    <string name="guest_note">Using OroRuta as a guest — No account needed. Saved routes and history stay on this device.</string>
+
+    <!-- Bottom nav -->
+    <string name="nav_home">Home</string>
+    <string name="nav_routes">Routes</string>
+    <string name="nav_map">Map</string>
+    <string name="nav_saved">Saved</string>
+    <string name="nav_more">More</string>
+
+    <!-- Home screen -->
+    <string name="where_are_you_going">Where are you going?</string>
+    <string name="from_label">From</string>
+    <string name="to_label">To</string>
+    <string name="use_my_location">Use My Location</string>
+    <string name="search_route">Search Route</string>
+    <string name="transportation_updates">Transportation updates</string>
+    <string name="offline_routes_available">%1$d routes available offline</string>
+    <string name="city_map_included">City map included</string>
+    <string name="last_synced">Last synced %1$s</string>
+    <string name="near_location">Near %1$s</string>
+    <string name="starting_from">Starting from %1$s</string>
+    <string name="location_off">Location is off</string>
+
+    <!-- Quick actions -->
+    <string name="qa_find_route">Find a Route</string>
+    <string name="qa_nearby">Nearby Jeepneys</string>
+    <string name="qa_view_map">View Map</string>
+    <string name="qa_directory">Route Directory</string>
+    <string name="qa_saved">Saved Routes</string>
+    <string name="qa_offline">Offline Routes</string>
+    <string name="qa_updates">Route Updates</string>
+    <string name="qa_fare">Fare Guide</string>
+    <string name="qa_report">Report Issue</string>
+
+    <!-- Search -->
+    <string name="recent_searches">Recent searches</string>
+    <string name="search_for_query">Search for \'%1$s\'</string>
+    <string name="suggested_places">Suggested places</string>
+    <string name="current_location">Current location</string>
+    <string name="filter_all_places">All places</string>
+    <string name="filter_landmarks">Landmarks</string>
+    <string name="filter_terminals">Terminals</string>
+
+    <!-- Results -->
+    <string name="n_jeepney_routes">%1$d jeepney routes</string>
+    <string name="sorted_by">sorted by %1$s</string>
+    <string name="sort_time">Shortest travel time</string>
+    <string name="sort_fare">Lowest estimated fare</string>
+    <string name="sort_walk">Least walking</string>
+    <string name="sort_transfers">Fewest transfers</string>
+    <string name="finding_routes">Finding jeepney routes\u2026</string>
+    <string name="result_footnote">Times and fares are estimates. Routes shown are jeepney routes only.</string>
+    <string name="no_transfers">No transfers</string>
+    <string name="n_transfer">%1$d transfer</string>
+    <string name="n_transfers">%1$d transfers</string>
+
+    <!-- Trip / Navigation -->
+    <string name="board_at">Board at %1$s</string>
+    <string name="transfer_at">Transfer at %1$s</string>
+    <string name="get_off_at">Get off at %1$s</string>
+    <string name="step_of_n">Step %1$d of %2$d</string>
+    <string name="exit_navigation">Exit Navigation</string>
+    <string name="approaching_dropoff">Approaching drop-off</string>
+    <string name="at_loading_point">I\'m at the loading point</string>
+    <string name="on_jeepney">I\'m on the jeepney</string>
+    <string name="got_off">I got off</string>
+    <string name="arrived">I\'ve arrived</string>
+    <string name="destination_reached">Destination reached</string>
+    <string name="youve_arrived_at">You\'ve arrived at %1$s</string>
+    <string name="location_notice">Uses your phone\'s location only. Jeepneys are not tracked.</string>
+
+    <!-- Fare -->
+    <string name="fare_estimate">Fare Estimate</string>
+    <string name="regular">Regular</string>
+    <string name="student">Student</string>
+    <string name="senior_citizen">Senior citizen</string>
+    <string name="pwd">PWD</string>
+    <string name="discount_note">20%% discount · valid ID</string>
+    <string name="minimum_fare">Minimum fare first %1$s km</string>
+    <string name="per_km">Each succeeding km</string>
+    <string name="fare_notice">Fares are estimates and may change based on official fare updates.</string>
+
+    <!-- Offline -->
+    <string name="offline_banner">You\'re offline</string>
+    <string name="cant_search_offline">Can\'t search while offline</string>
+    <string name="view_offline_routes">View Offline Routes</string>
+    <string name="retry_connection">Retry Connection</string>
+    <string name="back_online">Back online</string>
+    <string name="viewing_downloaded_copy">Viewing downloaded copy · synced %1$s</string>
+
+    <!-- Reports -->
+    <string name="report_notice">Reports are user-submitted and may require verification before being treated as official information.</string>
+    <string name="report_submitted">Thanks for your report</string>
+    <string name="reference_no">Reference no.: %1$s</string>
+    <string name="report_type_1">Incorrect route information</string>
+    <string name="report_type_2">Incorrect loading point</string>
+    <string name="report_type_3">Incorrect terminal</string>
+    <string name="report_type_4">Route change</string>
+    <string name="report_type_5">Other</string>
+    <string name="description_hint">Describe the issue (10–500 characters)</string>
+    <string name="submit_report">Submit report</string>
+
+    <!-- Saved -->
+    <string name="saved">Saved</string>
+    <string name="stored_on_device">Stored on this device · no account needed</string>
+
+    <!-- More -->
+    <string name="notifications">Notifications</string>
+    <string name="location_settings">Location Settings</string>
+    <string name="language">Language</string>
+    <string name="report_issue">Report an Issue</string>
+    <string name="help_support">Help &amp; Support</string>
+    <string name="about">About OroRuta</string>
+    <string name="privacy">Privacy</string>
+    <string name="terms">Terms &amp; Disclaimer</string>
+    <string name="version">OroRuta 1.0</string>
+
+    <!-- Empty states -->
+    <string name="no_route_found_title">We couldn\'t find a jeepney route matching your destination.</string>
+    <string name="no_route_cdo_only">OroRuta covers jeepney routes within Cagayan de Oro City only.</string>
+    <string name="change_destination">Change Destination</string>
+    <string name="change_start">Change Starting Location</string>
+    <string name="view_nearby">View Nearby Routes</string>
+    <string name="browse_all">Browse All Routes</string>
+
+    <!-- Location -->
+    <string name="allow_location">Allow Location</string>
+    <string name="not_now">Not Now</string>
+    <string name="location_prompt_title">Allow OroRuta to access your location?</string>
+    <string name="gps_disabled">GPS is disabled</string>
+    <string name="enter_location">Enter location</string>
+    <string name="turn_on_location">Turn on location</string>
+
+    <!-- Nearby -->
+    <string name="n_found">%1$d found</string>
+    <string name="nearby_notice">Distances are straight-line estimates.</string>
+    <string name="away">%1$s away · about %2$d min walk</string>
+
+    <!-- Announcements -->
+    <string name="announcements">Transportation Updates</string>
+    <string name="affects">Affects</string>
+    <string name="view_affected_route">View affected route</string>
+    <string name="effective">Effective: %1$s</string>
+</resources>

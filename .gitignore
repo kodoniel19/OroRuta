@@ -1,0 +1,25 @@
+# Android
+.gradle/
+build/
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+local.properties
+*.apk
+*.aab
+
+# Node, Backend & Web
+node_modules/
+backend/node_modules/
+backend/.env
+admin-web/node_modules/
+admin-web/dist/
+admin-web/.env
+*.log
+
+# IDE & OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db

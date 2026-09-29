@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OroRuta</string>
+    <string name="tagline">Imong Giya sa mga Ruta sa Dyip sa Cagayan de Oro</string>
+    <string name="no_account_needed">Walay account nga gikinahanglan</string>
+    <string name="guest_note">Naggamit og OroRuta isip bisita — Walay account nga kinahanglan. Ang gitipigan nga mga ruta ug kasaysayan nagpabilin sa imong device.</string>
+    <string name="nav_home">Balay</string>
+    <string name="nav_routes">Mga Ruta</string>
+    <string name="nav_map">Mapa</string>
+    <string name="nav_saved">Gitipigan</string>
+    <string name="nav_more">Dugang</string>
+    <string name="where_are_you_going">Asa ka padulong?</string>
+    <string name="from_label">Gikan</string>
+    <string name="to_label">Padulong</string>
+    <string name="use_my_location">Gamiton ang Akong Lokasyon</string>
+    <string name="search_route">Pangita og Ruta</string>
+    <string name="fare_notice">Ang mga bayad gibanabana lamang ug mahimong mausab base sa opisyal nga mga update sa bayad.</string>
+    <string name="report_notice">Ang mga report gisumite sa tiggamit ug mahimong kinahanglang i-verify una sa pagtratar niini isip opisyal nga impormasyon.</string>
+    <string name="location_notice">Gigamit lamang ang lokasyon sa imong telepono. Ang mga dyip wala gisubay.</string>
+    <string name="offline_banner">Wala ka sa internet</string>
+    <string name="cant_search_offline">Dili makahimo sa pagpangita samtang offline</string>
+    <string name="view_offline_routes">Tan-awa ang Mga Ruta nga Offline</string>
+    <string name="retry_connection">Sulayi pag-usab ang Koneksyon</string>
+    <string name="google_maps_key">YOUR_GOOGLE_MAPS_API_KEY_HERE</string>
+</resources>

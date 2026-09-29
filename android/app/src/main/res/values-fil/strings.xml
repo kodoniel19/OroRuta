@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OroRuta</string>
+    <string name="tagline">Ang Iyong Gabay sa mga Ruta ng Dyipni sa Cagayan de Oro</string>
+    <string name="no_account_needed">Hindi kailangan ng account</string>
+    <string name="guest_note">Gumagamit ng OroRuta bilang bisita — Hindi kailangan ng account. Ang mga nakalagak na ruta at kasaysayan ay nananatili sa device na ito.</string>
+    <string name="nav_home">Tahanan</string>
+    <string name="nav_routes">Mga Ruta</string>
+    <string name="nav_map">Mapa</string>
+    <string name="nav_saved">Naka-save</string>
+    <string name="nav_more">Higit Pa</string>
+    <string name="where_are_you_going">Saan ka pupunta?</string>
+    <string name="from_label">Mula</string>
+    <string name="to_label">Patungo</string>
+    <string name="use_my_location">Gamitin ang Aking Lokasyon</string>
+    <string name="search_route">Maghanap ng Ruta</string>
+    <string name="fare_notice">Ang mga pamasahe ay mga tinantya lamang at maaaring magbago batay sa mga opisyal na update sa pamasahe.</string>
+    <string name="report_notice">Ang mga ulat ay isinumite ng mga gumagamit at maaaring kailangang ma-verify bago ituring bilang opisyal na impormasyon.</string>
+    <string name="location_notice">Ginagamit lamang ang lokasyon ng iyong telepono. Hindi sinusubaybayan ang mga dyipni.</string>
+    <string name="offline_banner">Offline ka</string>
+    <string name="cant_search_offline">Hindi maka-search habang offline</string>
+    <string name="view_offline_routes">Tingnan ang Mga Offline na Ruta</string>
+    <string name="retry_connection">Subukang Muling Kumonekta</string>
+    <string name="google_maps_key">YOUR_GOOGLE_MAPS_API_KEY_HERE</string>
+</resources>

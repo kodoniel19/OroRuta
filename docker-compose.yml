@@ -1,0 +1,65 @@
+﻿version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: ororuta-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: ororuta
+      MYSQL_USER: ororuta
+      MYSQL_PASSWORD: ororuta
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uororuta", "-pororuta"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: mysql:8.0
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: db
+      MYSQL_USER: ororuta
+      MYSQL_PASSWORD: ororuta
+      MYSQL_DATABASE: ororuta
+    volumes:
+      - ./database:/database:ro
+    entrypoint: >
+      sh -c "mysql -hdb -uororuta -pororuta ororuta < /database/schema.sql &&
+             mysql -hdb -uororuta -pororuta ororuta < /database/seed.sql &&
+             echo 'Migration complete'"
+    profiles: ["migrate"]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ororuta-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: ororuta
+      DB_PASS: ororuta
+      DB_NAME: ororuta
+      ADMIN_API_KEY: change-me-in-production
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
