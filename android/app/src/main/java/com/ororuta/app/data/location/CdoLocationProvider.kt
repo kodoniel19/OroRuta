@@ -130,21 +130,16 @@ class CdoLocationProvider @Inject constructor(
                 null
             }
 
-            if (location != null) {
+            if (location != null && !(location.latitude == 0.0 && location.longitude == 0.0)) {
                 val lat = location.latitude
                 val lng = location.longitude
                 val inCdo = isWithinCdo(lat, lng)
 
-                val name = if (inCdo) {
-                    reverseGeocode(lat, lng)
-                } else {
-                    // Commuters outside CDO (or emulator default) are routed from CDO downtown
-                    findClosestCdoLandmark(CDO_DEFAULT_LAT, CDO_DEFAULT_LNG)
-                }
+                val name = reverseGeocode(lat, lng)
 
                 UserLocationInfo(
-                    latitude = if (inCdo) lat else CDO_DEFAULT_LAT,
-                    longitude = if (inCdo) lng else CDO_DEFAULT_LNG,
+                    latitude = lat,
+                    longitude = lng,
                     displayName = name,
                     isCagayanDeOro = inCdo
                 )

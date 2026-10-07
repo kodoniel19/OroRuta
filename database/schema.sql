@@ -48,21 +48,44 @@ CREATE TABLE IF NOT EXISTS places (
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS routes (
   id              CHAR(36)         PRIMARY KEY,
-  code            VARCHAR(10)      NOT NULL UNIQUE,
+  code            VARCHAR(10)      NOT NULL,
   name            VARCHAR(120)     NOT NULL,
   origin          VARCHAR(120)     NOT NULL,
   destination     VARCHAR(120)     NOT NULL,
   jeepney_type    ENUM('Traditional','Modern') NOT NULL DEFAULT 'Traditional',
-  direction       VARCHAR(200)     NULL,
   description     TEXT             NULL,
-  length_km       DECIMAL(5,2)     NOT NULL DEFAULT 0,
-  status          ENUM('Active','Rerouted','Updated','Temporary') NOT NULL DEFAULT 'Active',
+  inbound_distance_km DECIMAL(5,2) NOT NULL DEFAULT 0,
+  outbound_distance_km DECIMAL(5,2) NOT NULL DEFAULT 0,
+  status          ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+  verification_status ENUM('DRAFT', 'PENDING_VERIFICATION', 'VERIFIED', 'PUBLISHED', 'DATA_REVIEW_REQUIRED', 'ERROR') NOT NULL DEFAULT 'DRAFT',
   color           VARCHAR(9)       NOT NULL DEFAULT '#1471B0',
   offline_size_mb DECIMAL(5,2)     NOT NULL DEFAULT 0.5,
   last_updated_at DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_routes_code (code),
   INDEX idx_routes_status (status),
+  INDEX idx_routes_verification (verification_status),
   INDEX idx_routes_type (jeepney_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS route_directions (
+  id CHAR(36) PRIMARY KEY,
+  route_id CHAR(36) NOT NULL,
+  direction ENUM('Inbound', 'Outbound') NOT NULL,
+  distance_km DECIMAL(5,2) NOT NULL DEFAULT 0,
+  street_sequence TEXT NOT NULL,
+  FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_route_dir (route_id, direction)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS route_geometry (
+  id CHAR(36) PRIMARY KEY,
+  route_id CHAR(36) NOT NULL,
+  direction ENUM('Inbound', 'Outbound') NOT NULL,
+  geometry JSON NOT NULL,
+  geometry_status ENUM('PENDING', 'GENERATED', 'VERIFIED', 'ERROR') NOT NULL DEFAULT 'PENDING',
+  generated_at DATETIME NULL,
+  FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_route_geom_dir (route_id, direction)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS route_path_points (

@@ -25,30 +25,29 @@ interface RouteFormModalProps {
 type FormState = {
   id: string;
   name: string;
-  direction: Direction;
   origin: string;
   destination: string;
   majorRoads: string;
   description: string;
-  fare: string;
-  travelTime: string;
+  inboundDistanceKm: string;
+  outboundDistanceKm: string;
   status: RecordStatus;
 };
 type Errors = Partial<Record<keyof FormState, string>>;
 
-const DIRECTIONS: Direction[] = ['Northbound', 'Southbound', 'Eastbound', 'Westbound', 'Loop'];
-
 function toForm(route: JeepneyRoute | null, routes: JeepneyRoute[]): FormState {
   if (route) {
     return {
-      id: route.id, name: route.name, direction: route.direction, origin: route.origin, destination: route.destination,
-      majorRoads: route.majorRoads.join(', '), description: route.description, fare: String(route.fare),
-      travelTime: String(route.travelTime), status: route.status,
+      id: route.id, name: route.name, origin: route.origin, destination: route.destination,
+      majorRoads: (route.majorRoads || []).join(', '),
+      description: route.description, inboundDistanceKm: String(route.inboundDistanceKm || 5),
+      outboundDistanceKm: String(route.outboundDistanceKm || 5), status: route.status,
     };
   }
   return {
-    id: nextId('R', routes.map((r) => r.id)), name: '', direction: 'Eastbound', origin: '', destination: '',
-    majorRoads: '', description: '', fare: '13', travelTime: '', status: 'Active',
+    id: nextId('R', routes.map((r) => r.id)), name: '', origin: '', destination: '',
+    majorRoads: '',
+    description: '', inboundDistanceKm: '5', outboundDistanceKm: '5', status: 'Active',
   };
 }
 
@@ -85,12 +84,12 @@ export function RouteFormModal({ open, onClose, initial, routes, onSave }: Route
     if (!form.origin.trim()) e.origin = 'Enter the origin';
     if (!form.destination.trim()) e.destination = 'Enter the destination';
     else if (form.destination.trim().toLowerCase() === form.origin.trim().toLowerCase()) e.destination = 'Destination must differ from origin';
-    if (roads.length === 0) e.majorRoads = 'Add at least one major road';
     if (form.description.trim().length < 20) e.description = 'Describe the route in at least 20 characters';
-    const fare = Number(form.fare);
-    if (!form.fare || Number.isNaN(fare) || fare <= 0 || fare > 200) e.fare = 'Enter a fare between ₱1 and ₱200';
-    const time = Number(form.travelTime);
-    if (!form.travelTime || !Number.isInteger(time) || time <= 0 || time > 240) e.travelTime = 'Enter minutes between 1 and 240';
+    
+    const ink = Number(form.inboundDistanceKm);
+    if (!form.inboundDistanceKm || Number.isNaN(ink) || ink <= 0) e.inboundDistanceKm = 'Enter a valid inbound distance';
+    const outk = Number(form.outboundDistanceKm);
+    if (!form.outboundDistanceKm || Number.isNaN(outk) || outk <= 0) e.outboundDistanceKm = 'Enter a valid outbound distance';
     return e;
   };
 
@@ -98,20 +97,23 @@ export function RouteFormModal({ open, onClose, initial, routes, onSave }: Route
 
   const buildRoute = (path: LatLng[]): JeepneyRoute => ({
     id: form.id.trim().toUpperCase(),
+    code: form.id.trim().toUpperCase(),
     name: form.name.trim(),
-    direction: form.direction,
     origin: form.origin.trim(),
     destination: form.destination.trim(),
-    majorRoads: roads,
+    majorRoads: [],
     description: form.description.trim(),
-    fare: Number(form.fare),
-    travelTime: Number(form.travelTime),
+    inboundDistanceKm: Number(form.inboundDistanceKm),
+    outboundDistanceKm: Number(form.outboundDistanceKm),
+    verificationStatus: 'DRAFT',
+    fare: 15,
+    travelTime: 30,
     status: form.status,
     lastUpdated: nowIso(),
     color: routeColor,
     path,
     coordinates: toCoordinates(path),
-  });
+  } as JeepneyRoute);
 
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -187,10 +189,13 @@ export function RouteFormModal({ open, onClose, initial, routes, onSave }: Route
             <input id="rf-name" value={form.name} onChange={e => set('name', e.target.value)}
               placeholder="Agora – Bulua" className={err('name')} />
           </Field>
-          <Field label="Direction" htmlFor="rf-dir">
-            <Select id="rf-dir" value={form.direction} onChange={e => set('direction', e.target.value as Direction)}>
-              {DIRECTIONS.map(d => <option key={d}>{d}</option>)}
-            </Select>
+          <Field label="Inbound Distance (km)" htmlFor="rf-inbound" required error={errors.inboundDistanceKm}>
+            <input id="rf-inbound" type="number" step="0.1" value={form.inboundDistanceKm} onChange={e => set('inboundDistanceKm', e.target.value)}
+              placeholder="5.0" className={err('inboundDistanceKm')} />
+          </Field>
+          <Field label="Outbound Distance (km)" htmlFor="rf-outbound" required error={errors.outboundDistanceKm}>
+            <input id="rf-outbound" type="number" step="0.1" value={form.outboundDistanceKm} onChange={e => set('outboundDistanceKm', e.target.value)}
+              placeholder="5.0" className={err('outboundDistanceKm')} />
           </Field>
           <Field label="Status" htmlFor="rf-status">
             <Select id="rf-status" value={form.status} onChange={e => set('status', e.target.value as RecordStatus)}>
@@ -206,22 +211,10 @@ export function RouteFormModal({ open, onClose, initial, routes, onSave }: Route
             <input id="rf-dest" value={form.destination} onChange={e => set('destination', e.target.value)}
               placeholder="Bulua" className={err('destination')} />
           </Field>
-          <Field label="Major roads (comma-separated)" htmlFor="rf-roads" required error={errors.majorRoads} className="col-span-2">
-            <input id="rf-roads" value={form.majorRoads} onChange={e => set('majorRoads', e.target.value)}
-              placeholder="C.M. Recto Ave, Corrales Ave, Hayes St" className={err('majorRoads')} />
-          </Field>
           <Field label="Description" htmlFor="rf-desc" required error={errors.description} className="col-span-2">
             <textarea id="rf-desc" rows={3} value={form.description} onChange={e => set('description', e.target.value)}
               placeholder="Brief description of the route coverage and key landmarks."
               className={cn(inputClass, 'h-auto resize-none py-2.5', errors.description && errorInputClass)} />
-          </Field>
-          <Field label="Base fare (₱)" htmlFor="rf-fare" required error={errors.fare}>
-            <input id="rf-fare" type="number" step="0.50" min="1" value={form.fare}
-              onChange={e => set('fare', e.target.value)} className={cn(err('fare'), 'tabular-nums')} />
-          </Field>
-          <Field label="Travel time (minutes)" htmlFor="rf-time" required error={errors.travelTime}>
-            <input id="rf-time" type="number" min="1" value={form.travelTime}
-              onChange={e => set('travelTime', e.target.value)} className={cn(err('travelTime'), 'tabular-nums')} />
           </Field>
         </form>
       </Modal>

@@ -14,9 +14,17 @@ import javax.inject.Singleton
 
 @Singleton
 class TripRepository @Inject constructor(private val api: OroRutaApi) {
-    suspend fun searchTrips(from: String, to: String, fromLat: Double? = null, fromLng: Double? = null, sort: String = "time"): Resource<List<TripOption>> {
+    suspend fun searchTrips(
+        from: String,
+        to: String,
+        fromLat: Double? = null,
+        fromLng: Double? = null,
+        toLat: Double? = null,
+        toLng: Double? = null,
+        sort: String = "time"
+    ): Resource<List<TripOption>> {
         return try {
-            val results = api.searchTrips(from, to, fromLat, fromLng, sort)
+            val results = api.searchTrips(from, to, fromLat, fromLng, toLat, toLng, sort)
             Resource.Success(results)
         } catch (e: IOException) {
             Resource.Error("You're offline. Cannot search for routes.", isOffline = true)
@@ -74,11 +82,36 @@ class AnnouncementRepository @Inject constructor(
 class HistoryRepository @Inject constructor(
     private val api: OroRutaApi, private val dao: HistoryDao
 ) {
-    fun getHistory(): Flow<List<LocalHistory>> = dao.getAll()
+    fun getHistory(): Flow<List<LocalHistory>> = dao.getAll().map { list ->
+        // Deduplicate in-memory by normalized (from, to) to guarantee zero UI duplicates
+        val seen = mutableSetOf<String>()
+        val result = mutableListOf<LocalHistory>()
+        for (item in list) {
+            val key = "${item.from.trim().lowercase()}->${item.to.trim().lowercase()}"
+            if (seen.add(key)) {
+                result.add(item)
+            }
+        }
+        result.take(10)
+    }
 
     suspend fun add(from: String, to: String) {
-        try { api.addHistory(mapOf("from" to from, "to" to to)) } catch (_: Exception) {}
-        dao.insert(LocalHistory(UUID.randomUUID().toString(), from, to))
+        val cleanFrom = from.trim()
+        val cleanTo = to.trim()
+        if (cleanFrom.isBlank() || cleanTo.isBlank()) return
+
+        try { api.addHistory(mapOf("from" to cleanFrom, "to" to cleanTo)) } catch (_: Exception) {}
+
+        val existing = dao.findExact(cleanFrom, cleanTo)
+        if (existing != null) {
+            val now = System.currentTimeMillis()
+            dao.updateTimestamp(existing.id, now)
+            dao.deleteDuplicates(cleanFrom, cleanTo, existing.id)
+        } else {
+            val deterministicId = UUID.nameUUIDFromBytes("${cleanFrom.lowercase()}->${cleanTo.lowercase()}".toByteArray()).toString()
+            dao.insert(LocalHistory(deterministicId, cleanFrom, cleanTo, System.currentTimeMillis()))
+        }
+        dao.pruneOld(10)
     }
 
     suspend fun delete(id: String) {

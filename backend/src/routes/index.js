@@ -33,9 +33,10 @@ router.get("/routes", routes.list);
 router.get("/routes/:id", routes.getById);
 router.get("/routes/:id/offline-bundle", routes.getOfflineBundle);
 
-// Trips
+// Trips & Route Recommendations
 router.get("/trips/search", trips.search);
 router.get("/trips/:id", trips.getOption);
+router.post("/route-recommendations", trips.routeRecommendations);
 router.post("/trips/completed", requireDeviceId, trips.recordCompleted);
 
 // Fares
@@ -89,6 +90,10 @@ router.get("/admin/routes", requireAdmin, admin.getRoutes);
 router.post("/admin/routes", requireAdmin, admin.createRoute);
 router.put("/admin/routes/:id", requireAdmin, admin.updateRoute);
 router.delete("/admin/routes/:id", requireAdmin, admin.deleteRoute);
+router.get("/admin/routes/:id/directions", requireAdmin, admin.getRouteDirections);
+router.post("/admin/routes/:id/directions", requireAdmin, admin.saveRouteDirections);
+router.post("/admin/routes/:id/generate-geometry", requireAdmin, admin.generateGeometry);
+router.post("/admin/routes/:id/verify", requireAdmin, admin.verifyRoute);
 
 // Admin Locations CRUD
 router.get("/admin/locations", requireAdmin, admin.getLocations);
@@ -117,4 +122,14 @@ router.delete("/admin/reports/:id", requireAdmin, admin.deleteReport);
 router.get("/admin/activity", requireAdmin, admin.getActivity);
 router.post("/admin/activity", requireAdmin, admin.logActivity);
 
+// Admin Location Verification System
+router.get("/admin/verification/locations", requireAdmin, admin.getVerificationLocations);
+router.post("/admin/verification/locations", requireAdmin, admin.createVerificationLocation);
+router.post("/admin/verification/locations/geocode", requireAdmin, admin.geocodeLocation);
+router.put("/admin/verification/locations/:id/verify", requireAdmin, admin.verifyLocation);
+router.delete("/admin/verification/locations/:id", requireAdmin, admin.deleteVerificationLocation);
+router.post("/admin/verification/locations/bulk-validate", requireAdmin, admin.bulkValidateLocations);
+router.post("/admin/verification/locations/extract-from-routes", requireAdmin, admin.extractRouteLocations);
+
 module.exports = router;
+

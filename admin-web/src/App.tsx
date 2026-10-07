@@ -13,6 +13,7 @@ import { ResetPassword } from './pages/auth/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { JeepneyRoutes } from './pages/JeepneyRoutes';
 import { Locations } from './pages/Locations';
+import { LocationVerification } from './pages/LocationVerification';
 import { RouteMaps } from './pages/RouteMaps';
 import { Fares } from './pages/Fares';
 import { Announcements } from './pages/Announcements';
@@ -36,6 +37,7 @@ export function App() {
               <Route element={<RequireAuth><AdminLayout /></RequireAuth>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/routes" element={<JeepneyRoutes />} />
+                <Route path="/verification" element={<LocationVerification />} />
                 <Route path="/terminals" element={<Locations key="terminal" kind="terminal" />} />
                 <Route path="/loading-points" element={<Locations key="loading" kind="loading" />} />
                 <Route path="/unloading-points" element={<Locations key="unloading" kind="unloading" />} />

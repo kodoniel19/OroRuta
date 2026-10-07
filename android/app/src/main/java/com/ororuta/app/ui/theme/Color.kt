@@ -19,6 +19,7 @@ val Brand900 = Color(0xFF062C45)
 val Oro100 = Color(0xFFFFF4D1)
 val Oro400 = Color(0xFFF7C23A)
 val Oro500 = Color(0xFFF2A900)
+val Oro600 = Color(0xFFC88A00)
 val Oro700 = Color(0xFF8A5F00)
 
 val Ok50 = Color(0xFFE8F6EE)

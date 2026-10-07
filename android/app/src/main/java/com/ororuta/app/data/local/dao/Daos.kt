@@ -9,11 +9,25 @@ interface RouteDao {
     @Query("SELECT * FROM cached_routes ORDER BY code")
     fun getAll(): Flow<List<CachedRoute>>
 
+    @Query("SELECT * FROM cached_routes ORDER BY code")
+    suspend fun getAllSync(): List<CachedRoute>
+
     @Query("SELECT * FROM cached_routes WHERE id = :id")
     suspend fun getById(id: String): CachedRoute?
 
     @Query("SELECT * FROM cached_routes WHERE isOfflineDownload = 1")
     fun getOfflineRoutes(): Flow<List<CachedRoute>>
+
+    @Query("""
+        SELECT * FROM cached_routes 
+        WHERE code LIKE '%' || :q || '%' 
+           OR name LIKE '%' || :q || '%' 
+           OR origin LIKE '%' || :q || '%' 
+           OR destination LIKE '%' || :q || '%'
+           OR jsonData LIKE '%' || :q || '%'
+        ORDER BY code
+    """)
+    suspend fun search(q: String): List<CachedRoute>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(routes: List<CachedRoute>)
@@ -60,8 +74,17 @@ interface PendingReportDao {
 
 @Dao
 interface HistoryDao {
-    @Query("SELECT * FROM local_history ORDER BY createdAt DESC LIMIT 50")
+    @Query("SELECT * FROM local_history ORDER BY createdAt DESC LIMIT 10")
     fun getAll(): Flow<List<LocalHistory>>
+
+    @Query("SELECT * FROM local_history ORDER BY createdAt DESC LIMIT 10")
+    suspend fun getAllSync(): List<LocalHistory>
+
+    @Query("SELECT * FROM local_history WHERE LOWER(TRIM(`from`)) = LOWER(TRIM(:from)) AND LOWER(TRIM(`to`)) = LOWER(TRIM(:to)) ORDER BY createdAt DESC LIMIT 1")
+    suspend fun findExact(from: String, to: String): LocalHistory?
+
+    @Query("UPDATE local_history SET createdAt = :timestamp WHERE id = :id")
+    suspend fun updateTimestamp(id: String, timestamp: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: LocalHistory)
@@ -69,8 +92,14 @@ interface HistoryDao {
     @Query("DELETE FROM local_history WHERE id = :id")
     suspend fun delete(id: String)
 
+    @Query("DELETE FROM local_history WHERE LOWER(TRIM(`from`)) = LOWER(TRIM(:from)) AND LOWER(TRIM(`to`)) = LOWER(TRIM(:to)) AND id != :keepId")
+    suspend fun deleteDuplicates(from: String, to: String, keepId: String)
+
     @Query("DELETE FROM local_history")
     suspend fun clearAll()
+
+    @Query("DELETE FROM local_history WHERE id NOT IN (SELECT id FROM local_history ORDER BY createdAt DESC LIMIT :limit)")
+    suspend fun pruneOld(limit: Int = 10)
 }
 
 @Dao

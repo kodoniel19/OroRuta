@@ -97,7 +97,7 @@ fun SearchHistoryScreen(
                         }
                     }
 
-                    items(historyList) { item ->
+                    items(historyList, key = { it.id }) { item ->
                         Surface(
                             onClick = { onRepeatSearch(item.from, item.to) },
                             color = Color.White,

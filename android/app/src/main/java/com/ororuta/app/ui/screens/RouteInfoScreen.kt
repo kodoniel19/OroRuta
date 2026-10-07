@@ -2,6 +2,7 @@ package com.ororuta.app.ui.screens
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -22,8 +23,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
+import com.google.maps.android.compose.*
 import com.ororuta.app.domain.models.Resource
 import com.ororuta.app.domain.models.Route
+import com.ororuta.app.domain.models.RouteDirection
 import com.ororuta.app.ui.components.*
 import com.ororuta.app.ui.theme.*
 import com.ororuta.app.ui.viewmodels.RouteInfoViewModel
@@ -133,20 +141,21 @@ fun RouteInfoScreen(
 
                 is Resource.Success -> {
                     val route = state.data
+                    var selectedDirection by remember { mutableStateOf("Inbound") }
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
                     ) {
-                        // 230dp Map Preview
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(230.dp)
-                                .clickable { onViewOnMap(route.id) }
-                        ) {
-                            CdoCanvasMap(showControls = false, modifier = Modifier.fillMaxSize())
-                        }
+                        // Verified Route Map Preview with Inbound / Outbound Switcher
+                        RouteMapPreview(
+                            route = route,
+                            selectedDirection = selectedDirection,
+                            onDirectionChange = { selectedDirection = it },
+                            onClick = { onViewOnMap(route.id) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
                         // Info section
                         Surface(color = Color.White, modifier = Modifier.fillMaxWidth()) {
@@ -357,6 +366,154 @@ fun RouteInfoScreen(
                         }
 
                         Spacer(modifier = Modifier.height(32.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RouteMapPreview(
+    route: Route,
+    selectedDirection: String,
+    onDirectionChange: (String) -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val pts = remember(route, selectedDirection) {
+        parseGeometries(route, selectedDirection)
+    }
+
+    val routeColor = remember(route.color) {
+        try {
+            Color(android.graphics.Color.parseColor(route.color))
+        } catch (_: Exception) {
+            Brand600
+        }
+    }
+
+    val cameraPositionState = rememberCameraPositionState()
+
+    // Fit camera to the verified route bounds when points are loaded
+    LaunchedEffect(pts) {
+        if (pts.size >= 2) {
+            val builder = LatLngBounds.builder()
+            pts.forEach { builder.include(it) }
+            val bounds = builder.build()
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngBounds(bounds, 64),
+                500
+            )
+        } else if (pts.size == 1) {
+            cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(pts[0], 14f))
+        } else {
+            cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(LatLng(8.4822, 124.6472), 13.5f))
+        }
+    }
+
+    Column(modifier = modifier) {
+        // Map Viewport
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(230.dp)
+        ) {
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState,
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = false,
+                    compassEnabled = false,
+                    myLocationButtonEnabled = false,
+                    mapToolbarEnabled = false,
+                    scrollGesturesEnabled = true,
+                    zoomGesturesEnabled = true,
+                    tiltGesturesEnabled = false,
+                    rotationGesturesEnabled = false
+                ),
+                onMapClick = { onClick() }
+            ) {
+                if (pts.size >= 2) {
+                    Polyline(
+                        points = pts,
+                        color = routeColor,
+                        width = 14f
+                    )
+                    // Origin Pin (Azure)
+                    Marker(
+                        state = rememberMarkerState(position = pts.first()),
+                        title = "Origin: ${route.origin}",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                    )
+                    // Destination Pin (Red)
+                    Marker(
+                        state = rememberMarkerState(position = pts.last()),
+                        title = "Destination: ${route.destination}",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
+                    )
+                }
+            }
+
+            // Expand Map pill button
+            Surface(
+                color = Color.Black.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .clickable { onClick() }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.Fullscreen, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    Text("View on Map", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        // Inbound / Outbound Direction Switcher Tabs
+        val directions = if (route.directions.isNotEmpty()) {
+            route.directions
+        } else {
+            listOf(
+                RouteDirection("1", route.id, "Inbound", route.inboundDistanceKm, ""),
+                RouteDirection("2", route.id, "Outbound", route.outboundDistanceKm, "")
+            )
+        }
+
+        Surface(color = Color.White, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                directions.forEach { dir ->
+                    val isSelected = dir.direction.equals(selectedDirection, ignoreCase = true)
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isSelected) Brand600 else Canvas,
+                        border = BorderStroke(1.dp, if (isSelected) Brand600 else Line),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onDirectionChange(dir.direction) }
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "${dir.direction} (${dir.distanceKm} km)",
+                                color = if (isSelected) Color.White else Ink,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }

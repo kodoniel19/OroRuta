@@ -19,18 +19,50 @@ class RouteRepository @Inject constructor(
     private val dao: RouteDao,
     private val json: Json
 ) {
+    /**
+     * Fetches routes from the API. On success, caches them locally.
+     * On IOException (offline), loads most recent cached routes and returns them.
+     * The Resource wrapper carries an isOffline flag so the UI can distinguish.
+     */
     fun getRoutes(q: String = "", type: String = "", hasUpdates: Boolean = false): Flow<Resource<List<Route>>> = flow {
         emit(Resource.Loading)
         try {
             val remote = api.getRoutes(q, type, if (hasUpdates) "true" else "")
-            // Cache
+            // Cache all routes
             dao.insertAll(remote.map { it.toCached() })
             emit(Resource.Success(remote))
         } catch (e: IOException) {
-            val cached = dao.getAll()
-            emit(Resource.Error("You're offline. Showing cached routes.", isOffline = true))
+            // Offline: load cached routes and filter locally
+            val cached = if (q.isNotBlank()) {
+                dao.search(q)
+            } else {
+                dao.getAllSync()
+            }
+            if (cached.isNotEmpty()) {
+                val routes = cached.mapNotNull { safeDecode(it) }
+                    .let { list ->
+                        var filtered = list
+                        if (type.isNotBlank()) {
+                            filtered = filtered.filter { it.jeepneyType == type }
+                        }
+                        if (hasUpdates) {
+                            filtered = filtered.filter { it.status != "Active" }
+                        }
+                        filtered
+                    }
+                emit(Resource.Success(routes, isOffline = true))
+            } else {
+                emit(Resource.Error("You're offline and no cached routes are available.", isOffline = true))
+            }
         } catch (e: Exception) {
-            emit(Resource.Error(e.message ?: "Unknown error"))
+            // Try cache as fallback for any error
+            val cached = dao.getAllSync()
+            if (cached.isNotEmpty()) {
+                val routes = cached.mapNotNull { safeDecode(it) }
+                emit(Resource.Success(routes, isOffline = true))
+            } else {
+                emit(Resource.Error(e.message ?: "Unknown error"))
+            }
         }
     }
 
@@ -42,13 +74,27 @@ class RouteRepository @Inject constructor(
         } catch (e: IOException) {
             val cached = dao.getById(id)
             if (cached != null) {
-                val route = json.decodeFromString<Route>(cached.jsonData)
-                Resource.Success(route)
+                val route = safeDecode(cached)
+                if (route != null) {
+                    Resource.Success(route)
+                } else {
+                    Resource.Error("Route data is corrupted in cache.", isOffline = true)
+                }
             } else {
                 Resource.Error("Route not available offline.", isOffline = true)
             }
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Unknown error")
+            val cached = dao.getById(id)
+            if (cached != null) {
+                val route = safeDecode(cached)
+                if (route != null) {
+                    Resource.Success(route)
+                } else {
+                    Resource.Error(e.message ?: "Unknown error")
+                }
+            } else {
+                Resource.Error(e.message ?: "Unknown error")
+            }
         }
     }
 
@@ -69,6 +115,21 @@ class RouteRepository @Inject constructor(
     }
 
     suspend fun removeOffline(routeId: String) = dao.removeOffline(routeId)
+
+    /**
+     * Get all cached routes (for MapScreen to show route polylines even offline).
+     */
+    suspend fun getCachedRoutes(): List<Route> {
+        return dao.getAllSync().mapNotNull { safeDecode(it) }
+    }
+
+    private fun safeDecode(cached: CachedRoute): Route? {
+        return try {
+            json.decodeFromString<Route>(cached.jsonData)
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     private fun Route.toCached() = CachedRoute(
         id = id, code = code, name = name, origin = origin, destination = destination,

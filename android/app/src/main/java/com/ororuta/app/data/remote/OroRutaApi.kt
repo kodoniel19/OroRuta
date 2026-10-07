@@ -40,6 +40,8 @@ interface OroRutaApi {
         @Query("to") to: String,
         @Query("fromLat") fromLat: Double? = null,
         @Query("fromLng") fromLng: Double? = null,
+        @Query("toLat") toLat: Double? = null,
+        @Query("toLng") toLng: Double? = null,
         @Query("sort") sort: String = "time"
     ): List<TripOption>
 

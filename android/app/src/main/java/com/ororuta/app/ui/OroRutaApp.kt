@@ -56,7 +56,7 @@ fun OroRutaApp() {
         val currentRoute = currentDestination?.route ?: ""
         currentRoute == "home" ||
                 currentRoute == "routes" ||
-                currentRoute == "map" ||
+                currentRoute.startsWith("map") ||
                 currentRoute == "saved" ||
                 currentRoute == "more"
     }
@@ -78,7 +78,8 @@ fun OroRutaApp() {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         bottomTabs.forEach { tab ->
-                            val isSelected = currentDestination?.route == tab.route
+                            val currentRouteStr = currentDestination?.route ?: ""
+                            val isSelected = currentRouteStr == tab.route || (tab.route == "map" && currentRouteStr.startsWith("map"))
 
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -181,9 +182,28 @@ fun OroRutaApp() {
             }
 
             // 3. Map tab
-            composable("map") {
+            composable(
+                "map?placeId={placeId}&placeName={placeName}&lat={lat}&lng={lng}&kind={kind}",
+                arguments = listOf(
+                    navArgument("placeId") { defaultValue = "" },
+                    navArgument("placeName") { defaultValue = "" },
+                    navArgument("lat") { defaultValue = "0.0" },
+                    navArgument("lng") { defaultValue = "0.0" },
+                    navArgument("kind") { defaultValue = "landmark" }
+                )
+            ) { backStack ->
+                val placeId = backStack.arguments?.getString("placeId")?.ifBlank { null }
+                val placeName = backStack.arguments?.getString("placeName")?.ifBlank { null }
+                val lat = backStack.arguments?.getString("lat")?.toDoubleOrNull()
+                val lng = backStack.arguments?.getString("lng")?.toDoubleOrNull()
+                val kind = backStack.arguments?.getString("kind")?.ifBlank { null }
                 MapScreen(
                     isPushed = false,
+                    initialPlaceId = placeId,
+                    initialPlaceName = placeName,
+                    initialLat = lat,
+                    initialLng = lng,
+                    initialKind = kind,
                     onSearchClick = { navController.navigate("search") },
                     onNavigateRouteInfo = { routeId -> navController.navigate("route_info/$routeId") },
                     onStartNavigation = { optId -> navController.navigate("navigation/$optId") }
@@ -238,6 +258,9 @@ fun OroRutaApp() {
                     onBack = { navController.popBackStack() },
                     onSearchSubmit = { from, to ->
                         navController.navigate("results?from=$from&to=$to&sort=time")
+                    },
+                    onViewPlaceOnMap = { place ->
+                        navController.navigate("map?placeId=${place.id}&placeName=${place.name}&lat=${place.lat}&lng=${place.lng}&kind=${place.kind}")
                     }
                 )
             }
@@ -424,11 +447,11 @@ fun OroRutaApp() {
                 val homeVm = hiltViewModel<HomeViewModel>()
                 val uiState by homeVm.uiState.collectAsState()
                 SearchHistoryScreen(
-                    historyList = uiState.recentSearches,
+                    historyList = if (uiState.allHistory.isNotEmpty()) uiState.allHistory else uiState.recentSearches,
                     onBack = { navController.popBackStack() },
                     onRepeatSearch = { f, t -> navController.navigate("results?from=$f&to=$t") },
-                    onDeleteItem = {},
-                    onClearAll = {}
+                    onDeleteItem = { id -> homeVm.deleteHistory(id) },
+                    onClearAll = { homeVm.clearHistory() }
                 )
             }
 

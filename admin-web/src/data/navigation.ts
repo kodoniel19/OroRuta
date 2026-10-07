@@ -6,6 +6,7 @@ import {
   MapPinMinusIcon,
   ArrowLeftRightIcon,
   MapIcon,
+  ShieldCheckIcon,
   BanknoteIcon,
   MegaphoneIcon,
   MessageSquareWarningIcon,
@@ -23,6 +24,7 @@ export const navigation = [
     group: 'Network',
     items: [
       { label: 'Jeepney Routes', to: '/routes', icon: RouteIcon },
+      { label: 'Location Verification', to: '/verification', icon: ShieldCheckIcon },
       { label: 'Terminals', to: '/terminals', icon: BusFrontIcon },
       { label: 'Loading Points', to: '/loading-points', icon: MapPinPlusIcon },
       { label: 'Unloading Points', to: '/unloading-points', icon: MapPinMinusIcon },

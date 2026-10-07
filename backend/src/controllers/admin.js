@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { uuidv4 } = require('../utils');
+const { geocode, geocodeWithDetails, getRouteGeometry } = require('../utils/routing');
 
 // ─────────────────────────────────────────────
 // AUTH
@@ -68,13 +69,33 @@ async function getRoutes(req, res, next) {
     const [routes] = await db.execute('SELECT * FROM routes ORDER BY code');
 
     for (const r of routes) {
-      // Path points ordered by sequence
-      const [pts] = await db.execute(
-        'SELECT lat, lng, seq FROM route_path_points WHERE route_id = ? ORDER BY seq',
-        [r.id]
+      // Directions (inbound/outbound street sequences)
+      const [directions] = await db.execute(
+        'SELECT * FROM route_directions WHERE route_id = ?', [r.id]
       );
-      r.path = pts.map((p) => [parseFloat(p.lat), parseFloat(p.lng)]);
-      r.coordinates = pts.map((p) => ({ latitude: parseFloat(p.lat), longitude: parseFloat(p.lng) }));
+      r.directions = directions;
+
+      // Geometries
+      const [geometries] = await db.execute(
+        'SELECT * FROM route_geometry WHERE route_id = ?', [r.id]
+      );
+      r.geometries = geometries;
+
+      // Construct path from geometry for map rendering
+      r.path = [];
+      if (geometries && geometries.length > 0) {
+        const inbound = geometries.find(g => g.direction === 'Inbound');
+        if (inbound && inbound.geometry) {
+          try {
+            const geom = JSON.parse(inbound.geometry);
+            if (geom.coordinates) {
+              r.path = geom.coordinates.map((c, i) => [c[1], c[0]]);
+              r.coordinates = geom.coordinates.map(c => ({ latitude: c[1], longitude: c[0] }));
+            }
+          } catch (e) {}
+        }
+      }
+      if (!r.coordinates) r.coordinates = [];
 
       // Major roads
       const [roads] = await db.execute(
@@ -85,9 +106,10 @@ async function getRoutes(req, res, next) {
       );
       r.majorRoads = roads.map((road) => road.name);
 
-      // Estimate fare & travel time for UI format
+      // Estimate fare & travel time
+      const km = Math.max(parseFloat(r.inbound_distance_km) || 0, parseFloat(r.outbound_distance_km) || 0);
       r.fare = r.jeepney_type === 'Modern' ? 15 : 13;
-      r.travelTime = Math.round((parseFloat(r.length_km) || 5) * 3.5);
+      r.travelTime = Math.round((km || 5) * 3.5);
       r.lastUpdated = r.last_updated_at;
     }
 
@@ -106,29 +128,17 @@ async function createRoute(req, res, next) {
     const origin = body.origin || '';
     const destination = body.destination || '';
     const jeepney_type = body.vehicleType?.includes('Modern') || body.jeepney_type === 'Modern' ? 'Modern' : 'Traditional';
-    const direction = body.direction || 'Northbound';
     const description = body.description || '';
-    const length_km = parseFloat(body.length_km || body.lengthKm || 5.0);
-    const status = body.status === 'Inactive' ? 'Temporary' : (body.status || 'Active');
+    const inbound_distance_km = parseFloat(body.inboundDistanceKm || 5.0);
+    const outbound_distance_km = parseFloat(body.outboundDistanceKm || 5.0);
+    const status = body.status === 'Inactive' ? 'Inactive' : (body.status || 'Active');
     const color = body.color || '#1471B0';
 
     await db.execute(
-      `INSERT INTO routes (id, code, name, origin, destination, jeepney_type, direction, description, length_km, status, color, last_updated_at)
+      `INSERT INTO routes (id, code, name, origin, destination, jeepney_type, description, inbound_distance_km, outbound_distance_km, status, color, last_updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [id, code, name, origin, destination, jeepney_type, direction, description, length_km, status, color]
+      [id, code, name, origin, destination, jeepney_type, description, inbound_distance_km, outbound_distance_km, status, color]
     );
-
-    // Save path points if provided
-    const path = body.path || (body.coordinates ? body.coordinates.map((c) => [c.latitude, c.longitude]) : []);
-    if (Array.isArray(path) && path.length > 0) {
-      for (let i = 0; i < path.length; i++) {
-        const [lat, lng] = path[i];
-        await db.execute(
-          'INSERT INTO route_path_points (route_id, seq, map_x, map_y, lat, lng) VALUES (?, ?, 0, 0, ?, ?)',
-          [id, i + 1, lat, lng]
-        );
-      }
-    }
 
     res.status(201).json({ ok: true, id });
   } catch (err) {
@@ -147,34 +157,17 @@ async function updateRoute(req, res, next) {
     if (body.name !== undefined) { fields.push('name = ?'); vals.push(body.name); }
     if (body.origin !== undefined) { fields.push('origin = ?'); vals.push(body.origin); }
     if (body.destination !== undefined) { fields.push('destination = ?'); vals.push(body.destination); }
-    if (body.direction !== undefined) { fields.push('direction = ?'); vals.push(body.direction); }
     if (body.description !== undefined) { fields.push('description = ?'); vals.push(body.description); }
-    if (body.status !== undefined) {
-      const dbStatus = body.status === 'Inactive' ? 'Temporary' : body.status;
-      fields.push('status = ?');
-      vals.push(dbStatus);
-    }
+    if (body.inboundDistanceKm !== undefined) { fields.push('inbound_distance_km = ?'); vals.push(parseFloat(body.inboundDistanceKm)); }
+    if (body.outboundDistanceKm !== undefined) { fields.push('outbound_distance_km = ?'); vals.push(parseFloat(body.outboundDistanceKm)); }
+    if (body.status !== undefined) { fields.push('status = ?'); vals.push(body.status === 'Inactive' ? 'Inactive' : body.status); }
     if (body.color !== undefined) { fields.push('color = ?'); vals.push(body.color); }
-    if (body.fare !== undefined) { fields.push('offline_size_mb = ?'); vals.push(0.8); }
-
+    
     fields.push('last_updated_at = NOW()');
 
     if (fields.length) {
       vals.push(id);
       await db.execute(`UPDATE routes SET ${fields.join(', ')} WHERE id = ?`, vals);
-    }
-
-    // Update path if provided
-    const path = body.path || (body.coordinates ? body.coordinates.map((c) => [c.latitude, c.longitude]) : null);
-    if (Array.isArray(path) && path.length > 0) {
-      await db.execute('DELETE FROM route_path_points WHERE route_id = ?', [id]);
-      for (let i = 0; i < path.length; i++) {
-        const [lat, lng] = path[i];
-        await db.execute(
-          'INSERT INTO route_path_points (route_id, seq, map_x, map_y, lat, lng) VALUES (?, ?, 0, 0, ?, ?)',
-          [id, i + 1, lat, lng]
-        );
-      }
     }
 
     res.json({ ok: true });
@@ -524,28 +517,286 @@ async function logActivity(req, res, next) {
   }
 }
 
+// ─────────────────────────────────────────────
+// ROUTE VERIFICATION AND GEOMETRY
+// ─────────────────────────────────────────────
+async function getRouteDirections(req, res, next) {
+  try {
+    const { id } = req.params;
+    const [directions] = await db.execute('SELECT * FROM route_directions WHERE route_id = ?', [id]);
+    res.json(directions);
+  } catch (err) { next(err); }
+}
+
+async function saveRouteDirections(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { direction, street_sequence } = req.body;
+    
+    const [existing] = await db.execute('SELECT id FROM route_directions WHERE route_id = ? AND direction = ?', [id, direction]);
+    if (existing.length > 0) {
+      await db.execute('UPDATE route_directions SET street_sequence = ? WHERE route_id = ? AND direction = ?', [street_sequence, id, direction]);
+    } else {
+      await db.execute('INSERT INTO route_directions (id, route_id, direction, street_sequence) VALUES (?, ?, ?, ?)', [uuidv4(), id, direction, street_sequence]);
+    }
+    
+    // Changing directions resets verification status
+    await db.execute('UPDATE routes SET verification_status = "PENDING_VERIFICATION" WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
+async function generateGeometry(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { direction } = req.body;
+    
+    // Get the street sequence for this route and direction
+    const [directions] = await db.execute('SELECT street_sequence FROM route_directions WHERE route_id = ? AND direction = ?', [id, direction]);
+    if (!directions.length) {
+        return res.status(404).json({ ok: false, error: 'Direction not found' });
+    }
+    
+    const sequenceStr = directions[0].street_sequence;
+    const streets = sequenceStr.split('|').map(s => s.trim());
+    
+    // First check local locations database for verified coordinates
+    // Fall back to strict CDO-bounded Nominatim geocoding
+    const coordinates = [];
+    for (const street of streets) {
+      const cleanStreet = street.trim();
+      if (!cleanStreet) continue;
+
+      const [locs] = await db.execute(
+        'SELECT latitude, longitude, verificationStatus FROM locations WHERE LOWER(TRIM(name)) = ? OR LOWER(TRIM(originalName)) = ? LIMIT 1',
+        [cleanStreet.toLowerCase(), cleanStreet.toLowerCase()]
+      );
+
+      if (locs.length > 0 && locs[0].latitude != null && locs[0].longitude != null) {
+        coordinates.push({ lat: parseFloat(locs[0].latitude), lon: parseFloat(locs[0].longitude) });
+        continue;
+      }
+
+      // External geocoding strictly checked against CDO boundaries
+      const coords = await geocode(cleanStreet);
+      if (coords) {
+        coordinates.push(coords);
+      }
+      // Delay to respect OSM rate limits
+      await new Promise(r => setTimeout(r, 500));
+    }
+    
+    if (coordinates.length < 2) {
+        return res.status(400).json({ ok: false, error: 'NEEDS_COORDINATE_VERIFICATION' });
+    }
+    
+    const result = await getRouteGeometry(coordinates);
+    if (!result) {
+        return res.status(400).json({ ok: false, error: 'Failed to generate geometry' });
+    }
+    const geometry = JSON.stringify(result.geometry || result);
+    const calculatedKm = result.distanceMeters ? parseFloat((result.distanceMeters / 1000).toFixed(2)) : null;
+    
+    const [existing] = await db.execute('SELECT id FROM route_geometry WHERE route_id = ? AND direction = ?', [id, direction]);
+    if (existing.length > 0) {
+      await db.execute('UPDATE route_geometry SET geometry = ?, geometry_status = "GENERATED", generated_at = NOW() WHERE route_id = ? AND direction = ?', [geometry, id, direction]);
+    } else {
+      await db.execute('INSERT INTO route_geometry (id, route_id, direction, geometry, geometry_status, generated_at) VALUES (?, ?, ?, ?, "GENERATED", NOW())', [uuidv4(), id, direction, geometry]);
+    }
+    
+    res.json({ ok: true, geometry, calculatedKm });
+  } catch (err) { next(err); }
+}
+
+async function verifyRoute(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    await db.execute('UPDATE routes SET verification_status = ? WHERE id = ?', [status, id]);
+    if (status === 'PUBLISHED') {
+      await db.execute('UPDATE route_geometry SET geometry_status = "VERIFIED" WHERE route_id = ?', [id]);
+    }
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
+// ─────────────────────────────────────────────
+// LOCATION VERIFICATION SYSTEM
+// ─────────────────────────────────────────────
+
+async function getVerificationLocations(req, res, next) {
+  try {
+    const { status, q } = req.query;
+    let sql = 'SELECT * FROM locations WHERE 1=1';
+    const params = [];
+    if (status) {
+      sql += ' AND verificationStatus = ?';
+      params.push(status);
+    }
+    if (q) {
+      sql += ' AND (name LIKE ? OR originalName LIKE ?)';
+      params.push(`%${q}%`, `%${q}%`);
+    }
+    sql += ' ORDER BY verificationStatus, name';
+    const [rows] = await db.execute(sql, params);
+    res.json(rows);
+  } catch (err) { next(err); }
+}
+
+async function geocodeLocation(req, res, next) {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    
+    const candidates = await geocodeWithDetails(name);
+    res.json({ originalName: name, candidates });
+  } catch (err) { next(err); }
+}
+
+async function verifyLocation(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { latitude, longitude, address, city, barangay, geocodingName, confidence } = req.body;
+    
+    if (latitude == null || longitude == null) {
+      return res.status(400).json({ error: 'latitude and longitude are required' });
+    }
+    
+    await db.execute(
+      `UPDATE locations SET 
+        latitude = ?, longitude = ?, address = ?, city = ?, barangay = ?,
+        geocodingName = ?, confidence = ?,
+        verificationStatus = 'VERIFIED', verifiedAt = NOW(), updatedAt = NOW()
+      WHERE id = ?`,
+      [latitude, longitude, address || null, city || null, barangay || null,
+       geocodingName || null, confidence || null, id]
+    );
+    
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
+async function createVerificationLocation(req, res, next) {
+  try {
+    const { name, originalName, geocodingName, latitude, longitude, address, city, barangay, source } = req.body;
+    const id = uuidv4();
+    
+    // Determine initial status
+    let status = 'NEEDS_COORDINATE_VERIFICATION';
+    if (latitude != null && longitude != null) {
+      status = 'DATA_REVIEW_REQUIRED';
+    }
+    
+    await db.execute(
+      `INSERT INTO locations (id, name, originalName, geocodingName, latitude, longitude, address, city, barangay, source, verificationStatus)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, name, originalName || name, geocodingName || null,
+       latitude || null, longitude || null, address || null,
+       city || null, barangay || null, source || 'manual', status]
+    );
+    
+    res.status(201).json({ ok: true, id });
+  } catch (err) { next(err); }
+}
+
+async function deleteVerificationLocation(req, res, next) {
+  try {
+    const { id } = req.params;
+    await db.execute('DELETE FROM locations WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
+async function bulkValidateLocations(req, res, next) {
+  try {
+    const [rows] = await db.execute('SELECT * FROM locations');
+    const results = [];
+    const { isInsideCDO } = require('../utils/routing');
+    
+    for (const loc of rows) {
+      const issues = [];
+      
+      if (loc.latitude == null || loc.longitude == null) {
+        issues.push('MISSING_COORDINATES');
+      } else {
+        const lat = parseFloat(loc.latitude);
+        const lng = parseFloat(loc.longitude);
+        
+        if (!isInsideCDO(lat, lng)) {
+          issues.push('OUTSIDE_CDO_BOUNDS');
+        }
+        
+        // Check if coordinates are in water (rough check for CDO river area)
+        // The CDO river runs roughly around lat 8.48-8.50, lng 124.63-124.66
+        // This is a very rough heuristic
+        if (lat > 8.485 && lat < 8.495 && lng > 124.635 && lng < 124.655) {
+          issues.push('POSSIBLY_IN_RIVER');
+        }
+      }
+      
+      if (issues.length > 0 && loc.verificationStatus !== 'VERIFIED') {
+        await db.execute(
+          'UPDATE locations SET verificationStatus = ? WHERE id = ?',
+          ['DATA_REVIEW_REQUIRED', loc.id]
+        );
+      }
+      
+      results.push({
+        id: loc.id,
+        name: loc.name,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        currentStatus: loc.verificationStatus,
+        issues,
+      });
+    }
+    
+    res.json({ total: results.length, flagged: results.filter(r => r.issues.length > 0).length, results });
+  } catch (err) { next(err); }
+}
+
+async function extractRouteLocations(req, res, next) {
+  try {
+    // Extract all unique location names from route_directions street sequences
+    const [directions] = await db.execute('SELECT rd.*, r.name as route_name FROM route_directions rd JOIN routes r ON r.id = rd.route_id');
+    const [existingLocs] = await db.execute('SELECT name FROM locations');
+    const existingNames = new Set(existingLocs.map(l => l.name.trim().toLowerCase()));
+    
+    const newLocations = new Set();
+    
+    for (const dir of directions) {
+      if (!dir.street_sequence) continue;
+      const streets = dir.street_sequence.split('|').map(s => s.trim()).filter(s => s);
+      for (const street of streets) {
+        const key = street.toLowerCase();
+        if (!existingNames.has(key) && !newLocations.has(key)) {
+          newLocations.add(key);
+          const id = uuidv4();
+          await db.execute(
+            `INSERT INTO locations (id, name, originalName, verificationStatus, source)
+             VALUES (?, ?, ?, 'NEEDS_COORDINATE_VERIFICATION', 'route_extraction')`,
+            [id, street, street]
+          );
+        }
+      }
+    }
+    
+    res.json({ ok: true, newLocationsAdded: newLocations.size });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   login,
   getOverview,
-  getRoutes,
-  createRoute,
-  updateRoute,
-  deleteRoute,
-  getLocations,
-  createLocation,
-  updateLocation,
-  deleteLocation,
-  getFares,
-  createFare,
-  updateFare,
-  deleteFare,
-  getAnnouncements,
-  createAnnouncement,
-  updateAnnouncement,
-  deleteAnnouncement,
-  getReports,
-  updateReport,
-  deleteReport,
-  getActivity,
-  logActivity,
+  getRoutes, createRoute, updateRoute, deleteRoute,
+  getLocations, createLocation, updateLocation, deleteLocation,
+  getFares, createFare, updateFare, deleteFare,
+  getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement,
+  getReports, updateReport, deleteReport,
+  getActivity, logActivity,
+  getRouteDirections, saveRouteDirections, generateGeometry, verifyRoute,
+  // Location Verification
+  getVerificationLocations, geocodeLocation, verifyLocation,
+  createVerificationLocation, deleteVerificationLocation,
+  bulkValidateLocations, extractRouteLocations
 };

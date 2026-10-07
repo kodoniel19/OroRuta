@@ -21,6 +21,7 @@ data class OroRutaColors(
     val oro100: androidx.compose.ui.graphics.Color = Oro100,
     val oro400: androidx.compose.ui.graphics.Color = Oro400,
     val oro500: androidx.compose.ui.graphics.Color = Oro500,
+    val oro600: androidx.compose.ui.graphics.Color = Oro600,
     val oro700: androidx.compose.ui.graphics.Color = Oro700,
     val ok50: androidx.compose.ui.graphics.Color = Ok50,
     val ok600: androidx.compose.ui.graphics.Color = Ok600,

@@ -32,7 +32,8 @@ fun SearchScreen(
     prefillFrom: String,
     prefillTo: String,
     onBack: () -> Unit,
-    onSearchSubmit: (from: String, to: String) -> Unit
+    onSearchSubmit: (from: String, to: String) -> Unit,
+    onViewPlaceOnMap: ((Place) -> Unit)? = null
 ) {
     LaunchedEffect(prefillFrom, prefillTo) {
         if (prefillFrom.isNotBlank()) {
@@ -285,23 +286,27 @@ fun SearchScreen(
                     )
                 }
 
-                items(viewModel.suggestedPlaces) { place ->
-                    PlaceSearchRow(place = place) {
-                        if (focusedField == "from") {
-                            viewModel.fromText = place.name
-                            focusedField = "to"
-                            if (viewModel.toText.isNotBlank()) {
-                                viewModel.saveHistory(viewModel.fromText, viewModel.toText)
-                                onSearchSubmit(viewModel.fromText, viewModel.toText)
+                items(viewModel.suggestedPlaces, key = { it.id }) { place ->
+                    PlaceSearchRow(
+                        place = place,
+                        onClick = {
+                            if (focusedField == "from") {
+                                viewModel.selectPlace(place, "from")
+                                focusedField = "to"
+                                if (viewModel.toText.isNotBlank()) {
+                                    viewModel.saveHistory(viewModel.fromText, viewModel.toText)
+                                    onSearchSubmit(viewModel.fromText, viewModel.toText)
+                                }
+                            } else {
+                                viewModel.selectPlace(place, "to")
+                                val from = if (viewModel.fromText.isNotBlank()) viewModel.fromText else "Current Location"
+                                viewModel.fromText = from
+                                viewModel.saveHistory(from, place.name)
+                                onSearchSubmit(from, place.name)
                             }
-                        } else {
-                            viewModel.toText = place.name
-                            val from = if (viewModel.fromText.isNotBlank()) viewModel.fromText else "Current Location"
-                            viewModel.fromText = from
-                            viewModel.saveHistory(from, place.name)
-                            onSearchSubmit(from, place.name)
-                        }
-                    }
+                        },
+                        onViewOnMap = if (onViewPlaceOnMap != null) { { onViewPlaceOnMap(place) } } else null
+                    )
                     HorizontalDivider(color = Line)
                 }
             }
@@ -318,7 +323,7 @@ fun SearchScreen(
                     )
                 }
 
-                items(viewModel.recentHistory) { hist ->
+                items(viewModel.recentHistory, key = { it.id }) { hist ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -345,7 +350,11 @@ fun SearchScreen(
 }
 
 @Composable
-fun PlaceSearchRow(place: Place, onClick: () -> Unit) {
+fun PlaceSearchRow(
+    place: Place,
+    onClick: () -> Unit,
+    onViewOnMap: (() -> Unit)? = null
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -374,6 +383,15 @@ fun PlaceSearchRow(place: Place, onClick: () -> Unit) {
             Text(place.name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Ink)
             if (!place.area.isNullOrBlank()) {
                 Text(place.area, fontSize = 12.sp, color = InkMuted)
+            }
+        }
+
+        if (onViewOnMap != null && place.lat != 0.0 && place.lng != 0.0) {
+            IconButton(
+                onClick = onViewOnMap,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(Icons.Default.Map, contentDescription = "View on Map", tint = Brand600, modifier = Modifier.size(18.dp))
             }
         }
 

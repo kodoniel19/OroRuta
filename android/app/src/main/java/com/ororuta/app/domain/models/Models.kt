@@ -16,6 +16,23 @@ data class Place(
 )
 
 @Serializable
+data class RouteDirection(
+    val id: String,
+    @SerialName("route_id") val routeId: String,
+    val direction: String,
+    @SerialName("distance_km") val distanceKm: Double = 0.0,
+    @SerialName("street_sequence") val streetSequence: String = ""
+)
+
+@Serializable
+data class RouteGeometry(
+    val id: String,
+    @SerialName("route_id") val routeId: String,
+    val direction: String,
+    val geometry: String? = null
+)
+
+@Serializable
 data class Route(
     val id: String,
     val code: String,
@@ -26,7 +43,10 @@ data class Route(
     val direction: String? = null,
     val description: String? = null,
     @SerialName("length_km") val lengthKm: Double = 0.0,
+    @SerialName("inbound_distance_km") val inboundDistanceKm: Double = 0.0,
+    @SerialName("outbound_distance_km") val outboundDistanceKm: Double = 0.0,
     val status: String = "Active",
+    @SerialName("verification_status") val verificationStatus: String = "DRAFT",
     val color: String = "#1471B0",
     @SerialName("offline_size_mb") val offlineSizeMb: Double = 0.5,
     @SerialName("last_updated_at") val lastUpdatedAt: String? = null,
@@ -38,7 +58,11 @@ data class Route(
     val roads: List<Road> = emptyList(),
     val landmarks: List<Landmark> = emptyList(),
     val path: List<PathPoint> = emptyList(),
-    val announcements: List<Announcement> = emptyList()
+    val directions: List<RouteDirection> = emptyList(),
+    val geometries: List<RouteGeometry> = emptyList(),
+    val announcements: List<Announcement> = emptyList(),
+    val fare: Double = 13.0,
+    val travelTime: Int = 30
 )
 
 @Serializable
@@ -287,6 +311,6 @@ data class ReportResponse(val id: String, val referenceNo: String)
 
 sealed class Resource<out T> {
     object Loading : Resource<Nothing>()
-    data class Success<out T>(val data: T) : Resource<T>()
+    data class Success<out T>(val data: T, val isOffline: Boolean = false) : Resource<T>()
     data class Error(val message: String, val isOffline: Boolean = false) : Resource<Nothing>()
 }

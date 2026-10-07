@@ -6,7 +6,8 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { RouteChip } from '../ui/RouteChip';
 import { useData } from '../../contexts/DataContext';
 import type { JeepneyRoute } from '../../types/transit';
-import { formatDateTime, peso } from '../../utils/format';
+import { formatDateTime } from '../../utils/format';
+import { api } from '../../services/api';
 
 interface RouteDetailDrawerProps {
   route: JeepneyRoute | null;
@@ -65,21 +66,36 @@ export function RouteDetailDrawer({ route, onClose, onEdit, onEditMap, onToggleS
       {shown && (
         <div className="px-6 py-5 space-y-5">
           <div className="flex items-center gap-3">
-            <RouteChip id={shown.id} color={shown.color} />
+            <RouteChip id={shown.code} color={shown.color} />
             <StatusBadge status={shown.status} />
-            <span className="ml-auto text-xs text-fg-subtle">{shown.direction}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              shown.verificationStatus === 'PUBLISHED' ? 'bg-green-100 text-green-700' :
+              shown.verificationStatus === 'DATA_REVIEW_REQUIRED' ? 'bg-red-100 text-red-700' :
+              'bg-yellow-100 text-yellow-700'
+            }`}>
+              {shown.verificationStatus.replace(/_/g, ' ')}
+            </span>
+            <div className="ml-auto flex gap-2">
+               {shown.verificationStatus !== 'PUBLISHED' && (
+                 <Button size="sm" onClick={() => {
+                   api.routes.verify(shown.id, 'PUBLISHED').then(() => {
+                     onToggleStatus(shown); // Trigger refresh
+                   });
+                 }}>Publish</Button>
+               )}
+            </div>
           </div>
 
           <p className="text-sm text-fg leading-relaxed">{shown.description}</p>
 
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-xs text-fg-muted">Base Fare</dt>
-              <dd className="mt-1 font-semibold text-fg tabular-nums">₱{shown.fare.toFixed(2)}</dd>
+              <dt className="text-xs text-fg-muted">Inbound Distance</dt>
+              <dd className="mt-1 font-semibold text-fg tabular-nums">{shown.inboundDistanceKm} km</dd>
             </div>
             <div>
-              <dt className="text-xs text-fg-muted">Travel Time</dt>
-              <dd className="mt-1 font-medium text-fg">{shown.travelTime} min</dd>
+              <dt className="text-xs text-fg-muted">Outbound Distance</dt>
+              <dd className="mt-1 font-medium text-fg">{shown.outboundDistanceKm} km</dd>
             </div>
             <div>
               <dt className="text-xs text-fg-muted">Origin</dt>
@@ -89,13 +105,17 @@ export function RouteDetailDrawer({ route, onClose, onEdit, onEditMap, onToggleS
               <dt className="text-xs text-fg-muted">Destination</dt>
               <dd className="mt-1 font-medium text-fg">{shown.destination}</dd>
             </div>
-            <div className="col-span-2">
-              <dt className="text-xs text-fg-muted">Major Roads</dt>
-              <dd className="mt-1 text-fg">{shown.majorRoads.join(', ')}</dd>
+            <div className="col-span-2 flex gap-4">
+               <Button size="sm" variant="secondary" onClick={() => api.routes.generateGeometry(shown.id, 'Inbound')}>
+                 Generate Inbound Map
+               </Button>
+               <Button size="sm" variant="secondary" onClick={() => api.routes.generateGeometry(shown.id, 'Outbound')}>
+                 Generate Outbound Map
+               </Button>
             </div>
             <div>
-              <dt className="text-xs text-fg-muted">Path Points</dt>
-              <dd className="mt-1 font-mono text-sm text-fg-muted">{shown.path.length} pts</dd>
+              <dt className="text-xs text-fg-muted">Path Points (Inbound)</dt>
+              <dd className="mt-1 font-mono text-sm text-fg-muted">{shown.path?.length || 0} pts</dd>
             </div>
             <div>
               <dt className="text-xs text-fg-muted">Last Updated</dt>

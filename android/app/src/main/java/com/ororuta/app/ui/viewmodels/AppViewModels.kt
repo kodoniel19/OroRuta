@@ -29,6 +29,7 @@ data class HomeUiState(
     val userLat: Double = 8.4822,
     val userLng: Double = 124.6472,
     val recentSearches: List<LocalHistory> = emptyList(),
+    val allHistory: List<LocalHistory> = emptyList(),
     val announcements: List<Announcement> = emptyList(),
     val nearbyTab: Int = 0, // 0: Routes, 1: Terminals, 2: Loading, 3: Unloading
     val nearbyItems: List<NearbyResult> = emptyList(),
@@ -80,7 +81,7 @@ class HomeViewModel @Inject constructor(
     private fun observeStreams() {
         viewModelScope.launch {
             historyRepo.getHistory().collect { hist ->
-                _uiState.update { it.copy(recentSearches = hist.take(3)) }
+                _uiState.update { it.copy(recentSearches = hist.take(3), allHistory = hist) }
             }
         }
         viewModelScope.launch {
@@ -113,7 +114,14 @@ class HomeViewModel @Inject constructor(
 
     fun setManualStart(place: String) {
         _uiState.update { it.copy(manualStartPlace = place) }
-        loadNearby(_uiState.value.nearbyTab)
+    }
+
+    fun deleteHistory(id: String) {
+        viewModelScope.launch { historyRepo.delete(id) }
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch { historyRepo.clearAll() }
     }
 
     fun selectNearbyTab(tabIndex: Int) {
@@ -175,7 +183,7 @@ class SearchViewModel @Inject constructor(
     fun loadHistory() {
         viewModelScope.launch {
             historyRepo.getHistory().collect { list ->
-                recentHistory = list.take(5)
+                recentHistory = list.take(10)
             }
         }
     }
@@ -190,15 +198,31 @@ class SearchViewModel @Inject constructor(
         searchPlaces(text)
     }
 
+    var fromPlace by mutableStateOf<Place?>(null)
+    var toPlace by mutableStateOf<Place?>(null)
+
     fun swap() {
         val temp = fromText
         fromText = toText
         toText = temp
+        val tempPlace = fromPlace
+        fromPlace = toPlace
+        toPlace = tempPlace
     }
 
     fun setFilter(filter: String) {
         activeFilter = filter
         searchPlaces(if (toText.isNotBlank()) toText else fromText)
+    }
+
+    fun selectPlace(place: Place, forField: String) {
+        if (forField == "from") {
+            fromText = place.name
+            fromPlace = place
+        } else {
+            toText = place.name
+            toPlace = place
+        }
     }
 
     private fun searchPlaces(q: String) {
@@ -212,9 +236,17 @@ class SearchViewModel @Inject constructor(
         }
     }
 
+    private var lastSavedSearch: String? = null
+
     fun saveHistory(from: String, to: String) {
+        val cleanFrom = from.trim()
+        val cleanTo = to.trim()
+        if (cleanFrom.isBlank() || cleanTo.isBlank()) return
+        val key = "${cleanFrom.lowercase()}->${cleanTo.lowercase()}"
+        if (key == lastSavedSearch) return
+        lastSavedSearch = key
         viewModelScope.launch {
-            historyRepo.add(from, to)
+            historyRepo.add(cleanFrom, cleanTo)
         }
     }
 }
@@ -222,17 +254,46 @@ class SearchViewModel @Inject constructor(
 // Results ViewModel
 @HiltViewModel
 class ResultsViewModel @Inject constructor(
-    private val tripRepo: TripRepository
+    private val tripRepo: TripRepository,
+    private val locationProvider: CdoLocationProvider
 ) : ViewModel() {
 
     var tripsState by mutableStateOf<Resource<List<TripOption>>>(Resource.Loading)
     var currentSort by mutableStateOf("time")
 
-    fun searchTrips(from: String, to: String, sort: String = "time") {
+    fun searchTrips(
+        from: String,
+        to: String,
+        sort: String = "time",
+        fromLat: Double? = null,
+        fromLng: Double? = null,
+        toLat: Double? = null,
+        toLng: Double? = null
+    ) {
         currentSort = sort
         viewModelScope.launch {
             tripsState = Resource.Loading
-            tripsState = tripRepo.searchTrips(from, to, sort = sort)
+            var actualFromLat = fromLat
+            var actualFromLng = fromLng
+
+            // If starting point is "Current Location", get actual GPS coordinates
+            if (from.isBlank() || from.contains("Current Location", ignoreCase = true)) {
+                val realLoc = locationProvider.getDeviceLocationOrNull()
+                if (realLoc != null) {
+                    actualFromLat = realLoc.first
+                    actualFromLng = realLoc.second
+                }
+            }
+
+            tripsState = tripRepo.searchTrips(
+                from = from,
+                to = to,
+                fromLat = actualFromLat,
+                fromLng = actualFromLng,
+                toLat = toLat,
+                toLng = toLng,
+                sort = sort
+            )
         }
     }
 
@@ -394,6 +455,173 @@ class RouteInfoViewModel @Inject constructor(
             downloadProgress = 1.0f
             isDownloaded = true
         }
+    }
+}
+
+data class DirectionsGuide(
+    val originName: String,
+    val originLat: Double,
+    val originLng: Double,
+    val destinationName: String,
+    val destinationLat: Double,
+    val destinationLng: Double,
+    val distanceMeters: Int,
+    val estimatedMinutes: Int,
+    val pathPoints: List<com.google.android.gms.maps.model.LatLng>
+)
+
+// Map ViewModel (Database-driven Routes, Places, Landmarks, Directions, Recommendations)
+@HiltViewModel
+class MapViewModel @Inject constructor(
+    private val routeRepo: RouteRepository,
+    private val placeRepo: PlaceRepository,
+    private val tripRepo: TripRepository,
+    private val locationProvider: CdoLocationProvider
+) : ViewModel() {
+
+    var routesState by mutableStateOf<Resource<List<Route>>>(Resource.Loading)
+    val routes: List<Route>
+        get() = (routesState as? Resource.Success<List<Route>>)?.data ?: emptyList()
+
+    var placesState by mutableStateOf<Resource<List<Place>>>(Resource.Loading)
+    val places: List<Place>
+        get() = (placesState as? Resource.Success<List<Place>>)?.data ?: emptyList()
+
+    var directionsGuide by mutableStateOf<DirectionsGuide?>(null)
+    var isCalculatingDirections by mutableStateOf(false)
+
+    var recommendedJeepneyTrip by mutableStateOf<TripOption?>(null)
+    var isLoadingJeepneyRoute by mutableStateOf(false)
+
+    init {
+        loadRoutes()
+        loadPlaces()
+    }
+
+    fun loadRoutes() {
+        viewModelScope.launch {
+            routeRepo.getRoutes().collect { res ->
+                routesState = res
+            }
+        }
+    }
+
+    fun loadPlaces() {
+        viewModelScope.launch {
+            val res = placeRepo.search("")
+            placesState = res
+        }
+    }
+
+    fun calculateDirections(
+        fromLat: Double,
+        fromLng: Double,
+        toLat: Double,
+        toLng: Double,
+        fromName: String = "Current Location",
+        toName: String
+    ) {
+        viewModelScope.launch {
+            isCalculatingDirections = true
+            val dLat = Math.toRadians(toLat - fromLat)
+            val dLng = Math.toRadians(toLng - fromLng)
+            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(Math.toRadians(fromLat)) * Math.cos(Math.toRadians(toLat)) *
+                    Math.sin(dLng / 2) * Math.sin(dLng / 2)
+            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            val distMeters = (6371000 * c).toInt()
+            val minutes = Math.max(1, (distMeters / 75.0).toInt())
+
+            val points = mutableListOf<com.google.android.gms.maps.model.LatLng>()
+            points.add(com.google.android.gms.maps.model.LatLng(fromLat, fromLng))
+
+            val tripRes = tripRepo.searchTrips(fromName, toName, fromLat, fromLng, toLat, toLng)
+            if (tripRes is Resource.Success && tripRes.data.isNotEmpty()) {
+                val best = tripRes.data.first()
+                if (best.boardingLat != null && best.boardingLng != null) {
+                    points.add(com.google.android.gms.maps.model.LatLng(best.boardingLat, best.boardingLng))
+                }
+                val segRouteId = best.segments.firstOrNull()?.routeId
+                val matchedRoute = routes.find { it.id == segRouteId }
+                if (matchedRoute != null && matchedRoute.path.isNotEmpty()) {
+                    matchedRoute.path.forEach { pt ->
+                        if (pt.lat != 0.0 && pt.lng != 0.0) {
+                            points.add(com.google.android.gms.maps.model.LatLng(pt.lat, pt.lng))
+                        }
+                    }
+                }
+            } else {
+                val midLat = (fromLat + toLat) / 2
+                val midLng = (fromLng + toLng) / 2
+                points.add(com.google.android.gms.maps.model.LatLng(midLat, fromLng))
+                points.add(com.google.android.gms.maps.model.LatLng(midLat, midLng))
+            }
+            points.add(com.google.android.gms.maps.model.LatLng(toLat, toLng))
+
+            directionsGuide = DirectionsGuide(
+                originName = fromName,
+                originLat = fromLat,
+                originLng = fromLng,
+                destinationName = toName,
+                destinationLat = toLat,
+                destinationLng = toLng,
+                distanceMeters = distMeters,
+                estimatedMinutes = minutes,
+                pathPoints = points
+            )
+            isCalculatingDirections = false
+        }
+    }
+
+    fun loadJeepneyRecommendation(
+        fromLat: Double,
+        fromLng: Double,
+        toLat: Double,
+        toLng: Double,
+        destName: String
+    ) {
+        viewModelScope.launch {
+            isLoadingJeepneyRoute = true
+            val res = tripRepo.searchTrips("Current Location", destName, fromLat, fromLng, toLat, toLng)
+            if (res is Resource.Success && res.data.isNotEmpty()) {
+                recommendedJeepneyTrip = res.data.first()
+            } else {
+                val nearbyRoute = routes.firstOrNull()
+                if (nearbyRoute != null) {
+                    recommendedJeepneyTrip = TripOption(
+                        id = "rec-${nearbyRoute.id}",
+                        originPlaceId = "current",
+                        destinationPlaceId = "dest",
+                        minutes = 18,
+                        walkMeters = 350,
+                        transfers = 0,
+                        boardingName = "Loading Point near Current Location",
+                        boardingLat = fromLat,
+                        boardingLng = fromLng,
+                        dropoffName = "Stop near $destName",
+                        totalKm = 4.2,
+                        regularFare = 13.0,
+                        discountFare = 10.0,
+                        segments = listOf(
+                            TripSegment(
+                                tripOptionId = "rec-${nearbyRoute.id}",
+                                routeId = nearbyRoute.id,
+                                code = nearbyRoute.code,
+                                routeName = nearbyRoute.name,
+                                color = nearbyRoute.color,
+                                km = 4.2
+                            )
+                        )
+                    )
+                }
+            }
+            isLoadingJeepneyRoute = false
+        }
+    }
+
+    fun clearDirections() {
+        directionsGuide = null
+        recommendedJeepneyTrip = null
     }
 }
 

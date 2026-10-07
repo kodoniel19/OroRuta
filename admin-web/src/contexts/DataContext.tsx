@@ -69,7 +69,31 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       if (rData.status === 'fulfilled' && Array.isArray(rData.value) && rData.value.length > 0) {
-        setRoutes(rData.value.map((r) => ({ ...r, coordinates: r.coordinates ?? toCoordinates(r.path) })));
+        setRoutes(rData.value.map((r: any) => ({
+          id: r.id,
+          code: r.code ?? r.id,
+          name: r.name,
+          origin: r.origin,
+          destination: r.destination,
+          majorRoads: r.majorRoads ?? r.roads?.map((rd: any) => rd.name) ?? [],
+          description: r.description ?? '',
+          inboundDistanceKm: parseFloat(r.inbound_distance_km ?? r.inboundDistanceKm ?? 0),
+          outboundDistanceKm: parseFloat(r.outbound_distance_km ?? r.outboundDistanceKm ?? 0),
+          verificationStatus: r.verification_status ?? r.verificationStatus ?? 'DRAFT',
+          fare: r.fare ?? 13,
+          travelTime: r.travelTime ?? 30,
+          status: r.status === 'Active' ? 'Active' : 'Inactive',
+          lastUpdated: r.last_updated_at ?? r.lastUpdated ?? new Date().toISOString(),
+          color: r.color ?? '#1471B0',
+          path: Array.isArray(r.path)
+            ? r.path.map((p: any) => (Array.isArray(p) ? p : [Number(p.lat), Number(p.lng)]))
+            : [],
+          coordinates: r.coordinates ?? toCoordinates(
+            Array.isArray(r.path)
+              ? r.path.map((p: any) => (Array.isArray(p) ? p : [Number(p.lat), Number(p.lng)]))
+              : []
+          ),
+        } as JeepneyRoute)));
       }
       if (lData.status === 'fulfilled' && Array.isArray(lData.value) && lData.value.length > 0) {
         setLocations(lData.value);

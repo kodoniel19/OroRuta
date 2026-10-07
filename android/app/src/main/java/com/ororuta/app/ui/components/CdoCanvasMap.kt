@@ -33,7 +33,8 @@ data class MapMarker(
     val routeColor: String? = null,
     val note: String? = null,
     val lat: Double? = null,
-    val lng: Double? = null
+    val lng: Double? = null,
+    val area: String? = null
 )
 
 data class MapRouteLine(

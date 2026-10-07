@@ -7,16 +7,27 @@ export interface RouteCoordinate {
 }
 
 export type RecordStatus = 'Active' | 'Inactive';
-export type Direction = 'Northbound' | 'Southbound' | 'Eastbound' | 'Westbound' | 'Loop';
+export type Direction = 'Northbound' | 'Southbound' | 'Eastbound' | 'Westbound' | 'Loop' | 'Inbound' | 'Outbound';
+export type VerificationStatus = 'DRAFT' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'PUBLISHED' | 'DATA_REVIEW_REQUIRED' | 'ERROR';
+
+export interface RouteGeometry {
+  direction: Direction;
+  geometryStatus: string;
+  generatedAt: string;
+}
 
 export interface JeepneyRoute {
   id: string;
+  code?: string;
   name: string;
-  direction: Direction;
   origin: string;
   destination: string;
+  direction?: Direction;
   majorRoads: string[];
   description: string;
+  inboundDistanceKm?: number;
+  outboundDistanceKm?: number;
+  verificationStatus?: VerificationStatus;
   fare: number;
   travelTime: number;
   status: RecordStatus;

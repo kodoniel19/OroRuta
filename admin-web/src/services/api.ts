@@ -96,6 +96,23 @@ export const api = {
       request<{ ok: boolean }>(`/admin/routes/${id}`, {
         method: 'DELETE',
       }),
+    getDirections: (id: string) => 
+      request<any[]>(`/admin/routes/${id}/directions`),
+    saveDirections: (id: string, direction: string, street_sequence: string) =>
+      request<{ ok: boolean }>(`/admin/routes/${id}/directions`, {
+        method: 'POST',
+        body: JSON.stringify({ direction, street_sequence }),
+      }),
+    generateGeometry: (id: string, direction: string) =>
+      request<{ ok: boolean, geometry: string }>(`/admin/routes/${id}/generate-geometry`, {
+        method: 'POST',
+        body: JSON.stringify({ direction }),
+      }),
+    verify: (id: string, status: string) =>
+      request<{ ok: boolean }>(`/admin/routes/${id}/verify`, {
+        method: 'POST',
+        body: JSON.stringify({ status }),
+      }),
   },
 
   // Transit Locations (Terminals, Loading, Unloading, Transfer)
@@ -178,4 +195,88 @@ export const api = {
         body: JSON.stringify(entry),
       }),
   },
+
+  // Location Verification
+  verification: {
+    listLocations: (params?: { status?: string; q?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.status) qs.set('status', params.status);
+      if (params?.q) qs.set('q', params.q);
+      const query = qs.toString();
+      return request<VerificationLocation[]>(`/admin/verification/locations${query ? '?' + query : ''}`);
+    },
+    geocodeLocation: (name: string) =>
+      request<{ originalName: string; candidates: GeocodingCandidate[] }>('/admin/verification/locations/geocode', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
+    verifyLocation: (id: string, data: {
+      latitude: number; longitude: number;
+      address?: string; city?: string; barangay?: string;
+      geocodingName?: string; confidence?: number;
+    }) =>
+      request<{ ok: boolean }>(`/admin/verification/locations/${id}/verify`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    createLocation: (data: { name: string; originalName?: string; latitude?: number; longitude?: number; source?: string }) =>
+      request<{ ok: boolean; id: string }>('/admin/verification/locations', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deleteLocation: (id: string) =>
+      request<{ ok: boolean }>(`/admin/verification/locations/${id}`, {
+        method: 'DELETE',
+      }),
+    bulkValidate: () =>
+      request<{ total: number; flagged: number; results: BulkValidationResult[] }>('/admin/verification/locations/bulk-validate', {
+        method: 'POST',
+      }),
+    extractFromRoutes: () =>
+      request<{ ok: boolean; newLocationsAdded: number }>('/admin/verification/locations/extract-from-routes', {
+        method: 'POST',
+      }),
+  },
 };
+
+// Types for the verification system
+export interface VerificationLocation {
+  id: string;
+  name: string;
+  originalName: string;
+  geocodingName: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  address: string | null;
+  city: string | null;
+  barangay: string | null;
+  source: string | null;
+  confidence: number | null;
+  verificationStatus: 'DRAFT' | 'NEEDS_COORDINATE_VERIFICATION' | 'VERIFIED' | 'DATA_REVIEW_REQUIRED' | 'ERROR';
+  createdAt: string;
+  updatedAt: string;
+  verifiedAt: string | null;
+}
+
+export interface GeocodingCandidate {
+  latitude: number;
+  longitude: number;
+  displayName: string;
+  address: Record<string, string>;
+  city: string;
+  barangay: string;
+  confidence: number;
+  issues: string[];
+  osmType: string;
+  osmId: number;
+  insideCDO: boolean;
+}
+
+export interface BulkValidationResult {
+  id: string;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+  currentStatus: string;
+  issues: string[];
+}

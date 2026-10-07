@@ -157,7 +157,7 @@ export function JeepneyRoutes() {
             <table className="w-full min-w-[900px] text-sm">
               <thead>
                 <tr className="border-b border-line bg-canvas text-left text-xs font-medium text-fg-muted">
-                  {['Route', 'Name', 'Origin → Destination', 'Direction', 'Fare', 'Status', 'Updated', ''].map((h, i) => (
+                  {['Route', 'Name', 'Origin → Destination', 'Verification', 'Distance (In/Out)', 'Status', 'Updated', ''].map((h, i) => (
                     <th key={i} scope="col" className="px-4 py-2.5 font-medium">
                       {h || <span className="sr-only">Actions</span>}
                     </th>
@@ -178,8 +178,8 @@ export function JeepneyRoutes() {
                     <td className="px-4 py-3.5 text-fg-muted">
                       <span className="truncate max-w-[200px] block">{r.origin} → {r.destination}</span>
                     </td>
-                    <td className="px-4 py-3.5 text-fg-muted">{r.direction}</td>
-                    <td className="px-4 py-3.5 tabular-nums font-medium text-fg">₱{r.fare.toFixed(2)}</td>
+                    <td className="px-4 py-3.5 text-fg-muted">{r.verificationStatus}</td>
+                    <td className="px-4 py-3.5 tabular-nums font-medium text-fg">{r.inboundDistanceKm} km / {r.outboundDistanceKm} km</td>
                     <td className="px-4 py-3.5"><StatusBadge status={r.status} /></td>
                     <td className="px-4 py-3.5 text-xs text-fg-subtle">{formatRelative(r.lastUpdated)}</td>
                     <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>

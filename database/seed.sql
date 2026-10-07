@@ -36,30 +36,35 @@ INSERT INTO terminals (id, name, note, map_x, map_y, lat, lng) VALUES
 
 -- ─── LANDMARKS ────────────────────────────────────────────
 INSERT INTO landmarks (id, name, map_x, map_y, lat, lng) VALUES
-('lm-01','Liceo de Cagayan University',155,265,8.4961,124.6483),
-('lm-02','Limketkai Center',295,290,8.4987,124.6601),
-('lm-03','Xavier University',170,420,8.4832,124.6503),
-('lm-04','Centrio Mall',225,380,8.4821,124.6572),
-('lm-05','NMMC',250,340,8.4875,124.6588),
-('lm-06','Provincial Capitol',135,460,8.4777,124.6452),
-('lm-07','Camp Evangelista',380,220,8.5108,124.6681);
+('lm-01','Liceo de Cagayan University',155,265,8.4975,124.6407),
+('lm-02','Limketkai Center',295,290,8.4842,124.6568),
+('lm-03','Xavier University',170,420,8.4784,124.6489),
+('lm-04','Centrio Mall',225,380,8.4877,124.6517),
+('lm-05','NMMC',250,340,8.4875,124.6468),
+('lm-06','Provincial Capitol',135,460,8.4795,124.6468),
+('lm-07','Camp Evangelista',380,220,8.5108,124.6681),
+('lm-08','St. Augustine Metropolitan Cathedral',125,580,8.4777,124.6433),
+('lm-09','Cagayan de Oro City Hall',120,590,8.4772,124.6424);
 
 -- ─── PLACES ────────────────────────────────────────────
 INSERT INTO places (id, name, area, kind, map_x, map_y, lat, lng) VALUES
-('pl-01','Liceo de Cagayan University','Lapasan','school',155,265,8.4961,124.6483),
-('pl-02','Limketkai Center','Kauswagan','mall',295,290,8.4987,124.6601),
-('pl-03','Cogon Market','Poblacion','market',195,540,8.4792,124.6541),
-('pl-04','Divisoria','Poblacion','market',210,620,8.4722,124.6521),
-('pl-05','Centrio Mall','Poblacion','mall',225,380,8.4821,124.6572),
-('pl-06','Xavier University','Poblacion','school',170,420,8.4832,124.6503),
-('pl-07','Carmen Market','Carmen','market',185,110,8.5283,124.6473),
-('pl-08','Agora Terminal','Kauswagan','terminal',370,430,8.4749,124.6642),
-('pl-09','Bulua Terminal','Bulua','terminal',20,490,8.4731,124.6201),
-('pl-10','Provincial Capitol','Poblacion','government',135,460,8.4777,124.6452),
-('pl-11','NMMC','Kauswagan','hospital',250,340,8.4875,124.6588),
-('pl-12','Gusa','Gusa','landmark',370,290,8.5012,124.6698),
-('pl-13','SM CDO Uptown','Carmen','mall',330,120,8.5198,124.6612),
-('pl-14','Camp Evangelista','Kauswagan','landmark',380,220,8.5108,124.6681);
+('pl-01','Liceo de Cagayan University','Kauswagan','school',155,265,8.4975,124.6407),
+('pl-02','Limketkai Center','Lapasan','mall',295,290,8.4842,124.6568),
+('pl-03','Cogon Market','Cogon','market',195,540,8.4754,124.6502),
+('pl-04','Divisoria','Poblacion','market',210,620,8.4772,124.6465),
+('pl-05','Centrio Mall','Poblacion','mall',225,380,8.4877,124.6517),
+('pl-06','Xavier University','Poblacion','school',170,420,8.4784,124.6489),
+('pl-07','Carmen Market','Carmen','market',185,110,8.4804,124.6369),
+('pl-08','Agora Terminal','Lapasan','terminal',370,430,8.4907,124.6610),
+('pl-09','Bulua Terminal','Bulua','terminal',20,490,8.5132,124.6190),
+('pl-10','Provincial Capitol','Poblacion','government',135,460,8.4795,124.6468),
+('pl-11','NMMC','Poblacion','hospital',250,340,8.4875,124.6468),
+('pl-12','Gusa','Gusa','landmark',370,290,8.4925,124.6780),
+('pl-13','SM CDO Uptown','Carmen','mall',330,120,8.4578,124.6225),
+('pl-14','Camp Evangelista','Patag','landmark',380,220,8.5108,124.6681),
+('pl-15','St. Augustine Metropolitan Cathedral','Poblacion','landmark',125,580,8.4777,124.6433),
+('pl-16','Cagayan de Oro City Hall','Poblacion','government',120,590,8.4772,124.6424),
+('pl-17','Limketkai Mall','Lapasan','mall',295,290,8.4842,124.6568);
 
 -- ─── ROUTES ────────────────────────────────────────────
 INSERT INTO routes (id, code, name, origin, destination, jeepney_type, direction, description, length_km, status, color, offline_size_mb, last_updated_at) VALUES

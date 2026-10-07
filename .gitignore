@@ -18,6 +18,12 @@ admin-web/dist/
 admin-web/.env
 *.log
 
+# Scratch & PDF Build Artifacts
+scratch/
+backend/scratch/
+pdf_build/
+*.pdf
+
 # IDE & OS
 .idea/
 *.iml

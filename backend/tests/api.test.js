@@ -1,4 +1,4 @@
-﻿const request = require("supertest");
+const request = require("supertest");
 const app = require("../src/server");
 const db = require("../src/config/db");
 
@@ -134,6 +134,23 @@ describe("History", () => {
       .send({ from: "Liceo de Cagayan University", to: "Limketkai Center" });
     expect([200, 201]).toContain(res.status);
     expect(res.body).toHaveProperty("id");
+  });
+
+  it("POST /api/v1/history deduplicates repeated search and updates existing record", async () => {
+    // Post duplicate search
+    const resDup = await request(app)
+      .post("/api/v1/history")
+      .set("X-Device-Id", DEVICE_ID)
+      .send({ from: "Liceo de Cagayan University", to: "Limketkai Center" });
+    expect([200, 201]).toContain(resDup.status);
+
+    // Fetch history - should only contain 1 item for this pair
+    const resList = await request(app)
+      .get("/api/v1/history")
+      .set("X-Device-Id", DEVICE_ID);
+    expect(resList.status).toBe(200);
+    const matches = resList.body.filter(h => h.destination === "Limketkai Center");
+    expect(matches.length).toBe(1);
   });
 
   it("GET /api/v1/history returns history", async () => {

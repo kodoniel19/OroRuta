@@ -33,6 +33,8 @@ fun RoutesScreen(
     viewModel: RoutesViewModel,
     onSelectRoute: (routeId: String) -> Unit
 ) {
+    val state = viewModel.routesState
+
     Scaffold(
         topBar = {
             Surface(
@@ -107,6 +109,62 @@ fun RoutesScreen(
                             )
                         }
                     }
+                    val isOffline = (state as? Resource.Success<*>)?.isOffline == true
+                    if (isOffline) {
+                        Surface(
+                            color = Warn50,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Warn600)
+                                )
+                                Text(
+                                    text = "Offline – Showing cached routes",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Warn600
+                                )
+                            }
+                        }
+                    } else if (state is Resource.Success<*>) {
+                        Surface(
+                            color = Ok50,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Ok600)
+                                )
+                                Text(
+                                    text = "Online – Updated just now",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Ok600
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -117,7 +175,7 @@ fun RoutesScreen(
                 .padding(innerPadding)
                 .background(Canvas)
         ) {
-            when (val state = viewModel.routesState) {
+            when (state) {
                 is Resource.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = Brand600)
@@ -126,28 +184,64 @@ fun RoutesScreen(
 
                 is Resource.Error -> {
                     Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text(text = state.message, color = InkMuted, fontSize = 14.sp)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = if (state.isOffline) "No cached routes available" else "Unable to load routes",
+                                color = Ink,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = state.message,
+                                color = InkMuted,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
                 }
 
                 is Resource.Success<*> -> {
                     @Suppress("UNCHECKED_CAST")
                     val routes = (state as Resource.Success<List<Route>>).data
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        item {
-                            Text(
-                                text = "${routes.size} routes found",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = InkMuted
-                            )
+                    if (routes.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "No routes found",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Ink
+                                )
+                                Text(
+                                    text = "Try adjusting your search or filters.",
+                                    fontSize = 13.sp,
+                                    color = InkMuted
+                                )
+                            }
                         }
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            item {
+                                Text(
+                                    text = "${routes.size} routes found",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = InkMuted
+                                )
+                            }
 
-                        items(routes) { route ->
-                            RouteDirectoryRow(route = route, onClick = { onSelectRoute(route.id) })
+                            items(routes) { route ->
+                                RouteDirectoryRow(route = route, onClick = { onSelectRoute(route.id) })
+                            }
                         }
                     }
                 }
