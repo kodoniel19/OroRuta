@@ -1,6 +1,6 @@
 -- ============================================================
 -- OroRuta Portable Database Backup
--- Exported at: 2026-10-19T12:43:12.549Z
+-- Exported at: 2026-10-19T13:37:13.247Z
 -- Target: MySQL 8.0 / MariaDB 10.4+
 -- Includes: Complete schema, 68 LPTRP routes, 136 geometries,
 --           terminals, landmarks, places, fare rules, and announcements.
@@ -64,7 +64,7 @@ CREATE TABLE `announcement_details` (
   PRIMARY KEY (`id`),
   KEY `announcement_id` (`announcement_id`),
   CONSTRAINT `announcement_details_ibfk_1` FOREIGN KEY (`announcement_id`) REFERENCES `announcements` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=276 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=287 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `announcement_details` (`id`, `announcement_id`, `seq`, `text`) VALUES
   (1, 'a-01', 1, 'All R5 jeepneys will use the detour via National Highway bypassing the usual segment.'),
@@ -343,7 +343,18 @@ INSERT INTO `announcement_details` (`id`, `announcement_id`, `seq`, `text`) VALU
   (272, 'a-04', 1, 'Route R3, R5, R12, R2, and R1 are all affected by the terminal reorganization.'),
   (273, 'a-04', 2, 'New loading bays are designated per route at the terminal.'),
   (274, 'a-05', 1, 'Road repairs have been completed ahead of schedule.'),
-  (275, 'a-05', 2, 'R12 now runs on its original path through Gusa Rd.');
+  (275, 'a-05', 2, 'R12 now runs on its original path through Gusa Rd.'),
+  (276, 'a-01', 1, 'All R5 jeepneys will use the detour via National Highway bypassing the usual segment.'),
+  (277, 'a-01', 2, 'Expect longer travel time of approximately 10–15 additional minutes.'),
+  (278, 'a-01', 3, 'Loading and unloading designations remain the same at both terminals.'),
+  (279, 'a-02', 1, 'New loading zone is now 50 meters north of the previous stop near Limketkai Center.'),
+  (280, 'a-02', 2, 'Unloading for Agora-bound passengers has been adjusted near the eastern gate.'),
+  (281, 'a-03', 1, 'Alternative route avoids the flood-prone section of Masterson Ave.'),
+  (282, 'a-03', 2, 'Service frequency may be reduced during typhoon season.'),
+  (283, 'a-04', 1, 'Route R3, R5, R12, R2, and R1 are all affected by the terminal reorganization.'),
+  (284, 'a-04', 2, 'New loading bays are designated per route at the terminal.'),
+  (285, 'a-05', 1, 'Road repairs have been completed ahead of schedule.'),
+  (286, 'a-05', 2, 'R12 now runs on its original path through Gusa Rd.');
 
 -- ------------------------------------------------------------
 -- Table structure & data for table `announcement_routes`
@@ -423,7 +434,7 @@ INSERT INTO `content_pages` (`slug`, `title`, `sections`) VALUES
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `device_notification_prefs`;
 CREATE TABLE `device_notification_prefs` (
-  `device_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `device_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `route_changes` tinyint(1) NOT NULL DEFAULT '1',
   `closures` tinyint(1) NOT NULL DEFAULT '1',
   `terminals` tinyint(1) NOT NULL DEFAULT '1',
@@ -437,12 +448,12 @@ CREATE TABLE `device_notification_prefs` (
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `devices`;
 CREATE TABLE `devices` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_seen_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `language` varchar(8) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'en',
+  `language` varchar(8) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'en',
   `precise_location` tinyint(1) NOT NULL DEFAULT '0',
-  `manual_start_place_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `manual_start_place_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_devices_last_seen` (`last_seen_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -458,8 +469,8 @@ DROP TABLE IF EXISTS `faqs`;
 CREATE TABLE `faqs` (
   `id` int NOT NULL AUTO_INCREMENT,
   `seq` int NOT NULL DEFAULT '0',
-  `q` varchar(300) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `a` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `q` varchar(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `a` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_faq_seq` (`seq`)
 ) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -504,8 +515,8 @@ DROP TABLE IF EXISTS `help_topics`;
 CREATE TABLE `help_topics` (
   `id` int NOT NULL AUTO_INCREMENT,
   `seq` int NOT NULL DEFAULT '0',
-  `title` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `body` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `body` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_ht_seq` (`seq`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -522,8 +533,8 @@ INSERT INTO `help_topics` (`id`, `seq`, `title`, `body`) VALUES
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `landmarks`;
 CREATE TABLE `landmarks` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `map_x` decimal(8,4) NOT NULL DEFAULT '0.0000',
   `map_y` decimal(8,4) NOT NULL DEFAULT '0.0000',
   `lat` decimal(10,7) NOT NULL DEFAULT '0.0000000',
@@ -561,11 +572,11 @@ INSERT INTO `landmarks` (`id`, `name`, `map_x`, `map_y`, `lat`, `lng`) VALUES
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `loading_points`;
 CREATE TABLE `loading_points` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `note` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `point_type` enum('loading','unloading') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'loading',
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `note` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `point_type` enum('loading','unloading') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'loading',
   `map_x` decimal(8,4) NOT NULL DEFAULT '0.0000',
   `map_y` decimal(8,4) NOT NULL DEFAULT '0.0000',
   `lat` decimal(10,7) NOT NULL DEFAULT '0.0000000',
@@ -641,15 +652,31 @@ INSERT INTO `loading_points` (`id`, `route_id`, `name`, `note`, `point_type`, `m
   ('lp-limketkai-1-R2', '09cfc7ea-4f4a-477e-89a4-13666ddf29a1', 'Limketkai Center Loading Bay', 'Limketkai Drive', 'loading', '0.0000', '0.0000', '8.4838000', '124.6530000'),
   ('lp-limketkai-1-R3', '2e8ed762-ee8d-4694-b3ae-2c529cb926f3', 'Limketkai Center Loading Bay', 'Limketkai Drive', 'loading', '0.0000', '0.0000', '8.4838000', '124.6530000'),
   ('lp-limketkai-1-R4', 'ffa2a646-6ffd-4a4b-ae1f-76632fd95ac9', 'Limketkai Center Loading Bay', 'Limketkai Drive', 'loading', '0.0000', '0.0000', '8.4838000', '124.6530000'),
-  ('lp-limketkai-1-R5', '564269a7-bf89-4bff-a955-e8c518ba4dea', 'Limketkai Center Loading Bay', 'Limketkai Drive', 'loading', '0.0000', '0.0000', '8.4838000', '124.6530000');
+  ('lp-limketkai-1-R5', '564269a7-bf89-4bff-a955-e8c518ba4dea', 'Limketkai Center Loading Bay', 'Limketkai Drive', 'loading', '0.0000', '0.0000', '8.4838000', '124.6530000'),
+  ('lp-miami-baikingon-rbai', '5e26a5b7-ab6e-470e-96f9-a109990ffbe0', 'Miami Inn - Vamenta Blvd Loading Point', 'Verified Stop near 126 Vamenta Blvd, Carmen', 'loading', '0.0000', '0.0000', '8.4772850', '124.6376330'),
+  ('lp-miami-balulang-rbal', '70d79bf1-bb70-4eec-9673-43b92cd1f420', 'Miami Inn - Vamenta Blvd Loading Point', 'Verified Stop near 126 Vamenta Blvd, Carmen', 'loading', '0.0000', '0.0000', '8.4772850', '124.6376330'),
+  ('lp-miami-carmen-r5', '564269a7-bf89-4bff-a955-e8c518ba4dea', 'Miami Inn - Vamenta Blvd Loading Point', 'Verified Stop near 126 Vamenta Blvd, Carmen', 'loading', '0.0000', '0.0000', '8.4772850', '124.6376330'),
+  ('lp-miami-kauswagan-r2', 'b2682fed-e85e-43ce-b05d-d4a472c6097a', 'Miami Inn - Vamenta Blvd Loading Point', 'Verified Stop near 126 Vamenta Blvd, Carmen', 'loading', '0.0000', '0.0000', '8.4772850', '124.6376330'),
+  ('lp-miami-lapasan-r1', '38f1362f-d2a7-4e36-a989-9e178f2ddfae', 'Miami Inn - Vamenta Blvd Loading Point', 'Verified Stop near 126 Vamenta Blvd, Carmen', 'loading', '0.0000', '0.0000', '8.4772850', '124.6376330'),
+  ('lp-miami-lumbia-r3', '04f8a2d2-6a9c-41a4-80fb-64368d6fe41c', 'Miami Inn - Vamenta Blvd Loading Point', 'Verified Stop near 126 Vamenta Blvd, Carmen', 'loading', '0.0000', '0.0000', '8.4772850', '124.6376330'),
+  ('lp-miami-macabalan-r5', '9ef925b0-d6b4-4565-bd92-05b28173336d', 'Miami Inn - Vamenta Blvd Loading Point', 'Verified Stop near 126 Vamenta Blvd, Carmen', 'loading', '0.0000', '0.0000', '8.4772850', '124.6376330'),
+  ('lp-smdt-bugo-r1', '7f29e17a-f3e8-46b2-932c-c02377a48da3', 'SM CDO Downtown Loading/Unloading Point', 'CM Recto Ave corridor stop', 'loading', '0.0000', '0.0000', '8.4855000', '124.6535000'),
+  ('lp-smdt-bulua-r1', '785b6016-46e6-4dbb-9e9d-147d2ba36ef7', 'SM CDO Downtown Loading/Unloading Point', 'CM Recto Ave corridor stop', 'loading', '0.0000', '0.0000', '8.4855000', '124.6535000'),
+  ('lp-smdt-bulua-r2', '09cfc7ea-4f4a-477e-89a4-13666ddf29a1', 'SM CDO Downtown Loading/Unloading Point', 'CM Recto Ave corridor stop', 'loading', '0.0000', '0.0000', '8.4855000', '124.6535000'),
+  ('lp-smdt-iponan-r3', 'cb0010d4-bbf2-4261-9499-c69506f9f358', 'SM CDO Downtown Loading/Unloading Point', 'CM Recto Ave corridor stop', 'loading', '0.0000', '0.0000', '8.4855000', '124.6535000'),
+  ('lp-smdt-kauswagan-r1', '55f15c69-1061-4ca1-9989-95253b08d41f', 'SM CDO Downtown Loading/Unloading Point', 'CM Recto Ave corridor stop', 'loading', '0.0000', '0.0000', '8.4855000', '124.6535000'),
+  ('lp-smdt-puerto-r1', 'c80f880d-6491-4e83-89e7-1142a1c06749', 'SM CDO Downtown Loading/Unloading Point', 'CM Recto Ave corridor stop', 'loading', '0.0000', '0.0000', '8.4855000', '124.6535000'),
+  ('up-miami-lapasan-r1', '38f1362f-d2a7-4e36-a989-9e178f2ddfae', 'Miami Inn - Vamenta Blvd Drop-off Stop', 'Verified Stop near 126 Vamenta Blvd, Carmen', 'unloading', '0.0000', '0.0000', '8.4772850', '124.6376330'),
+  ('up-miami-lumbia-r3', '04f8a2d2-6a9c-41a4-80fb-64368d6fe41c', 'Miami Inn - Vamenta Blvd Drop-off Stop', 'Verified Stop near 126 Vamenta Blvd, Carmen', 'unloading', '0.0000', '0.0000', '8.4772850', '124.6376330'),
+  ('up-miami-macabalan-r5', '9ef925b0-d6b4-4565-bd92-05b28173336d', 'Miami Inn - Vamenta Blvd Drop-off Stop', 'Verified Stop near 126 Vamenta Blvd, Carmen', 'unloading', '0.0000', '0.0000', '8.4772850', '124.6376330');
 
 -- ------------------------------------------------------------
 -- Table structure & data for table `major_roads`
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `major_roads`;
 CREATE TABLE `major_roads` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -673,8 +700,8 @@ INSERT INTO `major_roads` (`id`, `name`) VALUES
 DROP TABLE IF EXISTS `map_base`;
 CREATE TABLE `map_base` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `type` enum('road','area_label','park','sea','river') COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` enum('road','area_label','park','sea','river') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `geometry` json NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_mb_type` (`type`)
@@ -686,8 +713,8 @@ CREATE TABLE `map_base` (
 DROP TABLE IF EXISTS `offline_map_pack`;
 CREATE TABLE `offline_map_pack` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `version` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `version` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `size_mb` decimal(6,2) NOT NULL,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
@@ -698,10 +725,10 @@ CREATE TABLE `offline_map_pack` (
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `places`;
 CREATE TABLE `places` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `area` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `kind` enum('school','mall','market','terminal','landmark','government','hospital') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'landmark',
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `area` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `kind` enum('school','mall','market','terminal','landmark','government','hospital') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'landmark',
   `map_x` decimal(8,4) NOT NULL DEFAULT '0.0000',
   `map_y` decimal(8,4) NOT NULL DEFAULT '0.0000',
   `lat` decimal(10,7) NOT NULL DEFAULT '0.0000000',
@@ -718,21 +745,28 @@ INSERT INTO `places` (`id`, `name`, `area`, `kind`, `map_x`, `map_y`, `lat`, `ln
   ('pl-bulua', 'Bulua Terminal', 'Bulua', 'terminal', '0.0000', '0.0000', '8.5040000', '124.6115000'),
   ('pl-campevang', 'Camp Evangelista', 'Patag', 'landmark', '0.0000', '0.0000', '8.5108000', '124.6681000'),
   ('pl-capitol', 'Provincial Capitol', 'Poblacion', 'government', '0.0000', '0.0000', '8.4795000', '124.6468000'),
+  ('pl-capitol-univ', 'Capitol University', 'Lapasan', 'school', '0.0000', '0.0000', '8.4870000', '124.6550000'),
   ('pl-carmen', 'Carmen Market', 'Carmen', 'market', '0.0000', '0.0000', '8.4845000', '124.6335000'),
   ('pl-cathedral', 'St. Augustine Metropolitan Cathedral', 'Poblacion', 'landmark', '0.0000', '0.0000', '8.4777000', '124.6433000'),
   ('pl-centrio', 'Centrio Mall', 'Poblacion', 'mall', '0.0000', '0.0000', '8.4877000', '124.6517000'),
   ('pl-cityhall', 'Cagayan de Oro City Hall', 'Poblacion', 'government', '0.0000', '0.0000', '8.4772000', '124.6424000'),
   ('pl-cogon', 'Cogon Market', 'Cogon', 'market', '0.0000', '0.0000', '8.4735000', '124.6497000'),
   ('pl-divisoria', 'Divisoria', 'Poblacion', 'landmark', '0.0000', '0.0000', '8.4777000', '124.6452000'),
+  ('pl-gaisano-city', 'Gaisano City Mall', 'Lapasan', 'mall', '0.0000', '0.0000', '8.4842000', '124.6515000'),
+  ('pl-gumamela-ext', 'Gumamela Extension, Carmen', 'Carmen', 'landmark', '0.0000', '0.0000', '8.4908000', '124.6338000'),
   ('pl-gusa', 'Gusa Crossing', 'Gusa', 'landmark', '0.0000', '0.0000', '8.4775000', '124.6830000'),
   ('pl-kauswagan', 'Kauswagan Crossing', 'Kauswagan', 'landmark', '0.0000', '0.0000', '8.4965000', '124.6310000'),
   ('pl-konghua', 'Kong Hua School', 'Kauswagan', 'school', '0.0000', '0.0000', '8.4965000', '124.6345000'),
   ('pl-liceo', 'Liceo de Cagayan University', 'Kauswagan', 'school', '0.0000', '0.0000', '8.4965000', '124.6407000'),
   ('pl-limketkai', 'Limketkai Center', 'Lapasan', 'mall', '0.0000', '0.0000', '8.4842000', '124.6568000'),
   ('pl-macasandig', 'Macasandig Terminal', 'Macasandig', 'terminal', '0.0000', '0.0000', '8.4625000', '124.6505000'),
+  ('pl-miami-inn', 'Miami Inn Carmen', 'Carmen', 'landmark', '0.0000', '0.0000', '8.4772850', '124.6376330'),
   ('pl-nmmc', 'NMMC', 'Poblacion', 'hospital', '0.0000', '0.0000', '8.4875000', '124.6468000'),
   ('pl-patag', 'Patag', 'Patag', 'landmark', '0.0000', '0.0000', '8.4760000', '124.6130000'),
+  ('pl-polymedic-plaza', 'Cagayan de Oro Polymedic Plaza', 'Kauswagan', 'hospital', '0.0000', '0.0000', '8.4940000', '124.6305000'),
   ('pl-puerto', 'Puerto Public Market', 'Puerto', 'market', '0.0000', '0.0000', '8.4990000', '124.7420000'),
+  ('pl-savemore-kauswagan', 'Savemore Market Kauswagan', 'Kauswagan', 'market', '0.0000', '0.0000', '8.4960000', '124.6340000'),
+  ('pl-sm-downtown', 'SM CDO Downtown Premier', 'Lapasan', 'mall', '0.0000', '0.0000', '8.4855000', '124.6535000'),
   ('pl-smuptown', 'SM CDO Uptown', 'Carmen', 'mall', '0.0000', '0.0000', '8.4578000', '124.6225000'),
   ('pl-ustp', 'USTP Lapasan', 'Lapasan', 'school', '0.0000', '0.0000', '8.4852000', '124.6572000'),
   ('pl-xavier', 'Xavier University', 'Poblacion', 'school', '0.0000', '0.0000', '8.4784000', '124.6489000');
@@ -742,15 +776,15 @@ INSERT INTO `places` (`id`, `name`, `area`, `kind`, `map_x`, `map_y`, `lat`, `ln
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `reports`;
 CREATE TABLE `reports` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `reference_no` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `device_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type` enum('Incorrect route information','Incorrect loading point','Incorrect terminal','Route change','Other') COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `location_text` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reference_no` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `device_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` enum('Incorrect route information','Incorrect loading point','Incorrect terminal','Route change','Other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `location_text` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `lat` decimal(10,7) DEFAULT NULL,
   `lng` decimal(10,7) DEFAULT NULL,
-  `status` enum('pending','verified','rejected') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `status` enum('pending','verified','rejected') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `reference_no` (`reference_no`),
@@ -764,11 +798,11 @@ CREATE TABLE `reports` (
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `route_directions`;
 CREATE TABLE `route_directions` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `direction` enum('Inbound','Outbound') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `direction` enum('Inbound','Outbound') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `distance_km` decimal(5,2) NOT NULL DEFAULT '0.00',
-  `street_sequence` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `street_sequence` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_route_dir` (`route_id`,`direction`),
   CONSTRAINT `route_directions_ibfk_1` FOREIGN KEY (`route_id`) REFERENCES `routes` (`id`) ON DELETE CASCADE
@@ -918,11 +952,11 @@ INSERT INTO `route_directions` (`id`, `route_id`, `direction`, `distance_km`, `s
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `route_geometry`;
 CREATE TABLE `route_geometry` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `direction` enum('Inbound','Outbound') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `direction` enum('Inbound','Outbound') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `geometry` json NOT NULL,
-  `geometry_status` enum('PENDING','GENERATED','VERIFIED','ERROR') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDING',
+  `geometry_status` enum('PENDING','GENERATED','VERIFIED','ERROR') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDING',
   `generated_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_route_geom_dir` (`route_id`,`direction`),
@@ -1073,8 +1107,8 @@ INSERT INTO `route_geometry` (`id`, `route_id`, `direction`, `geometry`, `geomet
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `route_landmarks`;
 CREATE TABLE `route_landmarks` (
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `landmark_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `landmark_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `seq` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`route_id`,`landmark_id`),
   KEY `landmark_id` (`landmark_id`),
@@ -1111,8 +1145,8 @@ INSERT INTO `route_landmarks` (`route_id`, `landmark_id`, `seq`) VALUES
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `route_major_roads`;
 CREATE TABLE `route_major_roads` (
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `road_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `road_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `seq` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`route_id`,`road_id`),
   KEY `road_id` (`road_id`),
@@ -1126,7 +1160,7 @@ CREATE TABLE `route_major_roads` (
 DROP TABLE IF EXISTS `route_path_points`;
 CREATE TABLE `route_path_points` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `seq` int NOT NULL,
   `map_x` decimal(8,4) NOT NULL,
   `map_y` decimal(8,4) NOT NULL,
@@ -1559,8 +1593,8 @@ INSERT INTO `route_path_points` (`id`, `route_id`, `seq`, `map_x`, `map_y`, `lat
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `route_terminals`;
 CREATE TABLE `route_terminals` (
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `terminal_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `terminal_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `seq` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`route_id`,`terminal_id`),
   KEY `terminal_id` (`terminal_id`),
@@ -1664,18 +1698,18 @@ INSERT INTO `route_terminals` (`route_id`, `terminal_id`, `seq`) VALUES
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `routes`;
 CREATE TABLE `routes` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `code` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `origin` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `destination` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `jeepney_type` enum('Traditional','Modern') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Traditional',
-  `description` text COLLATE utf8mb4_unicode_ci,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `origin` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `destination` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `jeepney_type` enum('Traditional','Modern') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Traditional',
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `inbound_distance_km` decimal(5,2) NOT NULL DEFAULT '0.00',
   `outbound_distance_km` decimal(5,2) NOT NULL DEFAULT '0.00',
-  `status` enum('Active','Inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Active',
-  `verification_status` enum('DRAFT','PENDING_VERIFICATION','VERIFIED','PUBLISHED','DATA_REVIEW_REQUIRED','ERROR') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT',
-  `color` varchar(9) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '#1471B0',
+  `status` enum('Active','Inactive') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Active',
+  `verification_status` enum('DRAFT','PENDING_VERIFICATION','VERIFIED','PUBLISHED','DATA_REVIEW_REQUIRED','ERROR') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT',
+  `color` varchar(9) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '#1471B0',
   `offline_size_mb` decimal(5,2) NOT NULL DEFAULT '0.50',
   `last_updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -1760,11 +1794,11 @@ INSERT INTO `routes` (`id`, `code`, `name`, `origin`, `destination`, `jeepney_ty
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `saved_destinations`;
 CREATE TABLE `saved_destinations` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `device_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `label` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `place_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `icon` enum('home','school','work','pin') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pin',
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `device_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `label` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `place_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `icon` enum('home','school','work','pin') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pin',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_sd_device` (`device_id`),
@@ -1776,13 +1810,13 @@ CREATE TABLE `saved_destinations` (
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `saved_trips`;
 CREATE TABLE `saved_trips` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `device_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `from_label` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `to_label` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `device_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `from_label` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `to_label` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `route_ids` json NOT NULL,
-  `route_ids_hash` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `trip_option_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `route_ids_hash` char(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `trip_option_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_saved_trip` (`device_id`,`from_label`,`to_label`,`route_ids_hash`),
@@ -1795,11 +1829,11 @@ CREATE TABLE `saved_trips` (
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `searches`;
 CREATE TABLE `searches` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `device_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `current_location` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `destination` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `device_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `current_location` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `destination` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_searches_device` (`device_id`,`created_at`),
@@ -1816,9 +1850,9 @@ INSERT INTO `searches` (`id`, `device_id`, `current_location`, `destination`, `r
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `terminals`;
 CREATE TABLE `terminals` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `note` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `note` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `map_x` decimal(8,4) NOT NULL DEFAULT '0.0000',
   `map_y` decimal(8,4) NOT NULL DEFAULT '0.0000',
   `lat` decimal(10,7) NOT NULL DEFAULT '0.0000000',
@@ -1845,10 +1879,10 @@ INSERT INTO `terminals` (`id`, `name`, `note`, `map_x`, `map_y`, `lat`, `lng`) V
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `transfer_points`;
 CREATE TABLE `transfer_points` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `note` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `note` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `map_x` decimal(8,4) NOT NULL DEFAULT '0.0000',
   `map_y` decimal(8,4) NOT NULL DEFAULT '0.0000',
   `lat` decimal(10,7) NOT NULL DEFAULT '0.0000000',
@@ -1864,14 +1898,14 @@ CREATE TABLE `transfer_points` (
 DROP TABLE IF EXISTS `trip_legs`;
 CREATE TABLE `trip_legs` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `trip_option_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `trip_option_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `seq` int NOT NULL,
-  `kind` enum('walk','board','stay','alight') COLLATE utf8mb4_unicode_ci NOT NULL,
-  `title` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `detail` varchar(300) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `kind` enum('walk','board','stay','alight') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `detail` varchar(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `minutes` int NOT NULL DEFAULT '0',
   `distance_m` int NOT NULL DEFAULT '0',
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `point_x` decimal(8,4) DEFAULT NULL,
   `point_y` decimal(8,4) DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -1886,25 +1920,25 @@ CREATE TABLE `trip_legs` (
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `trip_options`;
 CREATE TABLE `trip_options` (
-  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `origin_place_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `destination_place_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `origin_place_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `destination_place_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `minutes` int NOT NULL,
   `walk_meters` int NOT NULL DEFAULT '0',
   `transfers` int NOT NULL DEFAULT '0',
-  `direction` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` enum('Active','Rerouted','Updated','Temporary') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Active',
-  `boarding_name` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `direction` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('Active','Rerouted','Updated','Temporary') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Active',
+  `boarding_name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `boarding_map_x` decimal(8,4) DEFAULT NULL,
   `boarding_map_y` decimal(8,4) DEFAULT NULL,
   `boarding_lat` decimal(10,7) DEFAULT NULL,
   `boarding_lng` decimal(10,7) DEFAULT NULL,
-  `dropoff_name` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dropoff_name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `dropoff_map_x` decimal(8,4) DEFAULT NULL,
   `dropoff_map_y` decimal(8,4) DEFAULT NULL,
   `dropoff_lat` decimal(10,7) DEFAULT NULL,
   `dropoff_lng` decimal(10,7) DEFAULT NULL,
-  `transfer_name` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `transfer_name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `transfer_map_x` decimal(8,4) DEFAULT NULL,
   `transfer_map_y` decimal(8,4) DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -1923,9 +1957,9 @@ INSERT INTO `trip_options` (`id`, `origin_place_id`, `destination_place_id`, `mi
 DROP TABLE IF EXISTS `trip_segments`;
 CREATE TABLE `trip_segments` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `trip_option_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `trip_option_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `seq` int NOT NULL,
-  `route_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `route_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `from_x` decimal(8,4) NOT NULL,
   `from_y` decimal(8,4) NOT NULL,
   `to_x` decimal(8,4) NOT NULL,

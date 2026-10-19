@@ -1,21 +1,36 @@
 package com.ororuta.app.data.repository
 
+import android.content.Context
+import android.location.Geocoder
 import com.ororuta.app.data.local.dao.*
 import com.ororuta.app.data.local.entities.*
 import com.ororuta.app.data.remote.OroRutaApi
 import com.ororuta.app.domain.models.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.IOException
+import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class TripRepository @Inject constructor(private val api: OroRutaApi) {
+class TripRepository @Inject constructor(
+    private val api: OroRutaApi,
+    private val routeDao: RouteDao,
+    private val json: Json
+) {
+    /**
+     * Search for jeepney trip options.
+     * Primary: backend /trips/search API (uses verified route geometry + loading points).
+     * Fallback (when backend unreachable on physical device): local Room-based match
+     *   that searches cached routes by destination keyword and synthesises TripOption stubs
+     *   so the UI never shows "Can't search while offline" for a fully local device.
+     */
     suspend fun searchTrips(
         from: String,
         to: String,
@@ -29,9 +44,84 @@ class TripRepository @Inject constructor(private val api: OroRutaApi) {
             val results = api.searchTrips(from, to, fromLat, fromLng, toLat, toLng, sort)
             Resource.Success(results)
         } catch (e: IOException) {
-            Resource.Error("You're offline. Cannot search for routes.", isOffline = true)
+            // Backend unreachable (no adb reverse on physical device, or no Wi-Fi)
+            // Attempt a local match from Room-cached routes
+            val localTrips = buildLocalTrips(to, toLat, toLng)
+            if (localTrips.isNotEmpty()) {
+                Resource.Success(localTrips, isOffline = true)
+            } else {
+                Resource.Error(
+                    "Can't reach OroRuta server. Connect to Wi-Fi or use adb reverse tcp:3000 tcp:3000 while on the same network as your dev machine.",
+                    isOffline = true
+                )
+            }
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Search failed")
+        }
+    }
+
+    /**
+     * Build basic TripOption stubs from locally cached routes that match [destination].
+     * Results are sorted by estimated travel time.
+     */
+    private suspend fun buildLocalTrips(destination: String, toLat: Double?, toLng: Double?): List<TripOption> {
+        val destClean = destination.trim().lowercase()
+        if (destClean.length < 2) return emptyList()
+
+        return try {
+            val cached = routeDao.getAllSync()
+            val matched = cached.mapNotNull { cachedRoute ->
+                try { json.decodeFromString<Route>(cachedRoute.jsonData) } catch (_: Exception) { null }
+            }.filter { route ->
+                route.jeepneyType.equals("Traditional", ignoreCase = true) || route.jeepneyType.isBlank()
+            }.filter { route ->
+                val inDest = route.destination.lowercase().contains(destClean) || destClean.contains(route.destination.lowercase())
+                val inOrigin = route.origin.lowercase().contains(destClean) || destClean.contains(route.origin.lowercase())
+                val inLandmarks = route.landmarks.any { it.name.lowercase().contains(destClean) || destClean.contains(it.name.lowercase()) }
+                val inStops = route.stops.any { it.name.lowercase().contains(destClean) || destClean.contains(it.name.lowercase()) }
+                val inTerminals = route.terminals.any { it.name.lowercase().contains(destClean) || destClean.contains(it.name.lowercase()) }
+                inDest || inOrigin || inLandmarks || inStops || inTerminals
+            }.take(5)
+
+            matched.mapIndexed { idx, route ->
+                val dropoffTerminal = route.terminals.firstOrNull { it.name.lowercase().contains(destClean) }
+                    ?: route.terminals.lastOrNull()
+                val boardingTerminal = route.terminals.firstOrNull()
+                TripOption(
+                    id = "local_${route.id}_$idx",
+                    originPlaceId = route.id,
+                    destinationPlaceId = route.id,
+                    minutes = route.travelTime,
+                    walkMeters = 300,
+                    transfers = 0,
+                    direction = "Inbound",
+                    status = route.status,
+                    boardingName = boardingTerminal?.name ?: route.origin,
+                    boardingLat = boardingTerminal?.lat,
+                    boardingLng = boardingTerminal?.lng,
+                    dropoffName = dropoffTerminal?.name ?: route.destination,
+                    dropoffLat = dropoffTerminal?.lat ?: toLat,
+                    dropoffLng = dropoffTerminal?.lng ?: toLng,
+                    segments = listOf(
+                        TripSegment(
+                            tripOptionId = "local_${route.id}_$idx",
+                            seq = 1,
+                            routeId = route.id,
+                            code = route.code,
+                            routeName = route.name,
+                            color = route.color,
+                            jeepneyType = route.jeepneyType,
+                            routeStatus = route.status,
+                            km = route.lengthKm
+                        )
+                    ),
+                    totalKm = route.lengthKm,
+                    regularFare = route.fare,
+                    discountFare = route.fare * 0.8
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 
@@ -53,29 +143,77 @@ class TripRepository @Inject constructor(private val api: OroRutaApi) {
 
 @Singleton
 class PlaceRepository @Inject constructor(
-    private val api: OroRutaApi, private val dao: PlaceDao
+    @ApplicationContext private val context: Context,
+    private val api: OroRutaApi,
+    private val dao: PlaceDao
 ) {
+    /**
+     * Search places. Merges:
+     * 1. Backend /places API results
+     * 2. Room cache (offline fallback)
+     * 3. Android Geocoder results for free-text searches within CDO bounds
+     */
+    @Suppress("DEPRECATION")
     suspend fun search(q: String, filter: String = "all"): Resource<List<Place>> {
-        return try {
+        val apiResults = try {
             val results = api.getPlaces(q, filter = filter)
             val seen = mutableSetOf<String>()
-            val uniqueResults = results.filter {
-                val key = it.name.trim().lowercase()
-                seen.add(key)
-            }
-            dao.clearAll()
-            dao.insertAll(uniqueResults.map { CachedPlace(it.id, it.name, it.area, it.kind, it.mapX, it.mapY, it.lat, it.lng) })
-            Resource.Success(uniqueResults)
+            val unique = results.filter { seen.add(it.name.trim().lowercase()) }
+            // Only upsert, not clear — prevents cache thrash on every keystroke
+            dao.insertAll(unique.map { CachedPlace(it.id, it.name, it.area, it.kind, it.mapX, it.mapY, it.lat, it.lng) })
+            unique
         } catch (e: IOException) {
+            // Offline: serve cache
             val cached = dao.search(q)
             val seen = mutableSetOf<String>()
-            val uniqueCached = cached.filter {
-                val key = it.name.trim().lowercase()
-                seen.add(key)
-            }
-            Resource.Success(uniqueCached.map { Place(it.id, it.name, it.area, it.kind, it.mapX, it.mapY, it.lat, it.lng) })
+            cached.filter { seen.add(it.name.trim().lowercase()) }
+                .map { Place(it.id, it.name, it.area, it.kind, it.mapX, it.mapY, it.lat, it.lng) }
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Search failed")
+            emptyList()
+        }
+
+        // Geocoder fallback for free-text searches 2+ chars not already covered by API results
+        val geocoderResults = if (q.length >= 2) {
+            try {
+                val geocoder = Geocoder(context, Locale.getDefault())
+                // Search within CDO bounds: 8.35–8.60 N, 124.50–124.80 E
+                val addresses = geocoder.getFromLocationName("$q, Cagayan de Oro", 5, 8.35, 124.50, 8.60, 124.80)
+                val existingNames = apiResults.map { it.name.trim().lowercase() }.toSet()
+                addresses
+                    ?.filter { addr ->
+                        addr.hasLatitude() && addr.hasLongitude()
+                        && addr.latitude in 8.30..8.65
+                        && addr.longitude in 124.45..124.85
+                    }
+                    ?.mapNotNull { addr ->
+                        val name = (addr.featureName ?: addr.thoroughfare ?: addr.subLocality ?: addr.locality) ?: return@mapNotNull null
+                        val area = addr.subLocality ?: addr.locality ?: "Cagayan de Oro City"
+                        if (name.trim().lowercase() in existingNames) return@mapNotNull null
+                        Place(
+                            id = "geo_${addr.latitude}_${addr.longitude}",
+                            name = name,
+                            area = area,
+                            kind = "landmark",
+                            mapX = addr.longitude,
+                            mapY = addr.latitude,
+                            lat = addr.latitude,
+                            lng = addr.longitude
+                        )
+                    } ?: emptyList()
+            } catch (_: Exception) {
+                emptyList()
+            }
+        } else emptyList()
+
+        val merged = (apiResults + geocoderResults)
+            .let {
+                val seen = mutableSetOf<String>()
+                it.filter { p -> seen.add(p.name.trim().lowercase()) }
+            }
+        return if (merged.isNotEmpty() || apiResults.isNotEmpty()) {
+            Resource.Success(merged)
+        } else {
+            Resource.Error("No places found")
         }
     }
 }

@@ -295,8 +295,12 @@ fun OroRutaApp(initialRoute: String? = null) {
                     prefillFrom = prefillFrom,
                     prefillTo = prefillTo,
                     onBack = { navController.popBackStack() },
-                    onSearchSubmit = { from, to ->
-                        navController.navigate("results?from=$from&to=$to&sort=time")
+                    onSearchSubmit = { from, to, fromLat, fromLng, toLat, toLng ->
+                        val coordParams = buildString {
+                            if (fromLat != null && fromLng != null) append("&fromLat=$fromLat&fromLng=$fromLng")
+                            if (toLat != null && toLng != null) append("&toLat=$toLat&toLng=$toLng")
+                        }
+                        navController.navigate("results?from=$from&to=$to&sort=time$coordParams")
                     },
                     onViewPlaceOnMap = { place ->
                         navController.navigate("map?placeId=${place.id}&placeName=${place.name}&lat=${place.lat}&lng=${place.lng}&kind=${place.kind}")
@@ -305,20 +309,33 @@ fun OroRutaApp(initialRoute: String? = null) {
             }
 
             composable(
-                "results?from={from}&to={to}&sort={sort}",
+                "results?from={from}&to={to}&sort={sort}&fromLat={fromLat}&fromLng={fromLng}&toLat={toLat}&toLng={toLng}",
                 arguments = listOf(
                     navArgument("from") { defaultValue = "" },
                     navArgument("to") { defaultValue = "" },
-                    navArgument("sort") { defaultValue = "time" }
+                    navArgument("sort") { defaultValue = "time" },
+                    navArgument("fromLat") { defaultValue = "" },
+                    navArgument("fromLng") { defaultValue = "" },
+                    navArgument("toLat") { defaultValue = "" },
+                    navArgument("toLng") { defaultValue = "" }
                 )
             ) { backStack ->
                 val resultsVm = hiltViewModel<ResultsViewModel>()
                 val from = backStack.arguments?.getString("from") ?: ""
                 val to = backStack.arguments?.getString("to") ?: ""
+                val sort = backStack.arguments?.getString("sort") ?: "time"
+                val fromLat = backStack.arguments?.getString("fromLat")?.toDoubleOrNull()
+                val fromLng = backStack.arguments?.getString("fromLng")?.toDoubleOrNull()
+                val toLat = backStack.arguments?.getString("toLat")?.toDoubleOrNull()
+                val toLng = backStack.arguments?.getString("toLng")?.toDoubleOrNull()
                 ResultsScreen(
                     viewModel = resultsVm,
                     from = from,
                     to = to,
+                    fromLat = fromLat,
+                    fromLng = fromLng,
+                    toLat = toLat,
+                    toLng = toLng,
                     onBack = { navController.popBackStack() },
                     onEditSearch = { navController.navigate("search?from=$from&to=$to") },
                     onSelectTrip = { tripId, f, t -> navController.navigate("trip_detail/$tripId?from=$f&to=$t") },

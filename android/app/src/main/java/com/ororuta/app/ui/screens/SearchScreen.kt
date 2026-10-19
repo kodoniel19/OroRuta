@@ -32,7 +32,7 @@ fun SearchScreen(
     prefillFrom: String,
     prefillTo: String,
     onBack: () -> Unit,
-    onSearchSubmit: (from: String, to: String) -> Unit,
+    onSearchSubmit: (from: String, to: String, fromLat: Double?, fromLng: Double?, toLat: Double?, toLng: Double?) -> Unit,
     onViewPlaceOnMap: ((Place) -> Unit)? = null
 ) {
     LaunchedEffect(prefillFrom, prefillTo) {
@@ -212,7 +212,14 @@ fun SearchScreen(
                         onClick = {
                             viewModel.fromText = effectiveFrom
                             viewModel.saveHistory(effectiveFrom, viewModel.toText)
-                            onSearchSubmit(effectiveFrom, viewModel.toText)
+                            onSearchSubmit(
+                                effectiveFrom,
+                                viewModel.toText,
+                                viewModel.fromPlace?.lat,
+                                viewModel.fromPlace?.lng,
+                                viewModel.toPlace?.lat,
+                                viewModel.toPlace?.lng
+                            )
                         },
                         enabled = canSearch,
                         variant = ButtonVariant.Primary,
@@ -239,12 +246,12 @@ fun SearchScreen(
                                 if (focusedField == "to") {
                                     viewModel.toText = locName
                                     if (viewModel.fromText.isBlank()) viewModel.fromText = "Carmen Market"
-                                    onSearchSubmit(viewModel.fromText, viewModel.toText)
+                                    onSearchSubmit(viewModel.fromText, viewModel.toText, null, null, null, null)
                                 } else {
                                     viewModel.fromText = locName
                                     focusedField = "to"
                                     if (viewModel.toText.isNotBlank()) {
-                                        onSearchSubmit(viewModel.fromText, viewModel.toText)
+                                        onSearchSubmit(viewModel.fromText, viewModel.toText, null, null, null, null)
                                     }
                                 }
                             }
@@ -295,14 +302,22 @@ fun SearchScreen(
                                 focusedField = "to"
                                 if (viewModel.toText.isNotBlank()) {
                                     viewModel.saveHistory(viewModel.fromText, viewModel.toText)
-                                    onSearchSubmit(viewModel.fromText, viewModel.toText)
+                                    onSearchSubmit(
+                                        viewModel.fromText, viewModel.toText,
+                                        viewModel.fromPlace?.lat, viewModel.fromPlace?.lng,
+                                        viewModel.toPlace?.lat, viewModel.toPlace?.lng
+                                    )
                                 }
                             } else {
                                 viewModel.selectPlace(place, "to")
                                 val from = if (viewModel.fromText.isNotBlank()) viewModel.fromText else "Current Location"
                                 viewModel.fromText = from
                                 viewModel.saveHistory(from, place.name)
-                                onSearchSubmit(from, place.name)
+                                onSearchSubmit(
+                                    from, place.name,
+                                    viewModel.fromPlace?.lat, viewModel.fromPlace?.lng,
+                                    place.lat.takeIf { it != 0.0 }, place.lng.takeIf { it != 0.0 }
+                                )
                             }
                         },
                         onViewOnMap = if (onViewPlaceOnMap != null) { { onViewPlaceOnMap(place) } } else null
@@ -330,7 +345,8 @@ fun SearchScreen(
                             .clickable {
                                 viewModel.fromText = hist.from
                                 viewModel.toText = hist.to
-                                onSearchSubmit(hist.from, hist.to)
+                                // History items don't carry coordinates; backend will resolve by name
+                                onSearchSubmit(hist.from, hist.to, null, null, null, null)
                             }
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,

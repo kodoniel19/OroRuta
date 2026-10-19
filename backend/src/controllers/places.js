@@ -32,12 +32,30 @@ async function list(req, res, next) {
       rows = [];
     }
 
+    // Also search terminals, landmarks, and loading points if q is specified
+    if (q) {
+      const like = `%${q}%`;
+      try {
+        if (filter !== "landmarks") {
+          const [terms] = await db.execute("SELECT id, name, 'terminal' as kind, 'Cagayan de Oro' as area, lat, lng FROM terminals WHERE name LIKE ?", [like]);
+          rows = rows.concat(terms);
+        }
+        if (filter !== "terminals") {
+          const [lms] = await db.execute("SELECT id, name, 'landmark' as kind, 'Cagayan de Oro' as area, lat, lng FROM landmarks WHERE name LIKE ?", [like]);
+          rows = rows.concat(lms);
+          const [lps] = await db.execute("SELECT id, name, 'loading_point' as kind, 'Cagayan de Oro' as area, lat, lng FROM loading_points WHERE (name LIKE ? OR note LIKE ?) AND lat != 0 AND lng != 0", [like, like]);
+          rows = rows.concat(lps);
+        }
+      } catch (_) {}
+    }
+
     // Deduplicate by normalized name and ID
     const seenIds = new Set();
     const seenNames = new Set();
     const uniqueRows = [];
 
     for (const r of rows) {
+      if (!r.lat || !r.lng || isNaN(parseFloat(r.lat)) || isNaN(parseFloat(r.lng))) continue;
       const normName = (r.name || "").toLowerCase().trim();
       if (!seenIds.has(r.id) && !seenNames.has(normName)) {
         seenIds.add(r.id);

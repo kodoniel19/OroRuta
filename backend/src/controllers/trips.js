@@ -16,6 +16,27 @@ function calculatePolylineMeters(coords) {
   return meters;
 }
 
+// Common CDO known aliases for instant resolution
+const CDO_ALIASES = [
+  { keywords: ["sm downtown", "sm premier", "sm cdo downtown", "downtown premier"], name: "SM CDO Downtown Premier", area: "Lapasan", kind: "mall", lat: 8.4855, lng: 124.6535 },
+  { keywords: ["miami inn", "miami inn carmen", "miami", "vamenta miami"], name: "Miami Inn Carmen", area: "Carmen", kind: "landmark", lat: 8.477285, lng: 124.637633 },
+  { keywords: ["gumamela", "gumamela ext", "gumamela extension"], name: "Gumamela Extension, Carmen", area: "Carmen", kind: "landmark", lat: 8.4908, lng: 124.6338 },
+  { keywords: ["centrio", "ayala centrio", "centrio mall"], name: "Centrio Mall", area: "Poblacion", kind: "mall", lat: 8.4877, lng: 124.6517 },
+  { keywords: ["limketkai", "ketkai"], name: "Limketkai Center", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6568 },
+  { keywords: ["gaisano", "gaisano city"], name: "Gaisano City Mall", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6515 },
+  { keywords: ["cogon", "cogon market"], name: "Cogon Market", area: "Cogon", kind: "market", lat: 8.4735, lng: 124.6497 },
+  { keywords: ["carmen market", "carmen public market"], name: "Carmen Market", area: "Carmen", kind: "market", lat: 8.4845, lng: 124.6335 },
+  { keywords: ["agora", "agora terminal"], name: "Agora Terminal", area: "Lapasan", kind: "terminal", lat: 8.4857, lng: 124.6589 },
+  { keywords: ["bulua", "bulua terminal", "wtpm", "westbound"], name: "Bulua Terminal", area: "Bulua", kind: "terminal", lat: 8.5040, lng: 124.6115 },
+  { keywords: ["liceo", "liceo main", "liceo de cagayan"], name: "Liceo de Cagayan University", area: "Kauswagan", kind: "school", lat: 8.4965, lng: 124.6407 },
+  { keywords: ["xavier", "xu", "ateneo de cagayan"], name: "Xavier University", area: "Poblacion", kind: "school", lat: 8.4784, lng: 124.6489 },
+  { keywords: ["ustp", "must"], name: "USTP Lapasan", area: "Lapasan", kind: "school", lat: 8.4852, lng: 124.6572 },
+  { keywords: ["nmmc", "provincial hospital"], name: "NMMC", area: "Poblacion", kind: "hospital", lat: 8.4875, lng: 124.6468 },
+  { keywords: ["polymedic", "polymedic plaza"], name: "Cagayan de Oro Polymedic Plaza", area: "Kauswagan", kind: "hospital", lat: 8.4940, lng: 124.6305 },
+  { keywords: ["savemore kauswagan", "savemore market"], name: "Savemore Market Kauswagan", area: "Kauswagan", kind: "market", lat: 8.4960, lng: 124.6340 },
+  { keywords: ["capitol university", "cu"], name: "Capitol University", area: "Lapasan", kind: "school", lat: 8.4870, lng: 124.6550 }
+];
+
 /**
  * Resolves a place from query string or coordinates
  */
@@ -59,6 +80,20 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
   const q = (queryStr || "").trim().toLowerCase();
   if (!q) return null;
 
+  // Check alias table first
+  for (const alias of CDO_ALIASES) {
+    if (alias.keywords.some(k => q.includes(k) || k.includes(q))) {
+      return {
+        id: `alias-${alias.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+        name: alias.name,
+        area: alias.area,
+        kind: alias.kind,
+        lat: alias.lat,
+        lng: alias.lng
+      };
+    }
+  }
+
   try {
     const [places] = await db.execute("SELECT * FROM places ORDER BY name");
     // 1. Exact match
@@ -73,7 +108,24 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
       return { ...sub, lat: parseFloat(sub.lat), lng: parseFloat(sub.lng) };
     }
 
-    // 3. Keyword / Token match
+    // 3. Search landmarks, terminals, and loading points
+    const like = `%${q}%`;
+    const [terms] = await db.execute("SELECT id, name, lat, lng FROM terminals WHERE name LIKE ? LIMIT 1", [like]);
+    if (terms.length) {
+      return { id: terms[0].id, name: terms[0].name, area: "Cagayan de Oro", kind: "terminal", lat: parseFloat(terms[0].lat), lng: parseFloat(terms[0].lng) };
+    }
+
+    const [lms] = await db.execute("SELECT id, name, lat, lng FROM landmarks WHERE name LIKE ? LIMIT 1", [like]);
+    if (lms.length) {
+      return { id: lms[0].id, name: lms[0].name, area: "Cagayan de Oro", kind: "landmark", lat: parseFloat(lms[0].lat), lng: parseFloat(lms[0].lng) };
+    }
+
+    const [lps] = await db.execute("SELECT id, name, lat, lng FROM loading_points WHERE (name LIKE ? OR note LIKE ?) AND lat != 0 LIMIT 1", [like, like]);
+    if (lps.length) {
+      return { id: lps[0].id, name: lps[0].name, area: "Cagayan de Oro", kind: "loading_point", lat: parseFloat(lps[0].lat), lng: parseFloat(lps[0].lng) };
+    }
+
+    // 4. Keyword / Token match
     const tokens = q.split(/[\s,.-]+/).filter(t => t.length > 2 && !["near", "cdo", "city", "public", "market", "the"].includes(t));
     for (const t of tokens) {
       const matched = places.find(p => p.name.toLowerCase().includes(t));
@@ -89,7 +141,17 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
 /**
  * Identify a friendly boarding or dropoff stop name near coordinates
  */
-function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList) {
+function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, loadingPointsList = []) {
+  // 1. Check verified loading points (< 180m)
+  if (loadingPointsList && loadingPointsList.length > 0) {
+    for (const lp of loadingPointsList) {
+      if (lp.lat && lp.lng && haversineMeters(lat, lng, parseFloat(lp.lat), parseFloat(lp.lng)) < 180) {
+        return lp.name;
+      }
+    }
+  }
+
+  // 2. Check terminals (< 250m)
   if (terminalList && terminalList.length > 0) {
     for (const t of terminalList) {
       if (t.lat && t.lng && haversineMeters(lat, lng, parseFloat(t.lat), parseFloat(t.lng)) < 250) {
@@ -97,6 +159,7 @@ function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList) 
       }
     }
   }
+
   return `${defaultPrefix} near ${fallbackLandmark}`;
 }
 
@@ -128,6 +191,12 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
   try {
     const [terms] = await db.execute("SELECT id, name, lat, lng FROM terminals");
     allTerminals = terms;
+  } catch (_) {}
+
+  let allLoadingPoints = [];
+  try {
+    const [lps] = await db.execute("SELECT id, name, note, point_type, lat, lng FROM loading_points WHERE lat != 0 AND lng != 0");
+    allLoadingPoints = lps;
   } catch (_) {}
 
   const candidates = [];
@@ -216,8 +285,14 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
       const boardingCoord = [rideCoords[0][0], rideCoords[0][1]]; // [lng, lat]
       const dropoffCoord = [rideCoords[rideCoords.length - 1][0], rideCoords[rideCoords.length - 1][1]];
 
-      const boardingName = findStopLabel(boardingCoord[1], boardingCoord[0], "Loading point", originName, allTerminals);
-      const dropoffName = findStopLabel(dropoffCoord[1], dropoffCoord[0], "Drop-off stop", destName, allTerminals);
+      const boardingName = findStopLabel(boardingCoord[1], boardingCoord[0], "Loading point", originName, allTerminals, allLoadingPoints);
+      const dropoffName = findStopLabel(dropoffCoord[1], dropoffCoord[0], "Drop-off stop", destName, allTerminals, allLoadingPoints);
+
+      // Convenience penalty for having to walk far after alighting:
+      // A route dropping passenger 50m from SM Downtown gets 0 penalty.
+      // A route dropping at Cogon Market (750m walk to SM Downtown) gets a heavy penalty.
+      const dropoffPenalty = walkFromDropM > 250 ? Math.pow((walkFromDropM - 250) / 75, 1.4) * 4 : 0;
+      const convenienceScore = totalMinutes + dropoffPenalty;
 
       candidates.push({
         route: r,
@@ -235,6 +310,7 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
         walkMinutes,
         rideMinutes,
         totalMinutes,
+        convenienceScore,
         regularFare,
         discountFare,
         boardingCoord,
@@ -246,11 +322,18 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
     }
   }
 
-  // Deduplicate candidates by route code, keeping the direction with shortest travel time
+  // If some candidates drop passenger directly near destination (<= 300m),
+  // filter out candidates that leave the passenger with > 650m walk from drop-off.
+  const hasCloseDropoff = candidates.some(c => c.walkFromDropM <= 300);
+  const viableCandidates = hasCloseDropoff
+    ? candidates.filter(c => c.walkFromDropM <= 650)
+    : candidates;
+
+  // Deduplicate candidates by route code, keeping the direction with best convenience score
   const bestByCode = new Map();
-  for (const c of candidates) {
+  for (const c of viableCandidates) {
     const key = c.route.code;
-    if (!bestByCode.has(key) || c.totalMinutes < bestByCode.get(key).totalMinutes) {
+    if (!bestByCode.has(key) || c.convenienceScore < bestByCode.get(key).convenienceScore) {
       bestByCode.set(key, c);
     }
   }
@@ -281,16 +364,15 @@ async function search(req, res, next) {
     const candidates = await findJeepneyRoutesForOD(oLat, oLng, dLat, dLng, originPlace.name, destPlace.name);
 
     if (candidates.length === 0) {
-      // Return honest empty list when no valid route serves this OD
       return res.json([]);
     }
 
     // Sort according to requested criterion
     candidates.sort((a, b) => {
-      if (sort === "fare") return a.regularFare - b.regularFare || a.totalMinutes - b.totalMinutes;
-      if (sort === "walk") return a.totalWalkM - b.totalWalkM || a.totalMinutes - b.totalMinutes;
+      if (sort === "fare") return a.regularFare - b.regularFare || a.walkFromDropM - b.walkFromDropM || a.totalMinutes - b.totalMinutes;
+      if (sort === "walk") return a.totalWalkM - b.totalWalkM || a.walkFromDropM - b.walkFromDropM || a.totalMinutes - b.totalMinutes;
       if (sort === "transfers") return 0; // All direct routes have 0 transfers
-      return a.totalMinutes - b.totalMinutes || a.totalWalkM - b.totalWalkM;
+      return a.convenienceScore - b.convenienceScore || a.totalMinutes - b.totalMinutes;
     });
 
     // Build rich, distinct trip option objects for top candidates

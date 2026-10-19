@@ -82,6 +82,18 @@ data class CdoGeoStop(
 private val routeGeometriesCache = java.util.concurrent.ConcurrentHashMap<String, List<LatLng>>()
 private val allRouteCoordinatesCache = java.util.concurrent.ConcurrentHashMap<String, List<LatLng>>()
 
+/** Returns the index of the element with the minimum selector value, or 0 if list is empty. */
+private fun <T> List<T>.indexOfMinBy(selector: (T) -> Double): Int {
+    if (isEmpty()) return 0
+    var minIdx = 0
+    var minVal = selector(this[0])
+    for (i in 1 until size) {
+        val v = selector(this[i])
+        if (v < minVal) { minVal = v; minIdx = i }
+    }
+    return minIdx
+}
+
 fun parseGeometries(route: com.ororuta.app.domain.models.Route, direction: String? = null): List<LatLng> {
     val dirKey = direction?.trim()?.lowercase() ?: "all"
     val cacheKey = "${route.id}_${dirKey}_${route.geometries.size}_${route.path.size}"
@@ -1365,12 +1377,39 @@ fun MapScreen(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
+                                            // Determine route direction based on stop ordering:
+                                            // If nearest boarding stop appears before destination-related stop in
+                                            // inbound path → Inbound; otherwise Outbound.
+                                            val detectedDirection = remember(r, item, target) {
+                                                val boardLat = item.nearestStopLat ?: return@remember "Inbound"
+                                                val boardLng = item.nearestStopLng ?: return@remember "Inbound"
+                                                val inboundPts = parseGeometries(r, "Inbound")
+                                                if (inboundPts.size < 2) return@remember "Inbound"
+                                                // Find the index of the nearest boarding point in inbound path
+                                                val boardIdx = inboundPts.indexOfMinBy { pt ->
+                                                    val dLat = pt.latitude - boardLat
+                                                    val dLng = pt.longitude - boardLng
+                                                    dLat * dLat + dLng * dLng
+                                                }
+                                                // Find the index of the nearest destination point in inbound path
+                                                val destIdx = if (target.lat != null && target.lng != null) {
+                                                    val tLat = target.lat
+                                                    val tLng = target.lng
+                                                    inboundPts.indexOfMinBy { pt ->
+                                                        val dLat = pt.latitude - tLat
+                                                        val dLng = pt.longitude - tLng
+                                                        dLat * dLat + dLng * dLng
+                                                    }
+                                                } else inboundPts.size - 1
+                                                if (boardIdx <= destIdx) "Inbound" else "Outbound"
+                                            }
+
                                             OroButton(
                                                 text = "Show on Map",
                                                 onClick = {
                                                     selectedRouteId = r.id
                                                     nearbyRoutesTarget = null
-                                                    viewModel.selectRouteForGuidance(r.id, "Inbound", userLocation)
+                                                    viewModel.selectRouteForGuidance(r.id, detectedDirection, userLocation)
                                                     val pts = getAllRouteCoordinates(r)
                                                     if (pts.isNotEmpty()) {
                                                         coroutineScope.launch {
@@ -1412,7 +1451,7 @@ fun MapScreen(
                                                         destTitle
                                                     }
                                                     val navPath = buildString {
-                                                        append("route_info/${r.id}?destination=$encodedDest&direction=Inbound")
+                                                        append("route_info/${r.id}?destination=$encodedDest&direction=$detectedDirection")
                                                         if (dLat != null && dLng != null) {
                                                             append("&destLat=$dLat&destLng=$dLng")
                                                         }

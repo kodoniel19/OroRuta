@@ -30,6 +30,10 @@ fun ResultsScreen(
     viewModel: ResultsViewModel,
     from: String,
     to: String,
+    fromLat: Double? = null,
+    fromLng: Double? = null,
+    toLat: Double? = null,
+    toLng: Double? = null,
     onBack: () -> Unit,
     onEditSearch: () -> Unit,
     onSelectTrip: (tripOptionId: String, from: String, to: String) -> Unit,
@@ -39,7 +43,7 @@ fun ResultsScreen(
     onNavigateNearby: () -> Unit
 ) {
     LaunchedEffect(from, to) {
-        viewModel.searchTrips(from, to, viewModel.currentSort)
+        viewModel.searchTrips(from, to, viewModel.currentSort, fromLat, fromLng, toLat, toLng)
     }
 
     Scaffold(
