@@ -170,7 +170,9 @@ data class NearbyRouteDisplayItem(
     val matchReason: String,
     val nearestStopLat: Double? = null,
     val nearestStopLng: Double? = null,
-    val destinationServed: String? = null
+    val destinationServed: String? = null,
+    val onboardDistanceKm: Double? = null,
+    val dropoffStopName: String? = null
 )
 
 data class RouteStopPoint(
@@ -821,6 +823,58 @@ fun MapScreen(
                     }
                 }
 
+                // Calculate onboard ride distance between boarding stop and drop-off stop
+                val geoPts = parseGeometries(route)
+                var bestDropLat = targetLat
+                var bestDropLng = targetLng
+                var bestDropName: String? = null
+                if (hasTargetCoords && targetLat != null && targetLng != null) {
+                    var minDropDist = Double.MAX_VALUE
+                    for (term in route.terminals) {
+                        if (term.lat != 0.0 && term.lng != 0.0) {
+                            val d = haversine(targetLat, targetLng, term.lat, term.lng)
+                            if (d < minDropDist) {
+                                minDropDist = d
+                                bestDropLat = term.lat
+                                bestDropLng = term.lng
+                                bestDropName = term.name
+                            }
+                        }
+                    }
+                    for (s in route.stops) {
+                        if (s.lat != 0.0 && s.lng != 0.0) {
+                            val d = haversine(targetLat, targetLng, s.lat, s.lng)
+                            if (d < minDropDist) {
+                                minDropDist = d
+                                bestDropLat = s.lat
+                                bestDropLng = s.lng
+                                bestDropName = s.name
+                            }
+                        }
+                    }
+                    if (minDropDist > 500.0 && geoPts.isNotEmpty()) {
+                        for (pt in geoPts) {
+                            val d = haversine(targetLat, targetLng, pt.latitude, pt.longitude)
+                            if (d < minDropDist) {
+                                minDropDist = d
+                                bestDropLat = pt.latitude
+                                bestDropLng = pt.longitude
+                                bestDropName = "Drop-off near ${target.title}"
+                            }
+                        }
+                    }
+                }
+
+                val onboardKm = if (hasTargetCoords && bestLat != null && bestLng != null && bestDropLat != null && bestDropLng != null && geoPts.size >= 2) {
+                    TraditionalJeepneyFareService.calculateOnboardDistanceKm(
+                        routePoints = geoPts,
+                        boardingLat = bestLat,
+                        boardingLng = bestLng,
+                        dropoffLat = bestDropLat,
+                        dropoffLng = bestDropLng
+                    )
+                } else null
+
                 if (bestDist <= 10000.0 && bestStopName != null) {
                     NearbyRouteDisplayItem(
                         route = route,
@@ -830,7 +884,9 @@ fun MapScreen(
                         matchReason = if (!isNearMe) "Serves ${target.title}" else "Traditional Jeepney",
                         nearestStopLat = bestLat,
                         nearestStopLng = bestLng,
-                        destinationServed = if (!isNearMe) target.title else null
+                        destinationServed = if (!isNearMe) target.title else null,
+                        onboardDistanceKm = onboardKm,
+                        dropoffStopName = bestDropName
                     )
                 } else {
                     null
@@ -1307,13 +1363,19 @@ fun MapScreen(
 
                                         Spacer(modifier = Modifier.height(8.dp))
 
-                                        // Route stats: Fare, Travel time, Distance
-                                        val fareRes = remember(r) {
+                                        // Route stats: Fare, Travel time, Distance along onboard segment
+                                        val effectiveKm = item.onboardDistanceKm ?: if (r.lengthKm > 0) r.lengthKm else 4.0
+                                        val fareRes = remember(effectiveKm, r.jeepneyType) {
                                             TraditionalJeepneyFareService.calculateFareForDistance(
-                                                distanceKm = if (r.lengthKm > 0) r.lengthKm else 4.0,
+                                                distanceKm = effectiveKm,
                                                 category = PassengerCategory.REGULAR,
                                                 jeepneyType = r.jeepneyType
                                             )
+                                        }
+                                        val travelMins = if (item.onboardDistanceKm != null) {
+                                            Math.max(8, Math.round(item.onboardDistanceKm * 3.5).toInt())
+                                        } else {
+                                            r.travelTime
                                         }
 
                                         Row(
@@ -1352,22 +1414,20 @@ fun MapScreen(
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = "~${r.travelTime} mins",
+                                                text = "~$travelMins mins",
                                                 fontSize = 12.sp,
                                                 color = InkSoft
                                             )
-                                            if (r.lengthKm > 0) {
-                                                Text(
-                                                    text = "·",
-                                                    color = InkMuted,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "${"%.1f".format(r.lengthKm)} km",
-                                                    fontSize = 12.sp,
-                                                    color = InkMuted
-                                                )
-                                            }
+                                            Text(
+                                                text = "·",
+                                                color = InkMuted,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "${"%.1f".format(effectiveKm)} km",
+                                                fontSize = 12.sp,
+                                                color = InkMuted
+                                            )
                                         }
 
                                         Spacer(modifier = Modifier.height(12.dp))

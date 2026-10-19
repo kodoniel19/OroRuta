@@ -147,16 +147,39 @@ class PlaceRepository @Inject constructor(
     private val api: OroRutaApi,
     private val dao: PlaceDao
 ) {
+    companion object {
+        val CURATED_CDO_LANDMARKS = listOf(
+            Place("pl-limketkai", "Limketkai Center", "Lapasan", "mall", 124.6568, 8.4842, 8.4842, 124.6568),
+            Place("pl-sm-downtown", "SM CDO Downtown Premier", "Lapasan", "mall", 124.6535, 8.4855, 8.4855, 124.6535),
+            Place("pl-centrio", "Centrio Mall", "Poblacion", "mall", 124.6517, 8.4877, 8.4877, 124.6517),
+            Place("pl-cogon", "Cogon Market", "Cogon", "market", 124.6497, 8.4735, 8.4735, 124.6497),
+            Place("pl-cathedral", "St. Augustine Metropolitan Cathedral", "Poblacion", "landmark", 124.6433, 8.4777, 8.4777, 124.6433),
+            Place("pl-miami-inn", "Miami Inn Carmen", "Carmen", "landmark", 124.637633, 8.477285, 8.477285, 124.637633)
+        )
+
+        private val LANDMARK_ALIASES = mapOf(
+            "pl-limketkai" to listOf("limketkai", "limkdtkai", "ketkai", "limket"),
+            "pl-sm-downtown" to listOf("sm downtown", "sm cdo downtown", "sm premier", "smdt", "sm cd downtown"),
+            "pl-centrio" to listOf("centrio", "ayala centrio", "centrio mall"),
+            "pl-cogon" to listOf("cogon", "cogon market", "cogon public market"),
+            "pl-cathedral" to listOf("cathedral", "st augustine", "san agustin", "st. augustine cathedral"),
+            "pl-miami-inn" to listOf("miami inn", "miami inn carmen", "vamenta miami")
+        )
+    }
+
     /**
      * Search places. Merges:
-     * 1. Backend /places API results
-     * 2. Room cache (offline fallback)
-     * 3. Android Geocoder results for free-text searches within CDO bounds
+     * 1. Backend /places API results (includes fuzzy and alias matching)
+     * 2. Curated key CDO landmarks (offline fallback & destination suggestions)
+     * 3. Room cache (offline fallback)
+     * 4. Android Geocoder results for free-text searches within CDO bounds
      */
     @Suppress("DEPRECATION")
     suspend fun search(q: String, filter: String = "all"): Resource<List<Place>> {
+        val cleanQ = q.trim().lowercase()
+
         val apiResults = try {
-            val results = api.getPlaces(q, filter = filter)
+            val results = api.getPlaces(cleanQ, filter = filter)
             val seen = mutableSetOf<String>()
             val unique = results.filter { seen.add(it.name.trim().lowercase()) }
             // Only upsert, not clear — prevents cache thrash on every keystroke
@@ -164,7 +187,7 @@ class PlaceRepository @Inject constructor(
             unique
         } catch (e: IOException) {
             // Offline: serve cache
-            val cached = dao.search(q)
+            val cached = dao.search(cleanQ)
             val seen = mutableSetOf<String>()
             cached.filter { seen.add(it.name.trim().lowercase()) }
                 .map { Place(it.id, it.name, it.area, it.kind, it.mapX, it.mapY, it.lat, it.lng) }
@@ -172,13 +195,25 @@ class PlaceRepository @Inject constructor(
             emptyList()
         }
 
-        // Geocoder fallback for free-text searches 2+ chars not already covered by API results
-        val geocoderResults = if (q.length >= 2) {
+        // Check curated landmark matches if API returned empty or for offline typo matching
+        val curatedMatches = mutableListOf<Place>()
+        if (cleanQ.isNotBlank()) {
+            for ((id, aliases) in LANDMARK_ALIASES) {
+                if (aliases.any { it.contains(cleanQ) || cleanQ.contains(it) || (cleanQ.length >= 4 && it.take(4) == cleanQ.take(4)) }) {
+                    CURATED_CDO_LANDMARKS.find { it.id == id }?.let { curatedMatches.add(it) }
+                }
+            }
+        } else if (filter == "all" || filter == "landmarks") {
+            curatedMatches.addAll(CURATED_CDO_LANDMARKS)
+        }
+
+        // Geocoder fallback for free-text searches 2+ chars not already covered by API / curated results
+        val geocoderResults = if (cleanQ.length >= 2 && apiResults.isEmpty() && curatedMatches.isEmpty()) {
             try {
                 val geocoder = Geocoder(context, Locale.getDefault())
                 // Search within CDO bounds: 8.35–8.60 N, 124.50–124.80 E
-                val addresses = geocoder.getFromLocationName("$q, Cagayan de Oro", 5, 8.35, 124.50, 8.60, 124.80)
-                val existingNames = apiResults.map { it.name.trim().lowercase() }.toSet()
+                val addresses = geocoder.getFromLocationName("$cleanQ, Cagayan de Oro", 5, 8.35, 124.50, 8.60, 124.80)
+                val existingNames = (apiResults + curatedMatches).map { it.name.trim().lowercase() }.toSet()
                 addresses
                     ?.filter { addr ->
                         addr.hasLatitude() && addr.hasLongitude()
@@ -186,12 +221,18 @@ class PlaceRepository @Inject constructor(
                         && addr.longitude in 124.45..124.85
                     }
                     ?.mapNotNull { addr ->
-                        val name = (addr.featureName ?: addr.thoroughfare ?: addr.subLocality ?: addr.locality) ?: return@mapNotNull null
+                        val rawName = addr.featureName ?: addr.thoroughfare ?: addr.subLocality ?: addr.locality ?: return@mapNotNull null
+                        // Filter out generic city-wide results when user didn't search for "cagayan" or "cdo"
+                        val lowerRaw = rawName.trim().lowercase()
+                        if ((lowerRaw == "cagayan de oro" || lowerRaw == "cagayan de oro city" || lowerRaw == "misamis oriental")
+                            && !cleanQ.contains("cagayan") && !cleanQ.contains("cdo") && !cleanQ.contains("oro")) {
+                            return@mapNotNull null
+                        }
                         val area = addr.subLocality ?: addr.locality ?: "Cagayan de Oro City"
-                        if (name.trim().lowercase() in existingNames) return@mapNotNull null
+                        if (lowerRaw in existingNames) return@mapNotNull null
                         Place(
                             id = "geo_${addr.latitude}_${addr.longitude}",
-                            name = name,
+                            name = rawName,
                             area = area,
                             kind = "landmark",
                             mapX = addr.longitude,
@@ -205,15 +246,15 @@ class PlaceRepository @Inject constructor(
             }
         } else emptyList()
 
-        val merged = (apiResults + geocoderResults)
+        val merged = (curatedMatches + apiResults + geocoderResults)
             .let {
                 val seen = mutableSetOf<String>()
                 it.filter { p -> seen.add(p.name.trim().lowercase()) }
             }
-        return if (merged.isNotEmpty() || apiResults.isNotEmpty()) {
+        return if (merged.isNotEmpty()) {
             Resource.Success(merged)
         } else {
-            Resource.Error("No places found")
+            Resource.Error("No matching places found. Try searching by landmark name (e.g., Limketkai, Centrio, Cogon).")
         }
     }
 }

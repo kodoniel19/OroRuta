@@ -34,7 +34,10 @@ data class UserLocationInfo(
     val latitude: Double,
     val longitude: Double,
     val displayName: String,
-    val isCagayanDeOro: Boolean
+    val isCagayanDeOro: Boolean,
+    val isRealGps: Boolean = false,
+    val hasPermission: Boolean = true,
+    val isFixAvailable: Boolean = true
 )
 
 @Singleton
@@ -182,7 +185,10 @@ class CdoLocationProvider @Inject constructor(
                 latitude = CDO_DEFAULT_LAT,
                 longitude = CDO_DEFAULT_LNG,
                 displayName = CDO_DEFAULT_LABEL,
-                isCagayanDeOro = true
+                isCagayanDeOro = true,
+                isRealGps = false,
+                hasPermission = false,
+                isFixAvailable = false
             )
         }
 
@@ -204,14 +210,20 @@ class CdoLocationProvider @Inject constructor(
                     latitude = lat,
                     longitude = lng,
                     displayName = name,
-                    isCagayanDeOro = inCdo
+                    isCagayanDeOro = inCdo,
+                    isRealGps = true,
+                    hasPermission = true,
+                    isFixAvailable = true
                 )
             } else {
                 UserLocationInfo(
                     latitude = CDO_DEFAULT_LAT,
                     longitude = CDO_DEFAULT_LNG,
                     displayName = CDO_DEFAULT_LABEL,
-                    isCagayanDeOro = true
+                    isCagayanDeOro = true,
+                    isRealGps = false,
+                    hasPermission = true,
+                    isFixAvailable = false
                 )
             }
         } catch (e: Exception) {
@@ -219,7 +231,10 @@ class CdoLocationProvider @Inject constructor(
                 latitude = CDO_DEFAULT_LAT,
                 longitude = CDO_DEFAULT_LNG,
                 displayName = CDO_DEFAULT_LABEL,
-                isCagayanDeOro = true
+                isCagayanDeOro = true,
+                isRealGps = false,
+                hasPermission = true,
+                isFixAvailable = false
             )
         }
     }

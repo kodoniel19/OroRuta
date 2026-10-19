@@ -139,24 +139,52 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
 }
 
 /**
- * Identify a friendly boarding or dropoff stop name near coordinates
+ * Identify a friendly boarding or dropoff stop name near coordinates.
+ * Checks verified loading points and terminals in order;
+ * falls back to a descriptive label using nearby CDO street aliases.
  */
 function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, loadingPointsList = []) {
-  // 1. Check verified loading points (< 180m)
+  // 1. Check verified loading points (< 200m)
   if (loadingPointsList && loadingPointsList.length > 0) {
+    let closest = null, closestDist = Infinity;
     for (const lp of loadingPointsList) {
-      if (lp.lat && lp.lng && haversineMeters(lat, lng, parseFloat(lp.lat), parseFloat(lp.lng)) < 180) {
-        return lp.name;
+      if (lp.lat && lp.lng) {
+        const d = haversineMeters(lat, lng, parseFloat(lp.lat), parseFloat(lp.lng));
+        if (d < closestDist) { closestDist = d; closest = lp; }
       }
     }
+    if (closest && closestDist < 200) return closest.name;
   }
 
-  // 2. Check terminals (< 250m)
+  // 2. Check terminals (< 280m)
   if (terminalList && terminalList.length > 0) {
+    let closest = null, closestDist = Infinity;
     for (const t of terminalList) {
-      if (t.lat && t.lng && haversineMeters(lat, lng, parseFloat(t.lat), parseFloat(t.lng)) < 250) {
-        return t.name;
+      if (t.lat && t.lng) {
+        const d = haversineMeters(lat, lng, parseFloat(t.lat), parseFloat(t.lng));
+        if (d < closestDist) { closestDist = d; closest = t; }
       }
+    }
+    if (closest && closestDist < 280) return closest.name;
+  }
+
+  // 3. Approximate by CDO street using lat/lng banding
+  // Masterson Ave / CM Recto corridor runs roughly lng 124.62–124.66, lat 8.47–8.50
+  const streetHints = [
+    { minLat:8.510, maxLat:8.540, minLng:124.600, maxLng:124.640, name:"Masterson Ave (Bulua side)" },
+    { minLat:8.490, maxLat:8.512, minLng:124.620, maxLng:124.650, name:"Masterson Ave (Kauswagan side)" },
+    { minLat:8.475, maxLat:8.495, minLng:124.625, maxLng:124.645, name:"CM Recto Ave (Carmen side)" },
+    { minLat:8.476, maxLat:8.490, minLng:124.645, maxLng:124.668, name:"CM Recto Ave (Cogon-Divisoria)" },
+    { minLat:8.483, maxLat:8.495, minLng:124.648, maxLng:124.670, name:"Velez-Recto Junction area" },
+    { minLat:8.475, maxLat:8.483, minLng:124.640, maxLng:124.655, name:"Cogon Market area" },
+    { minLat:8.478, maxLat:8.492, minLng:124.638, maxLng:124.648, name:"Divisoria area" },
+    { minLat:8.482, maxLat:8.490, minLng:124.650, maxLng:124.660, name:"Limketkai / Lapasan area" },
+    { minLat:8.484, maxLat:8.492, minLng:124.655, maxLng:124.670, name:"Agora-Lapasan corridor" },
+    { minLat:8.488, maxLat:8.500, minLng:124.670, maxLng:124.695, name:"Puerto/Gusa Highway area" },
+  ];
+  for (const s of streetHints) {
+    if (lat >= s.minLat && lat <= s.maxLat && lng >= s.minLng && lng <= s.maxLng) {
+      return `${defaultPrefix} along ${s.name}`;
     }
   }
 
@@ -254,7 +282,8 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
       }
 
       // Direction check: Must board BEFORE drop-off along the route direction!
-      if (origIdx >= destIdx) {
+      // Also require at least 5 index positions apart to prevent same-stop or U-turn matches.
+      if (origIdx >= destIdx || (destIdx - origIdx) < 5) {
         continue;
       }
 
@@ -262,12 +291,13 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
       const rideCoords = coords.slice(origIdx, destIdx + 1);
       const rideDistMeters = calculatePolylineMeters(rideCoords);
 
-      // Must be a meaningful transit ride (at least 350 meters)
-      if (rideDistMeters < 350) {
+      // Must be a meaningful transit ride (at least 400 meters)
+      if (rideDistMeters < 400) {
         continue;
       }
 
-      const rideKm = Math.max(0.5, Math.round((rideDistMeters / 1000) * 10) / 10);
+      // Do NOT apply Math.max(0.5) — use the real computed distance for accurate fares
+      const rideKm = Math.round((rideDistMeters / 1000) * 10) / 10 || 0.5;
       const walkToBoardM = Math.round(minOrigDist);
       const walkFromDropM = Math.round(minDestDist);
       const totalWalkM = walkToBoardM + walkFromDropM;
@@ -369,6 +399,7 @@ async function search(req, res, next) {
 
     // Sort according to requested criterion
     candidates.sort((a, b) => {
+      if (sort === "time") return a.totalMinutes - b.totalMinutes || a.walkFromDropM - b.walkFromDropM;
       if (sort === "fare") return a.regularFare - b.regularFare || a.walkFromDropM - b.walkFromDropM || a.totalMinutes - b.totalMinutes;
       if (sort === "walk") return a.totalWalkM - b.totalWalkM || a.walkFromDropM - b.walkFromDropM || a.totalMinutes - b.totalMinutes;
       if (sort === "transfers") return 0; // All direct routes have 0 transfers
@@ -448,7 +479,8 @@ async function search(req, res, next) {
             route_id: r.id,
             seq: 1,
             code: r.code,
-            route_name: r.name,
+            // Human-readable: "Code: Origin ↔ Destination" format
+            route_name: `${r.code}: ${r.origin} ↔ ${r.destination}`,
             color: r.color,
             jeepney_type: r.jeepney_type || "Traditional",
             route_status: r.status || "Active",
@@ -476,8 +508,8 @@ async function search(req, res, next) {
             trip_option_id: optId,
             seq: 2,
             kind: "board",
-            title: `Board Route ${r.code} – ${r.name}`,
-            detail: `Look for route ${r.code} on signboard towards ${r.destination}`,
+            title: `Board Route ${r.code} (${r.origin} ↔ ${r.destination})`,
+            detail: `Look for "${r.code}" on the jeepney signboard heading towards ${c.direction === 'Inbound' ? r.destination : r.origin}`,
             minutes: 2,
             distance_m: 0,
             route_id: r.id,
@@ -489,8 +521,8 @@ async function search(req, res, next) {
             trip_option_id: optId,
             seq: 3,
             kind: "stay",
-            title: `Ride for ${c.rideKm} km towards ${c.dropoffName}`,
-            detail: `Stay on jeepney, prepare ₱${c.regularFare.toFixed(2)} fare`,
+            title: `Ride ${c.rideKm} km to ${c.dropoffName}`,
+            detail: `Stay on jeepney · Prepare ₱${c.regularFare.toFixed(2)} exact fare (discounted: ₱${c.discountFare.toFixed(2)})`,
             minutes: c.rideMinutes,
             distance_m: Math.round(c.rideKm * 1000),
             route_id: r.id,

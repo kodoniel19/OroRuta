@@ -4,64 +4,176 @@ const db = require("../config/db");
 // The system must rely on verified coordinates.
 const CDO_BASE_PLACES = [];
 
+const KEY_CDO_LANDMARKS = [
+  { id: 'pl-limketkai', name: 'Limketkai Center', area: 'Lapasan', kind: 'mall', lat: 8.4842, lng: 124.6568, aliases: ['limketkai', 'limkdtkai', 'ketkai', 'limketkai mall', 'limketkai center'] },
+  { id: 'pl-sm-downtown', name: 'SM CDO Downtown Premier', area: 'Lapasan', kind: 'mall', lat: 8.4855, lng: 124.6535, aliases: ['sm downtown', 'sm cdo downtown', 'sm premier', 'sm downtown premier', 'smdt'] },
+  { id: 'pl-centrio', name: 'Centrio Mall', area: 'Poblacion', kind: 'mall', lat: 8.4877, lng: 124.6517, aliases: ['centrio', 'centrio mall', 'ayala centrio'] },
+  { id: 'pl-cogon', name: 'Cogon Market', area: 'Cogon', kind: 'market', lat: 8.4735, lng: 124.6497, aliases: ['cogon', 'cogon market', 'cogon public market'] },
+  { id: 'pl-cathedral', name: 'St. Augustine Metropolitan Cathedral', area: 'Poblacion', kind: 'landmark', lat: 8.4777, lng: 124.6433, aliases: ['cathedral', 'st augustine', 'st. augustine cathedral', 'san agustin', 'san agustin church'] },
+  { id: 'pl-miami-inn', name: 'Miami Inn Carmen', area: 'Carmen', kind: 'landmark', lat: 8.477285, lng: 124.637633, aliases: ['miami inn', 'miami inn carmen', 'vamenta'] }
+];
+
+function levenshteinDistance(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
 async function list(req, res, next) {
   try {
     const { q = "", kind = "", filter = "all" } = req.query;
+    const cleanQ = q.trim().toLowerCase();
+
+    let rows = [];
+
+    // Check alias / fuzzy match against key landmarks first
+    if (cleanQ) {
+      for (const lm of KEY_CDO_LANDMARKS) {
+        const matchesAlias = lm.aliases.some(alias => {
+          if (alias.includes(cleanQ) || cleanQ.includes(alias)) return true;
+          if (cleanQ.length >= 4 && alias.length >= 4) {
+            return levenshteinDistance(cleanQ, alias) <= 2;
+          }
+          return false;
+        });
+        if (matchesAlias) {
+          if (filter === "terminals" && lm.kind !== "terminal") continue;
+          rows.push({
+            id: lm.id,
+            name: lm.name,
+            area: lm.area,
+            kind: lm.kind,
+            map_x: 0,
+            map_y: 0,
+            lat: lm.lat,
+            lng: lm.lng
+          });
+        }
+      }
+    } else if (filter === "all" || filter === "landmarks" || filter === "landmark") {
+      // When query is empty and viewing all or landmarks, display the 5 key CDO landmarks first
+      for (const lm of KEY_CDO_LANDMARKS) {
+        rows.push({
+          id: lm.id,
+          name: lm.name,
+          area: lm.area,
+          kind: lm.kind,
+          map_x: 0,
+          map_y: 0,
+          lat: lm.lat,
+          lng: lm.lng
+        });
+      }
+    }
+
     let sql = "SELECT * FROM places WHERE 1=1";
     const params = [];
-    if (q) {
+    if (cleanQ) {
       sql += " AND (name LIKE ? OR area LIKE ?)";
-      params.push(`%${q}%`, `%${q}%`);
+      params.push(`%${cleanQ}%`, `%${cleanQ}%`);
     }
     if (kind) {
       sql += " AND kind = ?";
       params.push(kind);
     }
     if (filter === "landmark" || filter === "landmarks") {
-      sql += " AND kind IN ('landmark', 'school', 'mall', 'government', 'hospital')";
+      sql += " AND kind IN ('landmark', 'school', 'mall', 'government', 'hospital', 'market', 'church')";
     } else if (filter === "terminal" || filter === "terminals") {
       sql += " AND kind = 'terminal'";
     }
     sql += " ORDER BY name LIMIT 50";
 
-    let rows = [];
     try {
       const [dbRows] = await db.execute(sql, params);
-      rows = dbRows;
-    } catch (_) {
-      rows = [];
+      rows = rows.concat(dbRows);
+    } catch (_) {}
+
+    // Search or list terminals
+    if (filter !== "landmarks" && filter !== "landmark") {
+      try {
+        let termSql = "SELECT id, name, 'terminal' as kind, 'Cagayan de Oro' as area, lat, lng FROM terminals WHERE lat != 0 AND lng != 0";
+        const termParams = [];
+        if (cleanQ) {
+          termSql += " AND name LIKE ?";
+          termParams.push(`%${cleanQ}%`);
+        }
+        termSql += " ORDER BY name LIMIT 20";
+        const [terms] = await db.execute(termSql, termParams);
+        rows = rows.concat(terms);
+      } catch (_) {}
     }
 
-    // Also search terminals, landmarks, and loading points if q is specified
-    if (q) {
-      const like = `%${q}%`;
+    // Search landmarks table
+    if (filter !== "terminals" && filter !== "terminal") {
       try {
-        if (filter !== "landmarks") {
-          const [terms] = await db.execute("SELECT id, name, 'terminal' as kind, 'Cagayan de Oro' as area, lat, lng FROM terminals WHERE name LIKE ?", [like]);
-          rows = rows.concat(terms);
+        let lmSql = "SELECT id, name, 'landmark' as kind, 'Cagayan de Oro' as area, lat, lng FROM landmarks WHERE lat != 0 AND lng != 0";
+        const lmParams = [];
+        if (cleanQ) {
+          lmSql += " AND name LIKE ?";
+          lmParams.push(`%${cleanQ}%`);
         }
-        if (filter !== "terminals") {
-          const [lms] = await db.execute("SELECT id, name, 'landmark' as kind, 'Cagayan de Oro' as area, lat, lng FROM landmarks WHERE name LIKE ?", [like]);
-          rows = rows.concat(lms);
-          const [lps] = await db.execute("SELECT id, name, 'loading_point' as kind, 'Cagayan de Oro' as area, lat, lng FROM loading_points WHERE (name LIKE ? OR note LIKE ?) AND lat != 0 AND lng != 0", [like, like]);
+        lmSql += " ORDER BY name LIMIT 20";
+        const [lms] = await db.execute(lmSql, lmParams);
+        rows = rows.concat(lms);
+
+        if (cleanQ) {
+          const [lps] = await db.execute(
+            "SELECT id, name, 'loading_point' as kind, 'Cagayan de Oro' as area, lat, lng FROM loading_points WHERE (name LIKE ? OR note LIKE ?) AND lat != 0 AND lng != 0 LIMIT 15",
+            [`%${cleanQ}%`, `%${cleanQ}%`]
+          );
           rows = rows.concat(lps);
         }
       } catch (_) {}
     }
 
-    // Deduplicate by normalized name and ID
+    function canonicalTerminalKey(name) {
+      const lower = (name || "").toLowerCase();
+      if (lower.includes("agora terminal") || lower.includes("agora integrated")) return "agora terminal";
+      if (lower.includes("bulua terminal") || lower.includes("bulua integrated")) return "bulua terminal";
+      if (lower.includes("westbound terminal")) return "westbound terminal";
+      if (lower.includes("carmen market") || lower.includes("carmen terminal")) return "carmen terminal";
+      if (lower.includes("bugo terminal")) return "bugo terminal";
+      return lower;
+    }
+
+    // Deduplicate by normalized name, canonical terminal, and ID while preserving ranking
     const seenIds = new Set();
     const seenNames = new Set();
+    const seenCanonicals = new Set();
     const uniqueRows = [];
 
     for (const r of rows) {
       if (!r.lat || !r.lng || isNaN(parseFloat(r.lat)) || isNaN(parseFloat(r.lng))) continue;
       const normName = (r.name || "").toLowerCase().trim();
-      if (!seenIds.has(r.id) && !seenNames.has(normName)) {
-        seenIds.add(r.id);
+      const idStr = String(r.id);
+      const canonKey = canonicalTerminalKey(normName);
+
+      if (r.kind === 'terminal' || canonKey.includes('terminal')) {
+        if (seenCanonicals.has(canonKey)) continue;
+        seenCanonicals.add(canonKey);
+      }
+
+      if (!seenIds.has(idStr) && !seenNames.has(normName)) {
+        seenIds.add(idStr);
         seenNames.add(normName);
         uniqueRows.push({
-          id: r.id,
+          id: idStr,
           name: r.name,
           area: r.area || "Cagayan de Oro",
           kind: r.kind || "landmark",

@@ -699,6 +699,20 @@ fun TripCard(
                 StatusPill(status = trip.status)
             }
 
+            // Route name subtitle — formatted by backend as "Code: Origin ↔ Destination"
+            val firstSeg = trip.segments.firstOrNull()
+            if (firstSeg != null && firstSeg.routeName.isNotBlank()) {
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = firstSeg.routeName,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = InkSoft,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
 
             // Time & Fare hero
@@ -731,6 +745,14 @@ fun TripCard(
                         fontWeight = FontWeight.ExtraBold,
                         color = Brand700
                     )
+                    if (trip.discountFare > 0 && trip.discountFare < trip.regularFare) {
+                        Text(
+                            text = "₱${String.format("%.2f", trip.discountFare)} student/senior",
+                            fontSize = 10.sp,
+                            color = Ok600,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                     Text(
                         text = "est. fare",
                         fontSize = 11.sp,
@@ -742,8 +764,14 @@ fun TripCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Subtitle stats: Walk & Transfers
+            val walkLabel = when {
+                trip.walkMeters < 50 -> "No significant walking"
+                trip.walkMeters < 1000 -> "${trip.walkMeters}m walk"
+                else -> "${".1f".let { fmt -> "%.${fmt}f".format(trip.walkMeters / 1000.0) }} km walk"
+            }
+            val transferLabel = if (trip.transfers == 0) "Direct route" else "${trip.transfers} transfer(s)"
             Text(
-                text = "${trip.walkMeters}m walk · " + if (trip.transfers == 0) "No transfers" else "${trip.transfers} transfer(s)",
+                text = "$walkLabel · $transferLabel",
                 style = MaterialTheme.typography.bodySmall.copy(color = InkMuted)
             )
 

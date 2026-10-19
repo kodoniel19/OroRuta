@@ -169,18 +169,48 @@ class SearchViewModel @Inject constructor(
     var recentHistory by mutableStateOf<List<LocalHistory>>(emptyList())
     var isSearching by mutableStateOf(false)
     var isLocating by mutableStateOf(false)
+    var locationError by mutableStateOf<String?>(null)
+
+    private var searchJob: kotlinx.coroutines.Job? = null
 
     init {
         loadHistory()
         searchPlaces("")
     }
 
-    fun useCurrentLocation(onLocationObtained: (String) -> Unit = {}) {
+    fun useCurrentLocation(
+        onLocationObtained: (String) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
         viewModelScope.launch {
             isLocating = true
+            locationError = null
+            if (!locationProvider.hasLocationPermission()) {
+                val msg = "Location permission is required to detect your GPS position. Please grant permission in Settings or select your starting point manually."
+                locationError = msg
+                onError(msg)
+                isLocating = false
+                return@launch
+            }
             val loc = locationProvider.getCurrentLocation()
-            fromText = loc.displayName
-            onLocationObtained(loc.displayName)
+            if (loc.isRealGps || loc.isFixAvailable) {
+                fromText = loc.displayName
+                fromPlace = Place(
+                    id = "current_gps_location",
+                    name = loc.displayName,
+                    area = "Cagayan de Oro City",
+                    kind = "landmark",
+                    mapX = loc.longitude,
+                    mapY = loc.latitude,
+                    lat = loc.latitude,
+                    lng = loc.longitude
+                )
+                onLocationObtained(loc.displayName)
+            } else {
+                val msg = "GPS signal is unavailable. Please check that Location is turned ON in Settings, or select your starting point manually."
+                locationError = msg
+                onError(msg)
+            }
             isLocating = false
         }
     }
@@ -195,12 +225,28 @@ class SearchViewModel @Inject constructor(
 
     fun onFromChange(text: String) {
         fromText = text
-        searchPlaces(text)
+        if (fromPlace?.name != text) fromPlace = null
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            if (text.isNotBlank()) kotlinx.coroutines.delay(250)
+            searchPlaces(text)
+        }
     }
 
     fun onToChange(text: String) {
         toText = text
-        searchPlaces(text)
+        if (toPlace?.name != text) toPlace = null
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            if (text.isNotBlank()) kotlinx.coroutines.delay(250)
+            searchPlaces(text)
+        }
+    }
+
+    fun onFieldFocused(field: String) {
+        searchJob?.cancel()
+        val q = if (field == "to") toText else fromText
+        searchPlaces(q)
     }
 
     var fromPlace by mutableStateOf<Place?>(null)
@@ -217,6 +263,7 @@ class SearchViewModel @Inject constructor(
 
     fun setFilter(filter: String) {
         activeFilter = filter
+        searchJob?.cancel()
         searchPlaces(if (toText.isNotBlank()) toText else fromText)
     }
 
@@ -236,6 +283,8 @@ class SearchViewModel @Inject constructor(
             val res = placeRepo.search(q, activeFilter)
             if (res is Resource.Success) {
                 suggestedPlaces = res.data
+            } else if (res is Resource.Error) {
+                suggestedPlaces = emptyList()
             }
             isSearching = false
         }

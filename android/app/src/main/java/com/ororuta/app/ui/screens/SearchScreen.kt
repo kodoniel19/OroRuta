@@ -74,8 +74,8 @@ fun SearchScreen(
                             )
                         )
                         TextButton(onClick = {
-                            viewModel.fromText = ""
-                            viewModel.toText = ""
+                            viewModel.onFromChange("")
+                            viewModel.onToChange("")
                         }) {
                             Text("Clear", color = Brand600, fontWeight = FontWeight.SemiBold)
                         }
@@ -122,7 +122,7 @@ fun SearchScreen(
                                         singleLine = true
                                     )
                                     if (viewModel.fromText.isNotBlank()) {
-                                        IconButton(onClick = { viewModel.fromText = "" }, modifier = Modifier.size(24.dp)) {
+                                        IconButton(onClick = { viewModel.onFromChange("") }, modifier = Modifier.size(24.dp)) {
                                             Icon(Icons.Default.Clear, contentDescription = "Clear", tint = InkMuted, modifier = Modifier.size(16.dp))
                                         }
                                     }
@@ -156,7 +156,7 @@ fun SearchScreen(
                                         singleLine = true
                                     )
                                     if (viewModel.toText.isNotBlank()) {
-                                        IconButton(onClick = { viewModel.toText = "" }, modifier = Modifier.size(24.dp)) {
+                                        IconButton(onClick = { viewModel.onToChange("") }, modifier = Modifier.size(24.dp)) {
                                             Icon(Icons.Default.Clear, contentDescription = "Clear", tint = InkMuted, modifier = Modifier.size(16.dp))
                                         }
                                     }
@@ -281,18 +281,66 @@ fun SearchScreen(
                 HorizontalDivider(color = Line)
             }
 
-            // Suggested matching places
-            if (viewModel.suggestedPlaces.isNotEmpty()) {
+            // Location error banner if GPS permission was denied or unavailable
+            if (viewModel.locationError != null) {
                 item {
+                    Surface(
+                        color = Bad50,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = Bad600, modifier = Modifier.size(20.dp))
+                            Text(
+                                text = viewModel.locationError ?: "",
+                                fontSize = 12.sp,
+                                color = Bad600,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Suggested matching places or curated landmarks
+            val sectionTitle = when {
+                viewModel.activeFilter == "terminals" -> "Terminals in Cagayan de Oro"
+                focusedField == "to" && viewModel.toText.isBlank() -> "Useful CDO Landmarks (Limketkai, SM, Centrio, Cogon)"
+                viewModel.toText.isBlank() && viewModel.fromText.isBlank() -> "Popular Cagayan de Oro Landmarks"
+                else -> "Matching Places"
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "Matching Places",
+                        text = sectionTitle,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = InkMuted,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                        color = InkMuted
                     )
+                    if (viewModel.isSearching) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = Brand600
+                        )
+                    }
                 }
+            }
 
+            if (viewModel.suggestedPlaces.isNotEmpty()) {
                 items(viewModel.suggestedPlaces, key = { it.id }) { place ->
                     PlaceSearchRow(
                         place = place,
@@ -300,6 +348,7 @@ fun SearchScreen(
                             if (focusedField == "from") {
                                 viewModel.selectPlace(place, "from")
                                 focusedField = "to"
+                                viewModel.onFieldFocused("to")
                                 if (viewModel.toText.isNotBlank()) {
                                     viewModel.saveHistory(viewModel.fromText, viewModel.toText)
                                     onSearchSubmit(
@@ -311,7 +360,7 @@ fun SearchScreen(
                             } else {
                                 viewModel.selectPlace(place, "to")
                                 val from = if (viewModel.fromText.isNotBlank()) viewModel.fromText else "Current Location"
-                                viewModel.fromText = from
+                                if (viewModel.fromText.isBlank()) viewModel.fromText = from
                                 viewModel.saveHistory(from, place.name)
                                 onSearchSubmit(
                                     from, place.name,
@@ -322,6 +371,31 @@ fun SearchScreen(
                         },
                         onViewOnMap = if (onViewPlaceOnMap != null) { { onViewPlaceOnMap(place) } } else null
                     )
+                    HorizontalDivider(color = Line)
+                }
+            } else if (!viewModel.isSearching && (viewModel.toText.isNotBlank() || viewModel.fromText.isNotBlank())) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.SearchOff, contentDescription = null, tint = InkMuted, modifier = Modifier.size(32.dp))
+                        Text(
+                            text = "No matching places found",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Ink
+                        )
+                        Text(
+                            text = "Try searching for key CDO destinations such as Limketkai, Centrio, SM Downtown, or Cogon.",
+                            fontSize = 12.sp,
+                            color = InkMuted,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
                     HorizontalDivider(color = Line)
                 }
             }

@@ -58,6 +58,36 @@ describe("Places", () => {
     expect(res.status).toBe(200);
     expect(res.body.some(p => p.name.includes("Limketkai"))).toBe(true);
   });
+
+  it("GET /api/v1/places?q=limkdtkai typo matches Limketkai Center", async () => {
+    const res = await request(app).get("/api/v1/places?q=limkdtkai");
+    expect(res.status).toBe(200);
+    expect(res.body.some(p => p.name.includes("Limketkai"))).toBe(true);
+  });
+
+  it("GET /api/v1/places?filter=landmarks contains the 5 key landmarks", async () => {
+    const res = await request(app).get("/api/v1/places?filter=landmarks");
+    expect(res.status).toBe(200);
+    const names = res.body.map(p => p.name);
+    expect(names.some(n => n.includes("Limketkai"))).toBe(true);
+    expect(names.some(n => n.includes("SM"))).toBe(true);
+    expect(names.some(n => n.includes("Centrio"))).toBe(true);
+    expect(names.some(n => n.includes("Cogon"))).toBe(true);
+    expect(names.some(n => n.includes("Cathedral"))).toBe(true);
+  });
+
+  it("GET /api/v1/places?filter=terminals returns verified terminals", async () => {
+    const res = await request(app).get("/api/v1/places?filter=terminals");
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body.some(p => p.name.includes("Terminal"))).toBe(true);
+  });
+
+  it("GET /api/v1/places?q=Miami returns Miami Inn Carmen", async () => {
+    const res = await request(app).get("/api/v1/places?q=Miami");
+    expect(res.status).toBe(200);
+    expect(res.body.some(p => p.name.includes("Miami Inn"))).toBe(true);
+  });
 });
 
 describe("Routes", () => {
@@ -101,6 +131,19 @@ describe("Trips", () => {
       .get("/api/v1/trips/search?from=UnknownPlace123&to=AnotherPlace456");
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
+  });
+
+  it("GET /api/v1/trips/search Carmen to Cogon calculates segment fare, not full route length", async () => {
+    const res = await request(app)
+      .get("/api/v1/trips/search?from=Carmen%20Market&to=Cogon%20Market&sort=time");
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThanOrEqual(1);
+    const topTrip = res.body[0];
+    // Segment ride distance must not equal full 11.9km route length
+    expect(topTrip.totalKm).toBeLessThan(11.9);
+    expect(topTrip.regularFare).toBeLessThan(27.25);
+    expect(topTrip.regularFare).toBeGreaterThanOrEqual(13.00);
   });
 });
 
