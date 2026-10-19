@@ -1,7 +1,12 @@
 package com.ororuta.app.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,14 +53,19 @@ fun OroRutaLogo(
     modifier: Modifier = Modifier
 ) {
     val bg = if (tone == LogoTone.Brand) Brand700 else Color.White
-    val goldDot = Oro500
+    val goldDot = Oro400
     val mainDot = if (tone == LogoTone.Brand) Color.White else Brand700
 
     Box(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(size * (11f / 40f)))
-            .background(bg),
+            .background(bg)
+            .border(
+                width = if (tone == LogoTone.Light) 1.5.dp else 1.dp,
+                color = if (tone == LogoTone.Light) Line else Color.White.copy(alpha = 0.18f),
+                shape = RoundedCornerShape(size * (11f / 40f))
+            ),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -167,12 +177,24 @@ fun OroButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(targetValue = if (isPressed && enabled) 0.98f else 1f, label = "btnScale")
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed && enabled) 0.95f else 1f,
+        animationSpec = spring(
+            dampingRatio = 0.72f,
+            stiffness = 800f
+        ),
+        label = "btnScale"
+    )
+    val elevation by animateDpAsState(
+        targetValue = if (isPressed && enabled) 1.dp else if (variant == ButtonVariant.Primary || variant == ButtonVariant.Oro) 3.dp else 0.dp,
+        animationSpec = tween(durationMillis = 150),
+        label = "btnElevation"
+    )
 
     val height = when (size) {
         ButtonSize.Sm -> 40.dp
         ButtonSize.Md -> 48.dp
-        ButtonSize.Lg -> 56.dp
+        ButtonSize.Lg -> 54.dp
     }
 
     val (bg, contentColor, borderStroke) = when (variant) {
@@ -189,9 +211,10 @@ fun OroButton(
     Surface(
         onClick = onClick,
         enabled = enabled && !loading,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         color = finalBg,
         contentColor = finalContent,
+        shadowElevation = elevation,
         border = if (borderStroke != null && enabled) androidx.compose.foundation.BorderStroke(1.dp, borderStroke) else null,
         modifier = modifier
             .scale(scale)
@@ -249,7 +272,8 @@ fun ScreenHeader(
     Surface(
         color = Color.White,
         modifier = modifier.fillMaxWidth(),
-        shadowElevation = 1.dp
+        shadowElevation = 1.dp,
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, Line)
     ) {
         Row(
             modifier = Modifier
@@ -259,9 +283,19 @@ fun ScreenHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (onBack != null) {
+                val backInteraction = remember { MutableInteractionSource() }
+                val isBackPressed by backInteraction.collectIsPressedAsState()
+                val backScale by animateFloatAsState(
+                    targetValue = if (isBackPressed) 0.88f else 1f,
+                    animationSpec = spring(dampingRatio = 0.7f, stiffness = 800f),
+                    label = "backScale"
+                )
                 IconButton(
                     onClick = onBack,
-                    modifier = Modifier.size(44.dp)
+                    interactionSource = backInteraction,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .scale(backScale)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -378,28 +412,48 @@ fun SegmentedControl(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFE6EAF0))
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFFE8ECEB))
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         options.forEachIndexed { index, title ->
             val isSelected = index == selectedIndex
+            val interactionSource = remember { MutableInteractionSource() }
+            val isPressed by interactionSource.collectIsPressedAsState()
+            val itemScale by animateFloatAsState(
+                targetValue = if (isPressed) 0.95f else 1f,
+                animationSpec = spring(dampingRatio = 0.72f, stiffness = 800f),
+                label = "segScale"
+            )
+            val animatedBg by animateColorAsState(
+                targetValue = if (isSelected) Color.White else Color.Transparent,
+                animationSpec = tween(180),
+                label = "segBg"
+            )
+            val animatedTextColor by animateColorAsState(
+                targetValue = if (isSelected) Ink else InkMuted,
+                animationSpec = tween(180),
+                label = "segTextColor"
+            )
+
             Surface(
                 onClick = { onSelect(index) },
-                shape = RoundedCornerShape(9.dp),
-                color = if (isSelected) Color.White else Color.Transparent,
+                interactionSource = interactionSource,
+                shape = RoundedCornerShape(11.dp),
+                color = animatedBg,
                 shadowElevation = if (isSelected) 2.dp else 0.dp,
                 modifier = Modifier
                     .weight(1f)
-                    .height(34.dp)
+                    .height(36.dp)
+                    .scale(itemScale)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) Ink else InkMuted,
+                            color = animatedTextColor,
                             fontSize = 12.sp
                         ),
                         maxLines = 1
@@ -485,77 +539,104 @@ fun StopListItem(
     kind: StopKind,
     name: String,
     note: String? = null,
+    isSelected: Boolean = false,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    Surface(
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
+        shape = RoundedCornerShape(10.dp),
+        color = if (isSelected) Brand50 else Color.Transparent,
+        border = if (isSelected) BorderStroke(1.5.dp, Brand600) else null,
+        modifier = modifier.fillMaxWidth()
     ) {
-        when (kind) {
-            StopKind.Terminal -> {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Brand700),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("T", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            when (kind) {
+                StopKind.Terminal -> {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Brand700),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("T", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                StopKind.Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(Ok600),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("L", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                StopKind.Unloading -> {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(Bad600),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("U", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                StopKind.Transfer -> {
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .rotate(45f)
+                            .background(Oro500),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("X", color = Ink, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.rotate(-45f))
+                    }
                 }
             }
-            StopKind.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(Ok600),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("L", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            StopKind.Unloading -> {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(Bad600),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("U", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            StopKind.Transfer -> {
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .rotate(45f)
-                        .background(Oro500),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("X", color = Ink, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.rotate(-45f))
-                }
-            }
-        }
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = Ink
-                )
-            )
-            if (!note.isNullOrBlank()) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = note,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = InkMuted
+                    text = name,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                        color = if (isSelected) Brand600 else Ink
                     )
                 )
+                if (!note.isNullOrBlank()) {
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = InkMuted
+                        )
+                    )
+                }
+            }
+
+            if (isSelected) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Brand600,
+                    modifier = Modifier.padding(start = 4.dp)
+                ) {
+                    Text(
+                        text = "VIEWING",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             }
         }
     }
@@ -569,13 +650,28 @@ fun TripCard(
     onStartNav: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val cardInteraction = remember { MutableInteractionSource() }
+    val isCardPressed by cardInteraction.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (isCardPressed) 0.98f else 1f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 800f),
+        label = "tripCardScale"
+    )
+    val cardElevation by animateDpAsState(
+        targetValue = if (isCardPressed) 1.dp else 2.5.dp,
+        label = "tripCardElevation"
+    )
+
     Surface(
+        onClick = onViewRoute,
+        interactionSource = cardInteraction,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onViewRoute() },
+            .scale(cardScale),
         color = Color.White,
-        shadowElevation = 2.dp
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = cardElevation,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Line)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Header: badges + direction + status
@@ -714,12 +810,28 @@ fun NearbyRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val rowInteraction = remember { MutableInteractionSource() }
+    val isRowPressed by rowInteraction.collectIsPressedAsState()
+    val rowScale by animateFloatAsState(
+        targetValue = if (isRowPressed) 0.975f else 1f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 800f),
+        label = "nearbyRowScale"
+    )
+    val rowElevation by animateDpAsState(
+        targetValue = if (isRowPressed) 0.5.dp else 1.5.dp,
+        label = "nearbyRowElevation"
+    )
+
     Surface(
         onClick = onClick,
+        interactionSource = rowInteraction,
         color = Color.White,
-        shape = RoundedCornerShape(12.dp),
-        shadowElevation = 1.dp,
-        modifier = modifier.fillMaxWidth()
+        shape = RoundedCornerShape(14.dp),
+        shadowElevation = rowElevation,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Line),
+        modifier = modifier
+            .fillMaxWidth()
+            .scale(rowScale)
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -785,12 +897,28 @@ fun AnnouncementCard(
     modifier: Modifier = Modifier,
     compact: Boolean = false
 ) {
+    val cardInteraction = remember { MutableInteractionSource() }
+    val isCardPressed by cardInteraction.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (isCardPressed) 0.965f else 1f,
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 800f),
+        label = "annCardScale"
+    )
+    val cardElevation by animateDpAsState(
+        targetValue = if (isCardPressed) 1.dp else 2.5.dp,
+        label = "annCardElevation"
+    )
+
     Surface(
         onClick = onClick,
+        interactionSource = cardInteraction,
         color = Color.White,
         shape = RoundedCornerShape(16.dp),
-        shadowElevation = 2.dp,
-        modifier = modifier.then(if (compact) Modifier.width(272.dp) else Modifier.fillMaxWidth())
+        shadowElevation = cardElevation,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Line),
+        modifier = modifier
+            .scale(cardScale)
+            .then(if (compact) Modifier.width(280.dp) else Modifier.fillMaxWidth())
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(

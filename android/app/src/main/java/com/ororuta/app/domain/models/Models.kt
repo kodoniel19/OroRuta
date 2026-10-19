@@ -1,7 +1,16 @@
 package com.ororuta.app.domain.models
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class Place(
@@ -24,11 +33,34 @@ data class RouteDirection(
     @SerialName("street_sequence") val streetSequence: String = ""
 )
 
+object FlexibleJsonStringSerializer : KSerializer<String?> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("FlexibleJsonString", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: String?) {
+        if (value == null) {
+            encoder.encodeNull()
+        } else {
+            encoder.encodeString(value)
+        }
+    }
+
+    override fun deserialize(decoder: Decoder): String? {
+        val jsonDecoder = decoder as? JsonDecoder ?: return try { decoder.decodeString() } catch (_: Exception) { null }
+        val element = jsonDecoder.decodeJsonElement()
+        return when (element) {
+            is JsonNull -> null
+            is JsonPrimitive -> element.content
+            else -> element.toString()
+        }
+    }
+}
+
 @Serializable
 data class RouteGeometry(
     val id: String,
     @SerialName("route_id") val routeId: String,
     val direction: String,
+    @Serializable(with = FlexibleJsonStringSerializer::class)
     val geometry: String? = null
 )
 
@@ -136,6 +168,8 @@ data class TripOption(
     @SerialName("boarding_lat") val boardingLat: Double? = null,
     @SerialName("boarding_lng") val boardingLng: Double? = null,
     @SerialName("dropoff_name") val dropoffName: String? = null,
+    @SerialName("dropoff_lat") val dropoffLat: Double? = null,
+    @SerialName("dropoff_lng") val dropoffLng: Double? = null,
     @SerialName("transfer_name") val transferName: String? = null,
     val segments: List<TripSegment> = emptyList(),
     val legs: List<TripLeg> = emptyList(),
@@ -143,7 +177,11 @@ data class TripOption(
     @SerialName("regularFare") val regularFare: Double = 0.0,
     @SerialName("discountFare") val discountFare: Double = 0.0,
     @SerialName("originPlace") val originPlace: Place? = null,
-    @SerialName("destPlace") val destPlace: Place? = null
+    @SerialName("destPlace") val destPlace: Place? = null,
+    @SerialName("geometry_coordinates") val geometryCoordinates: List<List<Double>> = emptyList(),
+    @SerialName("walk_to_board_coordinates") val walkToBoardCoordinates: List<List<Double>> = emptyList(),
+    @SerialName("jeepney_coordinates") val jeepneyCoordinates: List<List<Double>> = emptyList(),
+    @SerialName("walk_from_drop_coordinates") val walkFromDropCoordinates: List<List<Double>> = emptyList()
 )
 
 @Serializable
@@ -172,7 +210,13 @@ data class TripLeg(
     @SerialName("route_code") val routeCode: String? = null,
     @SerialName("route_color") val routeColor: String? = null,
     @SerialName("point_x") val pointX: Double? = null,
-    @SerialName("point_y") val pointY: Double? = null
+    @SerialName("point_y") val pointY: Double? = null,
+    @SerialName("start_lat") val startLat: Double? = null,
+    @SerialName("start_lng") val startLng: Double? = null,
+    @SerialName("end_lat") val endLat: Double? = null,
+    @SerialName("end_lng") val endLng: Double? = null,
+    @SerialName("point_lat") val pointLat: Double? = null,
+    @SerialName("point_lng") val pointLng: Double? = null
 )
 
 @Serializable

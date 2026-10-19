@@ -119,7 +119,6 @@ async function geocodeWithDetails(originalName) {
 
 async function getRouteGeometry(coordinates) {
   if (!coordinates || coordinates.length < 2) return null;
-  // Using OSRM to get driving geometry
   const coordsStr = coordinates.map(c => {
     if (Array.isArray(c)) return `${c[0]},${c[1]}`;
     const lon = c.lon !== undefined ? c.lon : (c.lng !== undefined ? c.lng : c.longitude);
@@ -128,17 +127,48 @@ async function getRouteGeometry(coordinates) {
   }).join(';');
   const url = `http://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
   try {
-    const res = await axios.get(url);
+    const res = await axios.get(url, { timeout: 8000 });
     if (res.data && res.data.routes && res.data.routes.length > 0) {
       return {
         geometry: res.data.routes[0].geometry,
-        distanceMeters: res.data.routes[0].distance
+        coordinates: res.data.routes[0].geometry.coordinates,
+        distanceMeters: res.data.routes[0].distance,
+        durationSeconds: res.data.routes[0].duration
       };
     }
   } catch(e) {
-    console.error(`OSRM error:`, e.message);
+    console.warn(`OSRM driving routing warning:`, e.message);
   }
   return null;
 }
 
-module.exports = { geocode, geocodeWithDetails, getRouteGeometry, isInsideCDO, CDO_BOUNDS };
+async function getWalkingRoute(fromLngLat, toLngLat) {
+  if (!fromLngLat || !toLngLat) return null;
+  const url = `http://router.project-osrm.org/route/v1/foot/${fromLngLat[0]},${fromLngLat[1]};${toLngLat[0]},${toLngLat[1]}?overview=full&geometries=geojson`;
+  try {
+    const res = await axios.get(url, { timeout: 6000 });
+    if (res.data && res.data.routes && res.data.routes.length > 0) {
+      return {
+        coordinates: res.data.routes[0].geometry.coordinates,
+        distanceMeters: res.data.routes[0].distance,
+        durationSeconds: res.data.routes[0].duration
+      };
+    }
+  } catch (e) {
+    // If foot profile is slow or fails, try driving profile
+    try {
+      const driveUrl = `http://router.project-osrm.org/route/v1/driving/${fromLngLat[0]},${fromLngLat[1]};${toLngLat[0]},${toLngLat[1]}?overview=full&geometries=geojson`;
+      const driveRes = await axios.get(driveUrl, { timeout: 6000 });
+      if (driveRes.data && driveRes.data.routes && driveRes.data.routes.length > 0) {
+        return {
+          coordinates: driveRes.data.routes[0].geometry.coordinates,
+          distanceMeters: driveRes.data.routes[0].distance,
+          durationSeconds: driveRes.data.routes[0].duration
+        };
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
+module.exports = { geocode, geocodeWithDetails, getRouteGeometry, getWalkingRoute, isInsideCDO, CDO_BOUNDS };

@@ -1,0 +1,287 @@
+DISTRICT 1
+
+Balubal (R1) – Puerto Public Market
+Inbound (8.6km): Centro Balubal – Balubal Road (Eastern) – Sayre Highway – Puerto Public Market Road (Eastern)- Puerto Public Market 
+Outbound (9.0km): Puerto Public Market – Puerto Public Market Road (Northern) - CM Recto Avenue – U-turn Underneath of Flyover – C.M. Recto Ave.- Agusan-Balubal Road – Balubal Road (Northern) - Centro Balubal 
+
+Balubal (R2) – Puerto Public Market
+Inbound (9.0km): Centro Balubal – Balubal Road (Northern)– Balubal-Agusan Road – C.M. Recto Ave. - Puerto Public Market Road (Northern) – Puerto Public Market 
+Outbound (8.6km): Puerto Public Market (Eastern) – Sayre Highway – Balubal Road (Eastern) – Centro Balubal 
+
+Bugo (R1) – Agora Market City and Terminal
+Inbound (15.0km): Villa Trinitas Subd. – Villa Trinitas Subd. Main Road – Cabilogan Senior St. – Acacia St. – Narra St. - CM Recto Ave. – Valenzuela Ave. – Agora Market City & Terminal 
+Outbound (16.0km): Agora Market City & Terminal – Gaabucayan St. – J. Pacana St. – C.M. Recto Ave. – U-turn (Delmonte Gate 2) – Greymar Subd. Road – Jamero St. – Cabilogan Sr. St. – Villa Trinitas Subd. Main Road – Villa Trinitas Subd. 
+
+Bugo (R2) – Cogon Public Market
+Inbound (16.0km): Villa Trinitas Subd. – Villa Trinitas Subd. Main Road – Cabilogan Senior St. – Acacia St. – Narra St. - CM Recto Ave. – JR Borja Avenue – Osmeña St. – Cogon Public Market 
+Outbound (16.0km): Cogon Public Market – Yacapin St. – Garcia St. – JR Borja Ave – CM Recto Ave. – U-turn (Delmonte Gate 2) – Greymar Subd. Road – Jamero St. – Cabilogan Sr. St. – Villa Trinitas Subd. Main Road – Villa Trinitas Subd. 
+
+Cugman – Cogon Public Market 
+Inbound (9.0km): Centro Brgy. Cugman– CM Recto Ave. – A. Velez St. – Echem St. – Capistrano St. – T. Chavez St. – Corrales Ave. – JR Borja St. – Daumar St. - Cogon Public Market 
+Outbound (8.0km): Yacapin St. – A. Velez St. – CM Recto Ave. – Cugman Old Road – Centro Brgy. Cugman 
+
+FS Catanico – Agora Market City and Terminal
+Inbound (11.3km): Barangay FS Catanico – FS Catanico Road – Brgy. Cugman Zone 2 Road – CM Recto Ave. – J. Pacana St. – Gaabucayan St. – Agora Market City & Terminal 
+Outbound (8.9km): Agora Market City & Terminal – Valenzuela Ave. – CM Recto Ave. – Brgy. Cugman Zone 2 Road – FS Catanico Road – Centro Barangay FS Catanico 
+
+Gusa (R1) – Puerto Public Market 
+Inbound (9.0km): Gusa Brgy. Hall– Gusa Old Road - Coastal Road – CM Recto Ave. – Puerto Public Market (Northern) – Puerto Public Market 
+Outbound (9.0km): Puerto Public Market Road (Eastern) - Sayre Highway – CM Recto Ave. – Emerald St. – Gusa Brgy. Hall 
+
+Gusa (R2) – Divisoria Park
+Inbound (5.6km): Gusa Old Road (Corner C.M. Recto Ave.)– Coastal Road – JR Borja Ave.– Cogon Public Market – JR Borja Ave. – Rizal St. – T. Chaves St. – Divisoria Park 
+Outbound (5.3km): Divisoria Park – Corrales Ave. – JR Borja Ave. – Cogon Market – JR Borja Ave. – CM Recto Ave. – Gusa Old Road 
+
+Indahag (R1) – Cogon Public Market
+Inbound (7.6km): Centro Brgy. Indahag – Camaman-an / Indahag Road – Hayes St. – Roxas St. (Cogon Public Market) 
+Outbound (7.7km): J.R. Borja Ave. – Quirino St. – Hayes St. – Camaman-an / Indahag Road – Centro Brgy. Indahag 
+
+Indahag (R2) – Cogon Public Market
+Inbound (8.1km): Indahag Centro – Indahag Road – Indahag/Macasandig Road – Mandumol Road - P. Chaves St. – Fernhill St. - Tomas Saco – Fernandez St. – Corrales Ave. – Hayes St. 
+Outbound (7.6km): Hayes St. – 12th St. (Nazareth) – 21st St. (Nazareth) – 15th St. (Nazareth) – 26th St. (Nazareth) – Fernhill St. – P. Chaves – Mandumol Road – – Indahag/Macasandig Road - Centro Brgy. Indahag 
+
+Indahag (R3) Taguanao – Cogon Public Market
+Inbound (8.6km): Centro Taguanao – South Diversion Road – Buena Oro Road – Madumol Road – P. Chavez St. – Fernhill St. - Tomas Saco St. – Fernandez St. – Corrales Ave. – Hayes St. 
+Outbound (8.2km): Hayes St. – 12th St. (Nazareth) – 22nd St. (Nazareth) – 8 th St. (Nazareth) – 2 nd St. (Nazareth) – 21st St. (Nazareth) – 6 th St. (Nazareth) – Tomas Saco St. – P. Chaves St. - Mandumol Road – Buena Oro Road – South Diversion Road – Centro Taguanao 
+
+Camaman-an (R3) Macapaya – Cogon Public Market
+Inbound (5.7km): Centro Sitio Macapaya - Sitio Macapaya Road – Hayes St. – Roxas St. (Cogon Public Market) 
+Outbound (5.5km): JR Borja Ave. – Camaman-an Road – Imburnal Road – Hayes St. - Sitio Macapaya Road- Centro Sitio Macapaya 
+
+Lapasan (R1) – Carmen Public Market
+Inbound (7.8km): Agora Market City & Terminal – Valenzuela Ave. – CM Recto Ave. – Marcos Bridge – RN Pelaez Blvd. – Vamenta Blvd. – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – V. Castro St. - Carmen Public Market 
+Outbound (8.9km): Carmen Public Market - Ipil St. – Max Suniel St. – Villarin St. – C. Diel St. – Masterson Ave. – Rodelsa Circle – Vamenta Blvd. – RN Pelaez Blvd. – Marcos Bridge – CM Recto Ave. – Valenzuela Ave. – Agora Market City & Terminal 
+
+Lapasan (R2) – Cogon Public Market 
+Inbound (4.5km): Agora Market City & Terminal – Gaabucayan St. – Corrales Ave. – C.M. Recto Ave. - A. Velez St. – Echem St. – Capistrano St. – Chavez St. – Corrales Ave. – JR Borja Ave. – Osmeña St. – Cogon Public Market 
+Outbound (3.5km): Cogon Public Market – Yacapin St. – V. Roa St. – JR Borja Ave. – A. Velez St. – CM Recto Ave. – Valenzuela Ave. – Agora Market City & Terminal 
+
+Lapasan (R3) – Cogon Public Market 
+Inbound (6.6km): Agora Market City & Terminal –Valenzuela Ave. – Sto. Niño St. – Baconga St. – CM Recto Ave. – A. Velez St. – Yacapin St. – Rizal St. – RN Abejuela St. – Corrales Ave. – JR Borja St. – Cogon Public Market 
+Outbound (2.6km): Cogon Public Market – Osmeña St. – J. Ramonal St. – Limketkai Drive – Limketkai Center – CM Recto Ave. – Valenzuela ave. – Agora Market City & Terminal 
+
+Macabalan (R1) Centro – Cogon Public Market
+Inbound (5.2km): Centro Macabalan – J. Pacana St. – Corrales Extn. – Coastal Road – Valenzuela Ave. – Gaabucayan St. Agora Market City & Terminal Terminal – Valenzuela ave. – CM Recto Ave. – Limketkai Drive – Limketkai Center – J. Ramonal St. – V. Roa St. – Cogon Public Market 
+Outbound (5.8km): Cogon Public Market – Hayes St. – Osmeña St. – J. Ramonal St. – Limketkai Drive – Limketkai Center – CM Recto Ave. – Valenzuela Ave. – Gaabucayan St. - Agora Market City & Terminal –– Valenzuela Ave. - Coastal Road Corrales Extn. – J. Pacana St. – Centro Macabalan 
+
+Macabalan (R2) Centro – Westbound Terminal and Public Market
+Inbound (6.5km): Centro Macabalan – J. Pacana St. – Puntod / Kauswagan Bridge – San Pedro St. – Coastal Road – Westbound Terminal & Public Market 
+Outbound (6.7km): Westbound Terminal & Public Market – Saarenas Ave. - Coastal Road – San Pedro St. – Puntod / Kauswagan Bridge – J. Pacana St. – Centro Macabalan 
+
+Macabalan (R3) Centro – Cogon Public Market
+Inbound (5.8km): Centro Macabalan - J. Pacana St. – Corrales Extn. – Corrales Ave. – T. Neri St. - Rizal St. – T. Chaves St. – Corrales Ave. – JR. Borja Ave. – Osmeña St. - Cogon Public Market 
+Outbound (4.8km): Cogon Public Market – Yacapin St. – Corrales Ave. – Corrales Extn. – J. Pacana St. – Centro Macabalan 
+
+Macabalan (R4) Centro – Cogon Public Market
+Inbound (5.8km): Centro Macabalan – J. Pacana St. – A. Velez St. – T. Neri St. – Rizal St. – RN Abejuela St. – Corrales Ave. – JR Borja St. – Osmena St. Cogon Public Market
+Outbound (5.1km): Cogon Public Market – Yacapin St. – A. Velez St. – J. Pacana St. – Centro Macabalan 
+
+Macabalan (R5) Centro – Carmen Public Market
+Inbound (6.3km): Centro Macabalan – J. Pacana St. – Marcos Bridge – RN Pelaez Blvd. – Vamenta Blvd. – Serina St. - Villarin St. - Max Suniel St. – V. Neri St. – Carmen Public Market 
+Outbound (6.2km): Carmen Public Market – Castro St. – Vamenta Blvd. – RN Pelaez Blvd. – Marcos Bridge – J. Pacana St. – Centro Macabalan 
+
+Macasandig (Centro Buena Oro) – Cogon Public Market
+Inbound (4.4km): Buena Oro –Mandumol Road – P. Chavez St. – Fernhill St. – Tomas Saco St. – 16th St. (Nazareth) – 12th St. (Nazareth) – 22nd St. (Nazareth) – 8 th St. (Nazareth) – Hayes St. – Osmeña St. – Yacapin St. – Cogon Public Market 
+Outbound (4.2km): Cogon Public Market – V. Roa St. – 8 th St. (Nazareth) – 2 nd St. (Nazareth) – 21st St. (Nazareth) – 6 th St. (Nazareth) – Tomas Saco St. – P. Chaves St. - Mandumol Road – Centro Buena Oro 
+
+Puerto (R1) Puerto Public Market – Agora Terminal
+Inbound (14.0km): Puerto Public Market – Puerto Public Market Road (Eastern) - Sayre Higway – CM Recto Ave. Corrales Extn. – Gaabucayan St. – Agora Market City & Terminal 
+Outbound (12.0km): Agora Market City & Terminal – Valenzuela Ave. – CM Recto Ave. – Puerto Public Market Road (Northern) – Puerto Public Market
+
+DISTRICT 1
+
+Baikingon –  Carmen Public Market
+Inbound (12.8km): Centro Baikingon – Baikingon Road – E. Jabulin St. – Bulao steel Bridge – Bulao-Canitoan Road Macapagal Road – Zayas Road – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – V. Castro St. - Carmen Public Market 
+Outbound (13.5km): Carmen Public Market – Ipil St. - Max Suniel St. – Villarin St. – Avanceña St. – Rabanes St. – C. Diel St. – Macapagal Road – Canitoan-Bulao Road – Bulao steel Bridge – E. Jabulin St. - Baikingon Road – Centro Baikingon 
+
+Balulang R1 Centro –  Carmen Public Market
+Inbound (6.9km): Centro Balulang – Balulang Road – M. Velez St. – Masterson Ave. – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – Carmen Public Market
+Outbound (5.0km): Carmen Public Market – Castro St. – Vamenta Blvd. – Masterson Ave. – M. Velez St. – Balulang Road – Centro Balulang 
+
+Balulang (R2) Villa Verde – Cogon Public Market
+Inbound (7.8km): Villa Verde Subd. – Balulang Road – M. Velez St. – Masterson Ave. – Kagay-an Bridge – Rodelsa Circle – Fernandez St. – Corrales Ave. – Hayes St. – Osmeña St. – Yacapin St. – Cogon Public Market 
+Outbound (7.7km): Cogon Public Market – V. Roa St. – 8 th St. (Nazareth) – 2 nd St. (Nazareth) – 21st St. (Nazareth) – 6 th St. – (Nazareth) – Rodelsa Circle – Kagay-an Bridge – Masterson Ave. – M. Velez St. – Balulang Road – Villa Verde Subd. 
+
+Balulang (R3) Xavier Heights – Cogon Public Market
+Inbound (8.0km): Xavier Heights Subd. – Masterson Ave. – Kagay-an Bridge – Rodelsa Circle – Fernandez St. – Corrales Ave. – JR Borja St. – Osmeña St. – Yacapin St. – Cogon Public Market 
+Outbound (7.9km): Cogon Public Market – V. Roa St. – JR Borja St. – Pabayo St. – Hayes St. – Velez St. – Rodelsa Circle – Kagayan Bridge – Masterson Ave. – Xavier Heights Subd 
+
+Bayabas (R1) – Cogon Public Market
+Inbound (6.6km): Brgy. Bayabas – Bayabas Road – San Pedro St. – RN Pelaez Blvd. – Marcos Bridge – CapistranoSt. – T. Chaves St. – Corrales Ave. – Hayes St. - Daumar St. - Cogon Public Market 
+Outbound (6.1km): JR Borja Ave. – A. Velez St. – C.M. Recto Ave. – Marcos Bridge - RN Pelaez Blvd. – San Pedro St. – Bayabas Road – Brgy. Bayabas 
+
+Bayabas (R2) – Carmen Public Market
+Inbound (8.1km): Brgy. Bayabas – Bayabas Road – San Pedro St. – San Lucas St. – Eagle St. - RN Pelaez Blvd. – PN. Roa Ave.– Villarin St. – C. Diel St. – Masterson Ave. - Vamenta Blvd. – V. Castro St. – Ipil St. – Carment Public Market 
+Outbound (6.2km): Carmen Public Market – Max Suniel St. – Villarin St. – PN Roa Ave. – RN Pelaez Blvd. – Eagle St. – San Lucas St. - San Pedro St. – Bayabas Road – Brgy. Bayabas 
+
+Bayabas (R3) – Carmen Public Market
+Inbound (8.1km): Brgy. Bayabas – Bayabas Road – San Pedro St. – RN Pelaez Blvd. – Vamenta Blvd. – Masterson Ave. - C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – Carmen Public Market 
+Outbound (4.8km): Carmen Public Market – Castro St. – Ipil St. – Max. Suniel St. – Villarin St. – C. Diel St. – Masterson Ave. Vamenta Blvd. – RN Pelaez Blvd. – San Pedro St. – Bayabas Road – Brgy. Bayabas 
+
+Bayabas (R4) – Carmen Public Market
+Inbound (10.5km):  Barangay Bayabas – Bayabas Road – Coastal Road – WTPM – Saarenas Avenue – CM Recto Ave. – PN Roa Ave. – Vamenta Blvd. – Seriña St. – Villarin St. – Max Suniel St. – V. Neri St. – V. Castro St. - Carmen Public Market. 
+Outbound (7.3km): Carmen Public Market – Ipil St. – Max Suniel St. – Yakal St. – Rosal St. – Ferrabrel St. – PN Roa Ave. – CM Recto Ave. – Saarenas Ave. – WTPM – Coastal Road – Bayabas Road – Brgy. Bayabas 
+
+Bayabas (R5) – Agora Market City and Terminal
+Inbound (9.1km):  Brgy. Bayabas – Bayabas Road – San Pedro St. – RN Peleaz Blvd. – Vamenta Blvd. – Max Suniel St. – V. Neri St. – Castro St. –Carmen Public Market – Vamenta Blvd. – JR Borja Bridge – JR Borja Ave. – Cogon Public Market – Roxas St. – Yacapin St. – Quirino St. – Ramonal St. – Limketkai Drive - Limketkai Center – CM Recto Ave. – Valenzuela Ave. – Agora Market City & Terminal 
+Outbound (4.5km): – Agora Market City & Terminal - Gaabucayan St. – J. Pacana St. – Puntod/Kauswagan Bridge – San Pedro St. – Bayabas Road – Brgy. Bayabas 
+
+Bonbon (R1) - Cogon Public Market
+Inbound (6.1km): Brgy. Bonbon – Bonbon Road – RN Pelaez Blvd. – Marcos Bridge – Capistrano St. - T. Chaves St. – Corrales Ave. – Hayes St. – Daumar St. – Cogon Public Market 
+Outbound (5.4km): – JR Borja Ave. – A. Velez St. – C.M. Recto Ave. – Marcos Bridge - RN Pelaez Blvd. – Bonbon Road – Brgy. Bonbon 
+
+Bonbon (R2) – Carmen Public Market
+Inbound (8.3km): Brgy. Bonbon – Bonbon Road – Bonbon-Pasil Road - The Baptist Extn. – The Baptist St. - RN Pelaez Blvd. – Vamenta Blvd. – Masterson Ave. – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – Carmen Public Market 
+Outbound (4.9km): Carmen Public Market – Castro St. – Ipil St. – Max Suniel St. – Villarin St. C. Diel St. – Masterson Ave. - Vamenta Blvd. – RN Pelaez Blvd. – The Baptist St. – The Baptist Extn. St. – Bonbon-Pasil Road - Bonbon Road – Brgy. Bonbon
+
+Bonbon (R3) – Agora Market City and Terminal
+Inbound (9.8km): Brgy. Bonbon – Bonbon Road – RN Pelaez Blvd. – Vamenta Blvd. – Max Suniel St. – V. Neri St. – Carmen Public Market – Castro St. – Vamenta Blvd. – Kagay-an Bridge – Rodelsa Circle – Tomas Saco St. – Fernandez St. – Corrales St. – Hayes St. – Roxas St. – Cogon Public Market – Yacapin St. – Quirino St. – Ramonal St. – Limketkai Drive – Limketkai center – C.M. Recto Ave. - Valenzuela Ave. – Agora Market City & Terminal 
+Outbound (4.1km): Agora Market City & Terminal – Gaabucayan St. – J. Pacana St. – Puntod/Kauswagan Bridge – San Pedro St. – RN Pelaez Blvd. – Bonbon Road - Brgy. Bonbon 
+
+Bonbon (R4) – Carmen Public Market
+Inbound (12.7km): Brgy. Bonbon – Bonbon Road – Bonbon Pasil Road – John the Baptist Extn.St. - John the Baptist St. – Saint Paul St. – RN Pelaez Blvd. – CM Recto Ave. – Saarenas Ave. – Coastal Road – Westbound Terminal – Saarenas Ave. – CM Recto Ave. – PN Roa St. – Vamenta Blvd. – Max Suniel St. – V. Neri St. – Carmen Public Market 
+Outbound (12.4km): Carmen Public Market –V. Castro St. - Ipil St. – Max Suniel St. – Yakal St. – Rosal St. – Ferrabrel St. – PN Roa St. – CM Recto Ave – Saarenas Ave. – Coastal Road – WTPM – Saarenas Ave. – CM Recto Ave. – RN Pelaez Blvd. – Saint. Paul St. - John the Baptist St. – John the Baptist Extn. - Bonbon-Pasil Road – Bonbon Road – Brgy. Bonbon 
+
+Bulua (R1) – Agora Market City and Terminal
+Inbound (11.4km): Westbound Terminal and Public Market – Saarenas Ave. – CM Recto Ave. – Brgy. Bulua – CM Recto Ave. U-turn Fronting LTO – CM Recto Ave. - Marcos Bridge – CM Recto Ave. – Limketkai Drive – Limketkai Center – Limketkai Drive – CM Recto Ave. – Valenzuela Ave. – Agora Market City & Terminal 
+Outbound (6.4km): Agora Market City & Terminal – Valenzuela Ave. – CM Recto Ave. – Marcos Bridge – CM Recto Ave. – Saarenas Ave. – Westbound Terminal 
+
+Bulua (R2) – Agora Market City and Terminal
+Inbound (8.7km): Bulua LTO - CM Recto Ave. – PN Roa Ave. – RN Pelaez Blvd. – Marcos Bridge – CM Recto Ave. – Limketkai Drive – Limketkai Center – Limketkai Drive – CM Recto Ave. – Valenzuela Ave. – Agora Market City Terminal 
+Outbound (8.2km): Agora Market City Terminal – Valenzuela Ave.– CM Recto Ave. - Marcos Bridge – RN Pelaez Blvd. – PN Roa Ave. – CM Recto Ave. – Bulua LTO 
+
+Bulua (R3) – Carmen Public Market
+Inbound (7.9km): Westbound Terminal and Public Market – Saarenas Ave. – CM Recto Ave. – PN Roa Ave. – Vamenta Blvd. – J. Seriña St. – Villarin St. – Max Suniel St. – V. Neri St. – Carmen Public Market 
+Outbound (5.4km): Carmen Public Market – Castro St. – Vamenta Blvd. – PN Roa Ave. – CM Recto Ave. – Saarenas Ave. – Coastal Road – Westbound Terminal and Public Market 
+
+Bulua (R4) – Cogon Public Market
+Inbound (7.8km): Westbound Terminal and Public Market – Coastal Road – San Pedro St. – Kauswagan / Puntod Bridge – J. Pacana St. – Velez St. – Yacapin St. – Rizal St. – RN Abejuela St. – Corrales Ave. – JR Borja St. – Osmeña St. – Cogon Public Market 
+Outbound (7.4km): Cogon Public Market – Yacapin St. – V. Roa St. – JR Borja St. – A. Velez St. – J. Pacana St. – Puntod / Kauswagan Bridge – San Pedro St. – Coastal Road – Westbound Terminal and Public Market 
+
+Bulua (R5) – Divisoria Park
+Inbound (9.7km): Westbound Terminal and Public Market – Saarenas Ave. – CM Recto Ave. – U-turn Bulua LTO – CM Recto Ave. – Marcos Bridge – Capistrano St. – Chaves St. – Corrales Ave. – Divisoria Park 
+Outbound (5.9km): Divisoria Park – T. Neri St. – Velez St. – CM Recto Ave. – Marcos Bridge – CM Recto Ave. – Saarenas Ave. – Westbound Terminal and Public Market 
+
+Bulua (R6) – Carmen Public Market
+Inbound (12.8km): Westbound Terminal and Public Market – Saarenas Ave. – CM Recto Ave. – Macapagal Drive – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – Carmen Public Market 
+Outbound (13.7km): Carmen Public Market – Castro St. – Vamenta Blvd. – Masterson Ave. – C. Diel St. – Macapagal Drive – CM Recto Ave. – Saarenas Ave. – Westbound Terminal and Public Market 
+
+Bulua (R7) – Terry Hills Subdivision - Divisoria Park
+Inbound (5.7km): (Terry Hills Subd.) - Galaxy St.- Eva Velez St. – L. Velez St. (Apovel Subdivision) – PN Roa St. – Vamenta Blvd. – Seriña St. - Ysalina Bridge – Gaerlan St. – Rizal St. - San Agustin St. – Pabayo St. – Fernandez St. – Corrales Ave. – T. Neri St. (Divisoria Park) 
+Outbound (5.7km): Divisoria Park – T. Neri St. – Rizal St. – Gaerlan St. – Ysalina Bridge –St. – Seriña St - Vamenta Blvd. – Castro St. – Ipil St. – Max Suniel St. – Yakal St. – Rosal St. – Ferrabrel St. – PN Roa St. – (Apovel Subdivision )L. Velez St. – E. Velez St. – Galaxy St. (Terry Hills Subd.) 
+
+Canitoan (R1) – Cogon Public Market
+Inbound (8.4km): Canitoan High School– Canitoan Road - Macapagal Road – C. Diel St. – Masterson Ave. – Kagay-an Bridge – Rodelsa Circle – Tomas Saco St. – 16 th St. (Nazareth) – 12 th St. (Nazareth) – 22 nd St. (Nazareth) – 8 th St. (Nazareth) – Hayes St. – Daumar St. 
+Outbound (8.5km): J.R. Borja St. -V. Roa St. – 8 th St. (Nazareth) – 2 nd St. (Nazareth) – 21 st St. (Nazareth) – 12th St. (Nazareth) – 16 th St. (Nazareth) – Tomas Saco St. – Rodelsa Circle – Kagay-an Bridge – Masterson Ave. – C. Diel St. – Macapagal Road – Canitoan Road – Canitoan High School 
+
+Canitoan (R2) Calaanan (Relocation) – Cogon Public Market
+Inbound (9.2km): Calaanan (Relocation) – Calaanan Road – Macapagal Road – C. Diel St. – Masterson Ave. – Kagay-an Bridge – Rodelsa Circle – Tomas Saco St. – 16 th St. (Nazareth) – 12 th St. (Nazareth) – 22 nd St. (Nazareth) – 8 th St. (Nazareth) – Hayes St. – Osmena St – Cogon Public Market 
+Outbound (9.3km): Cogon Public Market-Yacapin St. - V. Roa St. – 8 th St. (Nazareth) – 2 nd St. (Nazareth) – 21st St. (Nazareth) – 6th St. (Nazareth) – Tomas Saco St. – Rodelsa Circle – Kagay-an Bridge – Masterson Ave. – C. Diel St. – Macapagal Road – Calaanan Road – Calaanan (Relocation) 
+
+Carmen (R1) Silver Creek Subdivision - Cogon Public Market
+Inbound (6.3km): (Silver Creek) – C. Diel St. – Masterson Ave. – Kagay-an Bridge – Rodelsa Circle – Fernandez St. – Corrales Ave. – JR Borja St. – Osmeña St. – Yacapin St. (Cogon Public Market) 
+Outbound (6.2km): Cogon Public Market – V. Roa St. – 8 th St. (Nazareth) – 2 nd St. (Nazareth) – 18th St. (Nazareth) – Fernandez St. – Corrales Ave. – Hayes St. – Velez St. – Rodelsa Circle – Kagay-an Bridge – Masterson Ave. - C. Diel St. (Silver Creek) 
+
+Carmen (R2) San Agustin – Cogon Public Market
+Inbound (8.8km): San Agustin Valley – San Agustin Valley Road – Macapagal Road – Masterson Ave. – Vamenta Blvd. – JR Borja Bridge – JR Borja Ave. – Mortola St. – Hayes St.- Daumar St - Cogon Public Market 
+Outbound (8.4km): – Cogon Public Market - J.R. Borja St. – Pabayo St. – Cruz Taal St. – Rizal St. – Gaerlan St. – Ysalina Bridge – Seriña St. - Vamenta Blvd. – Masterson Ave. – Macapagal Road – San Agustin Valley Road – San Agustin Valley 
+
+Carmen (R3) Pueblo de Oro (Xavier Estates Gate 3) – Carmen Public Market
+Inbound (7.6km): Pueblo de Oro (Xavier Estates Gate 3)– Masterson Ave. – Vamenta Blvd. – PN Roa St. – Villarin St. – M. Suniel St. – V. Neri St. - Carmen Public Market 
+Outbound (5.3km): Carmen Public Market – V. Castro St. – Vamenta Blvd. – Masterson Ave. – Pueblo de Oro (Xavier Estates Gate 3) 
+
+Carmen (R4) Pueblo de Oro (Xavier Estates Gate 3) – Agora Market City and Terminal
+Inbound (8.7km): Pueblo de Oro (Xavier Estates) – Masterson Ave. – Kagay-an Bridge – Rodelsa Circle – Fernandez St. – Corrales Ave. – CM Recto Ave. – Valenzuela Ave. – Agora Market City and Terminal 
+Outbound (9.1km): Agora Market City and Terminal – Valenzuela Ave. – CM Recto Ave. – Corrales Ave. – Yacapin St. – Rizal St. – Fernandez St. – Rodelsa Circle – Kagay-an Bridge – Masterson Ave. – Pueblo de Oro (Xavier Estates Gate 3) 
+
+Carmen (R5) Carmen Public Market – Agora Market City and Terminal
+Inbound (6.2km): Carmen Public Market – Max Suniel St. – Villarin St. – J. Seriña St. – Ysalina Bridge – Gaerlan St. – Pabayo St. – Fernandez St. – Corrales Ave. – Hayes St. – Roxas St. – Yacapin St. – Quirino St. – J. Ramonal St. – Limketkai Drive – CM Recto Ave. – Valenzuela Ave.– Agora Market City and Terminal 
+Outbound (5.3km): Agora Market City and Terminal – Valenzuela Ave. – CM Recto Ave. – Limketkai Drive – J. Ramonal St. – V. Roa St. – JR Borja St. – Rizal St. – Gaerlan St. – Ysalina Bridge – Seriña St. - Vamenta Blvd. – Castro St.- Ipil St.– Carmen Public Market 
+
+Carmen (R6) Zone 10 – Cogon Public Market
+Inbound (5.2km): Carmen Zone 10 – Zone 10 Road – C. Diel St. – Masterson Ave. – Kagay-an Bridge – Rodelsa Circle – Tomas Saco St. – Fernandez St. – Corrales Ave. – Hayes St. – Osmena St. - Cogon Public Market 
+Outbound (4.9km): Cogon Public Market –Yacapin St. – V. Roa St. - 8 th St. (Nazareth) – 2 nd St. (Nazareth) – 18 th St. (Nazareth) – Fernandez St. – Corrales Ave. – Hayes St. – Velez St. – Rodelsa Circle – Kagay-an Bridge – Masterson Ave. – C. Diel St. – Zone 10 Road – Carmen Zone 10 
+
+Dansolihon (R1) – Carmen Public Market
+Inbound (5.2km): Carmen Zone 10 – Zone 10 Road – C. Diel St. – Masterson Ave. – Kagay-an Bridge – Rodelsa Circle – Tomas Saco St. – Fernandez St. – Corrales Ave. – Hayes St. – Osmena St. - Cogon Public Market 
+Outbound (4.9km): Cogon Public Market –Yacapin St. – V. Roa St. - 8 th St. (Nazareth) – 2 nd St. (Nazareth) – 18 th St. (Nazareth) – Fernandez St. – Corrales Ave. – Hayes St. – Velez St. – Rodelsa Circle – Kagay-an Bridge – Masterson Ave. – C. Diel St. – Zone 10 Road – Carmen Zone 10 
+
+Dansolihon (R2) – Carmen Public Market
+Inbound (22.0km): Uguiaban – Brgy. Dansolihon – CdeO-Airport-Bukidnon Road – Masterson Ave. – Macapagal Drive – SM Bypass Road – C. Diel St. – Villarin St. – Max Suniel St. – Carmen Public Market (V. Neri St.) 
+Outbound (33.0km): Carmen Public Market (V. Neri St.) – Castro St. – Ipil St. – Max Suniel St. – Villarin St. – C. Diel St. – SM Bypass Road – Macapagal Drive – Masterson Ave. – CdeO-Airport-Bukidnon Road – Brgy. Dansolihon – Uguiaban 
+
+Iponan (R1) Bulao – Carmen Public Market
+Inbound (14.8km): Bulao – Jabulin St. – Saarenas St. – Centro Iponan Road – CM Recto Ave. – Baculio St. – Caballero St. - Salvador St. – Coastal Road – WTPM Road – Saaranes St. – CM Recto Ave. – PN Roa Ave.– Vamental Blvd. – J. Seriña St. – Villarin St. – Max Suniel St. – V. Neri St. – Carmen Public Market 
+Outbound (12.3km): Carmen Public Market – Castro St. - Ipil St. – Max Suniel St. – Yakal St. – Lirio St. - Vamenta Blvd. – RN Pelaez Blvd. – CM Recto Ave. – Saarenas St. (WTPM) – Coastal Road – Salvador St. – CM Recto Ave. – Centro Iponan Road – Saarenas St. – Jabulin St. - Bulao 
+
+Iponan (R3) Kinasanghan Iponan – Limketkai via Agora Market City and Terminal
+Inbound (11.0km): Kinasanghan Iponan – CM Recto Ave. –Baculio St- Caballero St. – Salvador St. – Coastal Road– WTPM – Saarenas Ave. – Coastal Road - San Pedro St. – Puntod / Kauswagan Bridge – Coastal Road – Valenzuela Ave. – Gaabucayan St. (Agora Market City and Terminal) – Valenzuela Ave. – Recto Ave. – Limketkai Drive- Limketkai Center 
+Outbound (11.0km): Limketkai Center- Limketkai Drive – C.M. Recto Ave. -Valenzuela Ave. – Gaabucayan St. – J. Pacana St. – Puntod / Kauswagan Bridge – San Pedro St. – Coastal Road – Salvador St. – CM Recto Ave – Kinasanghan Iponan 
+
+Iponan (R4) Kisanlu/Regency - Gaisano City
+Inbound (11.0km): Kisanlu Subd. – Regency Road – CM Recto Ave. –Marcos Bridge – Capistrano St. – RN Abejuela St. – Corrales Ave. – C.M. Recto Ave. – Gaisano City 
+Outbound (9.0km): Gaisano City – CM Recto Ave. – Marcos Bridge – CM Recto Ave. – Regency Road – Kisanlu Subdivision 
+
+Iponan (R5) Bulao – Cogon Public Market
+Inbound (13.0km): Iponan Bulao – Jabulin St. – Saarenas St. – CM Recto Ave. – Marcos Bridge – Capistrano St. – T. Chaves St. – Corrales St. – Hayes St. – Daumar St. (Cogon Public Market) 
+Outbound (12.5km): JR Borja St. – A. Velez St. – C.M. Recto Ave. - Marcos Bridge – C.M. Recto Ave. – Saarenas St. – Jabulin St. – Iponan Bulao 
+
+Kauswagan (R1) NHA – Agora Terminal
+Inbound (5.3km): Phase 2 NHA Health Center Kauswagan (San Restituto St.) – Saint Michael St. - F. Pacana St. – CM Recto Ave. – Marcos Bridge – CM Recto Ave. – Valenzuela ave. – Agora Market City & Terminal 
+Outbound (5.1km): Agora Market City & Terminal – Valenzuela Ave. – CM Recto Ave. – Marcos Bridge – CM Recto Ave. – F. Pacana St. – Saint Michael St. - Phase 2 NHA Health Center Kauswagan (San Restituto St.) 
+
+Kauswagan (R2) NHA – Carmen Public Market
+Inbound (7.1km): Phase 2 NHA Health Center Kauswagan (San Restituto St.) – Saint Michael St. – Eagle St. – St. Ignatius Extn. – St. Ignatius St. – RN Pelaez Blvd. – Vamenta Blvd. – C.- Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – Carmen Public Market 
+Outbound (4.0km): Carmen Public Market – V. Castro St. – Vamenta Blvd. – RN Pelaez Blvd. – St. Ignatius St. – St. Ignatius Extn. – Eagle St. – Saint Michael St. – Phase 2 NHA Health Center Kauswagan (San Restituto St.) 
+
+Kauswagan (R3) – Carmen Public Market
+Inbound (12.0km): Kauswagan Pasil Road (Gasoline Station)– San Pedro St. – San Restituto St. – St. Michael St. – CM Recto Ave. – Saarenas Ave. – WTPM – Saarenas Ave. – CM Recto Ave. – PN Roa Ave. – Vamenta Blvd. – Seriña St. – Villarin St. – Max Suniel St. – V. Neri St. – Carmen Public Market 
+Outbound (9.4km): Carmen Public Market – V. Castro St. - Ipil St. – Max Suniel St. – Yakal St. – Rosal St. – Ferrabrel St. – PN Roa Ave. – CM Recto Ave. – Saarenas Ave. – WTPM – Saarenas Ave. – CM Recto Ave. – St. Michael St. – San Restituto St. – San Pedro St. – Kauswagan Pasil Road (Gasoline Station) 
+
+Lumbia (R1) – Cogon Public Market
+Inbound (14.8km): Centro Brgy. Lumbia – Lumbia Diversion Palalan Road – Masterson Ave. – Kagay-an Bridge – Rodelsa Circle – Tomas Saco St. – Fernandez St. – Corrales Ave. – Hayes St. – Daumar St. (Cogon) 
+Outbound (14.9km): J.R. Borja St. – V. Roa St. – 8 th St. (Nazareth) – 2 nd St. (Nazareth) – 21st St. (Nazareth) – 6 th St. (Nazareth) – Tomas Saco St. – Rodelsa Circle – Kagay-an Bridge – Masterson Ave. – Lumbia Diversion Palalan Road – Centro Brgy. Lumbia 
+
+Lumbia (R2) – Carmen Public Market
+Inbound (15.1km): Centro Brgy. Lumbia – F. Delima St. – Masterson Ave. – Macapagal Drive – SM By pass Road - C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – Carmen Public Market 
+Outbound (15.2km): Carmen Public Market – V. Castro St. - Ipil St. – Max Suniel St. – Villarin St. – Avanceña St. – Rabanes St. - C. Diel St. – SM by pass Road – Macapagal Drive – Masterson Ave. – F. Delima St. – Centro Brgy. Lumbia 
+
+Lumbia (R3) Gran Europa – Carmen Public Market
+Inbound (11.0km): Gran Europa – Masterson Ave. – Vamenta Blvd. – PN Roa St. – Villarin St.- M. Suniel St. – V. Neri St. – Carmen Public Market  (Ororama)
+Outbound (9.0km):(Ororama) Carmen Public Market – Castro St. – Vamenta Blvd. – Masterson Ave. – Gran Europa 
+
+Lumbia (R4) Gran Europa – Cogon Public Market via Taguanao
+Inbound (13.1km): Gran Europa – Masterson Ave. – South Diversion Road (Taguanao Road) – Tibasak Road – P. Chavez St. – Fernhill St. – T. Saco St. – Fernandez St. – Corrales Ave. – Hayes St. – Cogon Public Market - Daumar St. - 
+Outbound (13.2km): J. R. Borja St. – V. Roa St. Hayes St. - 12th St. (Nazareth) – 21st St. (Nazareth) – 15th St. (Nazareth) – 26th St. (Nazareth) – Fernhill St. –P. Chavez St. – Tibasak Road – South Diversion Road (Taguanao Road) – Masterson Ave. – Gran Europa 
+
+Pagatpat (R1) Centro – Westbound Terminal
+Inbound (11.7km): Pagatpat Centro – Pagatpat Road – Canitoan Road – Macapagal Drive – CM Recto Ave. – Saarenas Ave. – Westbound Terminal and Public Market 
+Outbound (11.9km): Westbound Terminal and Public Market – Saarenas Ave. – CM Recto Ave. – Macapagal Drive – Canitoan Road – Pagatpat Road – Pagatpat Centro 
+
+Pagatpat (R2) – Carmen Public Market
+Inbound (11.4km): Centro Brgy. Pagatpat – Pagatpat Road – Canitoan Road –Macapagal Drive – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – V. Castro St. - Carmen Public Market 
+Outbound (11.1km): Carmen Public Market – Ipil St. – Max Suniel St. – Villarin St. – Avanceña St. – Rabanes St. - C. Diel St. – Macapagal Drive – Canitoan Road – Pagatpat Road – Centro Brgy. Pagatpat 
+
+Pagatpat (R3) Pamalihi – Carmen Public Market
+Inbound (12.0km): Centro Pamalihi – Pamalihi Road - Pagatpat Road – Canitoan Road –Macapagal Drive – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – V. Castro St. - Carmen Public Market 
+Outbound (12.2km): Carmen Public Market – Ipil St. – Max Suniel St. – Villarin St. – Avanceña St. – Rabanes St. - C. Diel St. – Macapagal Drive – Canitoan Road – Pagatpat Road – Pamalihi Road – Centro Pamalihi 
+
+Patag Camp Evangelsita – Divisoria Park
+Inbound (4.2km): Camp Evangelista – Cadre Road – PN Roa St. – RN Pelaez Blvd. – Marcos Bridge – A. Velez St. – Cruz Taal St. – Rizal St. – (Divisoria Park) 
+Outbound (3.3km): (Divisoria Park) – Rizal St. – Gaerlan St. – Ysalina Bridge – Seriña St. Vamenta Blvd. – Castro St. – Ipil St. – Carmen Public Market – Max Suniel St. – Yakal St. – Rosal St. – Ferrabrel St. – PN Roa St. – Cadre Road – Camp Evangelista 
+
+San Simon – Carmen Public Market
+Inbound (16.1km): Centro San Simon – Pagatpat Road – Canitoan Road – Macapagal Road – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – V. Castro St. - Carmen Public Market 
+Outbound (15.8km): Carmen Public Market – Ipil St. – Max Suniel St. – Villarin St. – Avanceña St. – Rabanes St. - C. Diel St. – Macapagal Road – Canitoan Road – Pagatpat Road – San Simon 
+
+Tuburan – Carmen Public Market
+Inbound (31.0km): Centro Brgy. Tuburan – Tuburan Road – Taglimao Road – Pagalungan Road – F. Delima St. – Masterson Ave. – Macapagal Drive – SM by pass Road – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – V. Castro St. - Carmen Public Market 
+Outbound (31.1km): Carmen Public Market – Ipil St. – Max Suniel St. – Villarin St. – Avanceña St. – Rabanes St. - C. Diel St. – SM by pass Road – Macapagal Drive – Masterson Ave. – F. Delima St. – Pagalungan Road – Taglimao Road – Tuburan Road – Centro Brgy. Tuburan 
+
+Tagpangi – Carmen Public Market
+Inbound (26.0km): Centro Tagpangi – Tagpangi Road – Pagalungan Road – F. Delima St. – Masterson Ave. – Macapagal Drive – SM Bypass Road – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – V. Castro - Carmen Public Market 
+Outbound (26.0km): Carmen Public Market – Ipil St. – Max Suniel St. – Villarin St. – Avanceña St. – Rabanes St. - C. Diel St. – SM Bypass Road – Macapagal Drive – Masterson Ave. – F. Delima St. – Pagalungan Road – Tagpangi Road – Tagpangi 
+
+Tumpagon – Carmen Public Market
+Inbound (41.6km): Centro Brgy. Tumpagon – Pigsag-an Road - Tuburan Road – Taglimao Road – Pagalungan Road – F. Delima St. – Masterson Ave. – Macapagal Drive – SM Bypass Road – C. Diel St. – Villarin St. – Max Suniel St. – V. Neri St. – V. Castro St. - Carmen Public Market 
+Outbound (41.7km): Carmen Public Market – Ipil St. – Max Suniel St. – Villarin St. – Avanceña St. – Rabanes St. - C. Diel St. – SM Bypass Road – Macapagal Drive – Masterson Ave. – F. Delima St. – Pagalungan Road – Taglimao Road – Tuburan Road – Pigsag-an Road – Centro Brgy. Tumpagon 

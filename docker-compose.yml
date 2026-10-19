@@ -1,4 +1,4 @@
-﻿version: "3.9"
+version: "3.9"
 
 services:
   db:
@@ -14,8 +14,7 @@ services:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+      - ./database/ororuta_backup.sql:/docker-entrypoint-initdb.d/01_ororuta_backup.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uororuta", "-pororuta"]
       interval: 10s
@@ -35,9 +34,8 @@ services:
     volumes:
       - ./database:/database:ro
     entrypoint: >
-      sh -c "mysql -hdb -uororuta -pororuta ororuta < /database/schema.sql &&
-             mysql -hdb -uororuta -pororuta ororuta < /database/seed.sql &&
-             echo 'Migration complete'"
+      sh -c "mysql -hdb -uororuta -pororuta ororuta < /database/ororuta_backup.sql &&
+             echo 'Database restoration complete'"
     profiles: ["migrate"]
 
   backend:

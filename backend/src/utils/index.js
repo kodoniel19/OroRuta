@@ -1,4 +1,4 @@
-﻿const { v4: uuidv4 } = require("uuid");
+const { v4: uuidv4 } = require("uuid");
 
 // Haversine distance in meters
 function haversineMeters(lat1, lng1, lat2, lng2) {
@@ -22,14 +22,11 @@ function generateRefNo(seq) {
   return `OR-${dd}${mm}${yy}-${n}`;
 }
 
-// Estimate fare: min + ceil(max(0, km - minKm)) * perKm
-function estimateFare(km, rule, category) {
-  const base = parseFloat(rule.minimum);
-  const extraKm = Math.max(0, km - parseFloat(rule.minimum_km));
-  const fare = base + Math.ceil(extraKm) * parseFloat(rule.per_km);
-  if (category === "Regular") return Math.round(fare * 100) / 100;
-  const discount = parseFloat(rule.discount_rate);
-  return Math.round(fare * (1 - discount) * 100) / 100;
+// Estimate fare using LTFRB traditional jeepney fare service
+const { calculateTraditionalFare } = require("../services/fareService");
+function estimateFare(km, rule, category = "Regular") {
+  const result = calculateTraditionalFare(km, category);
+  return result.selectedCategoryFare;
 }
 
 // Simple SHA-256-like hash (just md5 via crypto for route_ids_hash)

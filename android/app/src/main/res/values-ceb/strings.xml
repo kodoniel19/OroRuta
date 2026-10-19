@@ -21,5 +21,4 @@
     <string name="cant_search_offline">Dili makahimo sa pagpangita samtang offline</string>
     <string name="view_offline_routes">Tan-awa ang Mga Ruta nga Offline</string>
     <string name="retry_connection">Sulayi pag-usab ang Koneksyon</string>
-    <string name="google_maps_key">YOUR_GOOGLE_MAPS_API_KEY_HERE</string>
 </resources>

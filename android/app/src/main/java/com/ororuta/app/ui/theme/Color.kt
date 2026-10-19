@@ -3,34 +3,39 @@ package com.ororuta.app.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // OroRuta Design System Colors
-val Canvas = Color(0xFFF3F5F8)
-val Line = Color(0xFFE2E7ED)
-val Ink = Color(0xFF0F1B2A)
-val InkSoft = Color(0xFF3A4A5C)
-val InkMuted = Color(0xFF627184)
+// Clean, modern light background with deep green / dark teal and golden-yellow accents (inspired by Cagayan de Oro)
+val Canvas = Color(0xFFF6F8F7)
+val Line = Color(0xFFE2E8E5)
+val Ink = Color(0xFF101B17)
+val InkSoft = Color(0xFF334640)
+val InkMuted = Color(0xFF647771)
 
-val Brand50 = Color(0xFFEAF3FA)
-val Brand100 = Color(0xFFCFE3F2)
-val Brand500 = Color(0xFF1471B0)
-val Brand600 = Color(0xFF0E5A8A)
-val Brand700 = Color(0xFF0B4A72)
-val Brand900 = Color(0xFF062C45)
+// Deep Forest / Dark Teal Brand Colors
+val Brand50 = Color(0xFFEBF5F1)
+val Brand100 = Color(0xFFCEE7DE)
+val Brand500 = Color(0xFF147D64)
+val Brand600 = Color(0xFF0F6652)
+val Brand700 = Color(0xFF0B4D3D)
+val Brand900 = Color(0xFF062920)
 
-val Oro100 = Color(0xFFFFF4D1)
-val Oro400 = Color(0xFFF7C23A)
-val Oro500 = Color(0xFFF2A900)
-val Oro600 = Color(0xFFC88A00)
-val Oro700 = Color(0xFF8A5F00)
+// Golden-Yellow Accents (Oro - Cagayan de Oro "City of Golden Friendship")
+val Oro50 = Color(0xFFFFFBEB)
+val Oro100 = Color(0xFFFEF3C7)
+val Oro400 = Color(0xFFFBBF24)
+val Oro500 = Color(0xFFF59E0B)
+val Oro600 = Color(0xFFD97706)
+val Oro700 = Color(0xFFB45309)
 
-val Ok50 = Color(0xFFE8F6EE)
-val Ok600 = Color(0xFF1E8A4C)
+// Semantic feedback colors
+val Ok50 = Color(0xFFECFDF5)
+val Ok600 = Color(0xFF16A34A)
 
-val Warn50 = Color(0xFFFFF3E0)
-val Warn600 = Color(0xFFB45F00)
+val Warn50 = Color(0xFFFFFBEB)
+val Warn600 = Color(0xFFD97706)
 
-val Bad50 = Color(0xFFFDECEC)
-val Bad100 = Color(0xFFF9D6D4)
-val Bad600 = Color(0xFFC0362C)
+val Bad50 = Color(0xFFFEF2F2)
+val Bad100 = Color(0xFFFEE2E2)
+val Bad600 = Color(0xFFDC2626)
 
 // Surface / background aliases for M3
 val SurfaceBackground = Canvas

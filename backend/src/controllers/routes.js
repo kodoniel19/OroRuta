@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { calculateTraditionalFare } = require("../services/fareService");
 
 async function list(req, res, next) {
   try {
@@ -51,16 +52,21 @@ async function list(req, res, next) {
 
       // Geometries
       const [geometries] = await db.execute("SELECT * FROM route_geometry WHERE route_id = ?", [r.id]);
+      for (const g of geometries) {
+        if (g.geometry && typeof g.geometry === 'object') {
+          g.geometry = JSON.stringify(g.geometry);
+        }
+      }
       r.geometries = geometries;
 
       // Construct path for legacy compatibility
       r.path = [];
       if (geometries && geometries.length > 0) {
         // Just take inbound for the preview path
-        const inbound = geometries.find(g => g.direction === 'Inbound');
+        const inbound = geometries.find(g => g.direction === 'Inbound') || geometries[0];
         if (inbound && inbound.geometry) {
             try {
-                const geom = JSON.parse(inbound.geometry);
+                const geom = typeof inbound.geometry === 'string' ? JSON.parse(inbound.geometry) : inbound.geometry;
                 if (geom.coordinates) {
                     r.path = geom.coordinates.map((c, i) => ({ route_id: r.id, seq: i, lat: c[1], lng: c[0], map_x: 0, map_y: 0 }));
                 }
@@ -79,23 +85,11 @@ async function list(req, res, next) {
          WHERE rmr.route_id = ? ORDER BY rmr.seq`, [r.id]);
       r.roads = roads;
 
-      // Fare estimate
-      try {
-        const [[rule]] = await db.execute("SELECT minimum, minimum_km, per_km FROM fare_rules WHERE is_current = 1 LIMIT 1");
-        if (rule) {
-          const km = r.length_km || 5;
-          if (km <= rule.minimum_km) {
-            r.fare = rule.minimum;
-          } else {
-            r.fare = rule.minimum + (km - rule.minimum_km) * rule.per_km;
-          }
-          r.fare = Math.round(r.fare * 100) / 100;
-        } else {
-          r.fare = r.jeepney_type === 'Modern' ? 15 : 13;
-        }
-      } catch (_) {
-        r.fare = r.jeepney_type === 'Modern' ? 15 : 13;
-      }
+      // Traditional jeepney fare estimate
+      const km = r.length_km || 5;
+      const fareRes = calculateTraditionalFare(km, "Regular", r.jeepney_type);
+      r.fare = fareRes.selectedCategoryFare ?? 13.00;
+      r.discountedFare = fareRes.discountedFare ?? 10.40;
 
       // Terminals
       const [terminals] = await db.execute(
@@ -124,9 +118,45 @@ async function list(req, res, next) {
 
 async function getById(req, res, next) {
   try {
-    const [rows] = await db.execute("SELECT * FROM routes WHERE id = ?", [req.params.id]);
+    const routeIdOrCode = req.params.id;
+    let [rows] = await db.execute(
+      "SELECT * FROM routes WHERE id = ? OR code = ? OR LOWER(code) = LOWER(?) LIMIT 1",
+      [routeIdOrCode, routeIdOrCode, routeIdOrCode]
+    );
+
+    if (!rows.length) {
+      const lower = routeIdOrCode.toLowerCase();
+      const seedAliases = {
+        'r-05': '785b6016-46e6-4dbb-9e9d-147d2ba36ef7',
+        'r-02': 'ab2932ac-f720-4ddf-b8da-d1ce269bf890',
+        'r-01': '04f8a2d2-6a9c-41a4-80fb-64368d6fe41c',
+        'r-03': '306c43f2-66bd-4fa2-b90c-2f4a1ddde665',
+        'r-04': '35e62a9b-9819-4620-9a56-a13393e288b3',
+        'r-06': 'f9f9ff75-5901-4026-8cca-2024912ff3e6',
+        'r1': '785b6016-46e6-4dbb-9e9d-147d2ba36ef7',
+        'r2': 'ab2932ac-f720-4ddf-b8da-d1ce269bf890',
+        'r3': '306c43f2-66bd-4fa2-b90c-2f4a1ddde665',
+        'r4': '35e62a9b-9819-4620-9a56-a13393e288b3',
+        'r5': 'ab2932ac-f720-4ddf-b8da-d1ce269bf890',
+        'r6': '92f61e2e-6336-4010-9109-7789dd23a8eb',
+        'c1': '3bcdc4d3-4790-4a3e-a1bf-ad48b2241ee0',
+        'b1': '785b6016-46e6-4dbb-9e9d-147d2ba36ef7'
+      };
+      if (seedAliases[lower]) {
+        const [aliasRows] = await db.execute("SELECT * FROM routes WHERE id = ?", [seedAliases[lower]]);
+        if (aliasRows.length) rows = aliasRows;
+      }
+      if (!rows.length) {
+        const [partialRows] = await db.execute(
+          "SELECT * FROM routes WHERE code LIKE ? OR name LIKE ? ORDER BY code LIMIT 1",
+          [`%${routeIdOrCode}%`, `%${routeIdOrCode}%`]
+        );
+        if (partialRows.length) rows = partialRows;
+      }
+    }
+
     if (!rows.length) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Route not found" } });
-    const route = rows[0];
+    let route = rows[0];
     
     const [terminals] = await db.execute(`SELECT t.* FROM terminals t JOIN route_terminals rt ON rt.terminal_id = t.id WHERE rt.route_id = ? ORDER BY rt.seq`, [route.id]);
     const [stops] = await db.execute("SELECT * FROM loading_points WHERE route_id = ? ORDER BY name", [route.id]);
@@ -134,18 +164,42 @@ async function getById(req, res, next) {
     const [roads] = await db.execute(`SELECT mr.* FROM major_roads mr JOIN route_major_roads rmr ON rmr.road_id = mr.id WHERE rmr.route_id = ? ORDER BY rmr.seq`, [route.id]);
     const [landmarks] = await db.execute(`SELECT l.* FROM landmarks l JOIN route_landmarks rl ON rl.landmark_id = l.id WHERE rl.route_id = ? ORDER BY rl.seq`, [route.id]);
     
-    const [directions] = await db.execute("SELECT * FROM route_directions WHERE route_id = ?", [route.id]);
-    route.directions = directions;
+    let [directions] = await db.execute("SELECT * FROM route_directions WHERE route_id = ?", [route.id]);
+    let [geometries] = await db.execute("SELECT * FROM route_geometry WHERE route_id = ?", [route.id]);
 
-    const [geometries] = await db.execute("SELECT * FROM route_geometry WHERE route_id = ?", [route.id]);
+    // If this route record has no geometries, check if a verified route exists with the same code or name
+    if (geometries.length === 0) {
+      const [vRoute] = await db.execute(
+        `SELECT r.* FROM routes r 
+         WHERE (r.code = ? OR (r.name LIKE '%Bulua%' AND ? LIKE '%Bulua%'))
+           AND (SELECT COUNT(*) FROM route_geometry WHERE route_id = r.id) > 0 
+         LIMIT 1`,
+        [route.code, route.name]
+      );
+      if (vRoute.length > 0) {
+        const vr = vRoute[0];
+        route.inbound_distance_km = route.inbound_distance_km || vr.inbound_distance_km;
+        route.outbound_distance_km = route.outbound_distance_km || vr.outbound_distance_km;
+        [directions] = await db.execute("SELECT * FROM route_directions WHERE route_id = ?", [vr.id]);
+        [geometries] = await db.execute("SELECT * FROM route_geometry WHERE route_id = ?", [vr.id]);
+      }
+    }
+
+    for (const g of geometries) {
+      if (g.geometry && typeof g.geometry === 'object') {
+        g.geometry = JSON.stringify(g.geometry);
+      }
+    }
+
+    route.directions = directions;
     route.geometries = geometries;
 
     route.path = [];
     if (geometries && geometries.length > 0) {
-      const inbound = geometries.find(g => g.direction === 'Inbound');
+      const inbound = geometries.find(g => g.direction === 'Inbound') || geometries[0];
       if (inbound && inbound.geometry) {
           try {
-              const geom = JSON.parse(inbound.geometry);
+              const geom = typeof inbound.geometry === 'string' ? JSON.parse(inbound.geometry) : inbound.geometry;
               if (geom.coordinates) {
                   route.path = geom.coordinates.map((c, i) => ({ route_id: route.id, seq: i, lat: c[1], lng: c[0], map_x: 0, map_y: 0 }));
               }
@@ -158,25 +212,54 @@ async function getById(req, res, next) {
 
     const [announcements] = await db.execute(`SELECT a.* FROM announcements a JOIN announcement_routes ar ON ar.announcement_id = a.id WHERE ar.route_id = ? AND a.status != 'Expired' ORDER BY a.date DESC`, [route.id]);
 
-    let fare = route.jeepney_type === 'Modern' ? 15 : 13;
-    try {
-      const [[rule]] = await db.execute("SELECT minimum, minimum_km, per_km FROM fare_rules WHERE is_current = 1 LIMIT 1");
-      if (rule) {
-        const km = route.length_km || 5;
-        fare = km <= rule.minimum_km ? rule.minimum : rule.minimum + (km - rule.minimum_km) * rule.per_km;
-        fare = Math.round(fare * 100) / 100;
-      }
-    } catch (_) {}
+    const km = route.length_km || 5;
+    const fareRes = calculateTraditionalFare(km, "Regular", route.jeepney_type);
+    const fare = fareRes.selectedCategoryFare ?? 13.00;
+    const discountedFare = fareRes.discountedFare ?? 10.40;
 
     const travelTime = Math.round((route.length_km || 5) * 3.5);
 
-    res.json({ ...route, terminals, stops, transfers, roads, landmarks, announcements, fare, travelTime });
+    res.json({ ...route, terminals, stops, transfers, roads, landmarks, announcements, fare, discountedFare, travelTime });
   } catch (err) { next(err); }
 }
 
 async function getOfflineBundle(req, res, next) {
   try {
-    const [rows] = await db.execute("SELECT * FROM routes WHERE id = ?", [req.params.id]);
+    const routeIdOrCode = req.params.id;
+    let [rows] = await db.execute(
+      "SELECT * FROM routes WHERE id = ? OR code = ? OR LOWER(code) = LOWER(?) LIMIT 1",
+      [routeIdOrCode, routeIdOrCode, routeIdOrCode]
+    );
+    if (!rows.length) {
+      const lower = routeIdOrCode.toLowerCase();
+      const seedAliases = {
+        'r-05': '785b6016-46e6-4dbb-9e9d-147d2ba36ef7',
+        'r-02': 'ab2932ac-f720-4ddf-b8da-d1ce269bf890',
+        'r-01': '04f8a2d2-6a9c-41a4-80fb-64368d6fe41c',
+        'r-03': '306c43f2-66bd-4fa2-b90c-2f4a1ddde665',
+        'r-04': '35e62a9b-9819-4620-9a56-a13393e288b3',
+        'r-06': 'f9f9ff75-5901-4026-8cca-2024912ff3e6',
+        'r1': '785b6016-46e6-4dbb-9e9d-147d2ba36ef7',
+        'r2': 'ab2932ac-f720-4ddf-b8da-d1ce269bf890',
+        'r3': '306c43f2-66bd-4fa2-b90c-2f4a1ddde665',
+        'r4': '35e62a9b-9819-4620-9a56-a13393e288b3',
+        'r5': 'ab2932ac-f720-4ddf-b8da-d1ce269bf890',
+        'r6': '92f61e2e-6336-4010-9109-7789dd23a8eb',
+        'c1': '3bcdc4d3-4790-4a3e-a1bf-ad48b2241ee0',
+        'b1': '785b6016-46e6-4dbb-9e9d-147d2ba36ef7'
+      };
+      if (seedAliases[lower]) {
+        const [aliasRows] = await db.execute("SELECT * FROM routes WHERE id = ?", [seedAliases[lower]]);
+        if (aliasRows.length) rows = aliasRows;
+      }
+      if (!rows.length) {
+        const [partialRows] = await db.execute(
+          "SELECT * FROM routes WHERE code LIKE ? OR name LIKE ? ORDER BY code LIMIT 1",
+          [`%${routeIdOrCode}%`, `%${routeIdOrCode}%`]
+        );
+        if (partialRows.length) rows = partialRows;
+      }
+    }
     if (!rows.length) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Route not found" } });
     const route = rows[0];
     const [terminals] = await db.execute(`SELECT t.* FROM terminals t JOIN route_terminals rt ON rt.terminal_id=t.id WHERE rt.route_id=?`, [route.id]);

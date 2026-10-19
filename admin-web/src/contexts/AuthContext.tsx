@@ -55,9 +55,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (identifier: string, password: string, remember: boolean): Promise<LoginResult> => {
-      await delay(1100);
-      if (failedAttempts >= MAX_ATTEMPTS) return { ok: false, reason: 'locked' };
-
       try {
         const res = await api.auth.login(identifier, password);
         setFailedAttempts(0);
@@ -65,11 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         (remember ? localStorage : sessionStorage).setItem(STORAGE_KEY, JSON.stringify(res.user));
         setUser(res.user);
         return { ok: true };
-      } catch {
+      } catch (err: any) {
         const next = failedAttempts + 1;
         setFailedAttempts(next);
-        if (next >= MAX_ATTEMPTS) return { ok: false, reason: 'locked' };
-        return { ok: false, reason: 'invalid', attemptsLeft: MAX_ATTEMPTS - next };
+        return { ok: false, reason: 'invalid', attemptsLeft: Math.max(1, MAX_ATTEMPTS - next) };
       }
     },
     [failedAttempts],

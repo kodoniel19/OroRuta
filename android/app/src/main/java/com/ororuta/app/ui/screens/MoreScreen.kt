@@ -31,7 +31,6 @@ fun MoreScreen(
     viewModel: MoreViewModel,
     onNavigateSaved: () -> Unit,
     onNavigateHistory: () -> Unit,
-    onNavigateOffline: () -> Unit,
     onNavigateNotifications: () -> Unit,
     onNavigateLocationSettings: () -> Unit,
     onNavigateLanguage: () -> Unit,
@@ -43,7 +42,6 @@ fun MoreScreen(
 ) {
     val savedCount by viewModel.savedCount.collectAsState()
     val historyCount by viewModel.historyCount.collectAsState()
-    val offlineCount by viewModel.offlineCount.collectAsState()
 
     Scaffold { innerPadding ->
         Column(
@@ -115,8 +113,6 @@ fun MoreScreen(
                     MenuRow(icon = Icons.Default.Bookmark, label = "Saved Routes", badge = "$savedCount", onClick = onNavigateSaved)
                     HorizontalDivider(color = Line)
                     MenuRow(icon = Icons.Default.History, label = "Search History", badge = "$historyCount", onClick = onNavigateHistory)
-                    HorizontalDivider(color = Line)
-                    MenuRow(icon = Icons.Default.CloudDownload, label = "Offline Routes", badge = "$offlineCount", onClick = onNavigateOffline)
                 }
             }
 

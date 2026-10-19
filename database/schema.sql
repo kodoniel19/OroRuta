@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS places (
   map_y   DECIMAL(8,4) NOT NULL DEFAULT 0,
   lat     DECIMAL(10,7) NOT NULL DEFAULT 0,
   lng     DECIMAL(10,7) NOT NULL DEFAULT 0,
+  UNIQUE KEY uq_places_name (name),
   INDEX idx_places_name (name),
   INDEX idx_places_kind (kind)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

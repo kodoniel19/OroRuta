@@ -12,8 +12,14 @@ interface RouteDao {
     @Query("SELECT * FROM cached_routes ORDER BY code")
     suspend fun getAllSync(): List<CachedRoute>
 
-    @Query("SELECT * FROM cached_routes WHERE id = :id")
-    suspend fun getById(id: String): CachedRoute?
+    @Query("""
+        SELECT * FROM cached_routes 
+        WHERE id = :idOrCode 
+           OR LOWER(code) = LOWER(:idOrCode) 
+           OR UPPER(code) = UPPER(:idOrCode) 
+        LIMIT 1
+    """)
+    suspend fun getById(idOrCode: String): CachedRoute?
 
     @Query("SELECT * FROM cached_routes WHERE isOfflineDownload = 1")
     fun getOfflineRoutes(): Flow<List<CachedRoute>>
@@ -49,12 +55,21 @@ interface PlaceDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(places: List<CachedPlace>)
+
+    @Query("DELETE FROM cached_places")
+    suspend fun clearAll()
 }
 
 @Dao
 interface AnnouncementDao {
     @Query("SELECT * FROM cached_announcements WHERE status != 'Expired' ORDER BY date DESC")
     fun getActive(): Flow<List<CachedAnnouncement>>
+
+    @Query("SELECT * FROM cached_announcements ORDER BY date DESC")
+    suspend fun getAllSync(): List<CachedAnnouncement>
+
+    @Query("SELECT * FROM cached_announcements WHERE status = :status ORDER BY date DESC")
+    suspend fun getByStatusSync(status: String): List<CachedAnnouncement>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<CachedAnnouncement>)

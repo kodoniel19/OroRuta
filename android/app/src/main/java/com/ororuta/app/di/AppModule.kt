@@ -46,8 +46,8 @@ object AppModule {
                 level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
                         else HttpLoggingInterceptor.Level.NONE
             })
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
             .build()
 
     @Provides @Singleton

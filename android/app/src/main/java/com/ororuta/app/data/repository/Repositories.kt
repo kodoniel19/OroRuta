@@ -7,6 +7,8 @@ import com.ororuta.app.domain.models.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.util.UUID
 import javax.inject.Inject
@@ -33,6 +35,17 @@ class TripRepository @Inject constructor(private val api: OroRutaApi) {
         }
     }
 
+    suspend fun getTripOption(id: String): Resource<TripOption> {
+        return try {
+            val trip = api.getTrip(id)
+            Resource.Success(trip)
+        } catch (e: IOException) {
+            Resource.Error("You're offline. Cannot load trip details.", isOffline = true)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to load trip option")
+        }
+    }
+
     suspend fun recordCompleted(tripOptionId: String?) {
         try { api.recordCompleted(mapOf("tripOptionId" to (tripOptionId ?: ""))) } catch (_: Exception) {}
     }
@@ -45,11 +58,22 @@ class PlaceRepository @Inject constructor(
     suspend fun search(q: String, filter: String = "all"): Resource<List<Place>> {
         return try {
             val results = api.getPlaces(q, filter = filter)
-            dao.insertAll(results.map { CachedPlace(it.id, it.name, it.area, it.kind, it.mapX, it.mapY, it.lat, it.lng) })
-            Resource.Success(results)
+            val seen = mutableSetOf<String>()
+            val uniqueResults = results.filter {
+                val key = it.name.trim().lowercase()
+                seen.add(key)
+            }
+            dao.clearAll()
+            dao.insertAll(uniqueResults.map { CachedPlace(it.id, it.name, it.area, it.kind, it.mapX, it.mapY, it.lat, it.lng) })
+            Resource.Success(uniqueResults)
         } catch (e: IOException) {
             val cached = dao.search(q)
-            Resource.Success(cached.map { Place(it.id, it.name, it.area, it.kind, it.mapX, it.mapY, it.lat, it.lng) })
+            val seen = mutableSetOf<String>()
+            val uniqueCached = cached.filter {
+                val key = it.name.trim().lowercase()
+                seen.add(key)
+            }
+            Resource.Success(uniqueCached.map { Place(it.id, it.name, it.area, it.kind, it.mapX, it.mapY, it.lat, it.lng) })
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Search failed")
         }
@@ -58,24 +82,60 @@ class PlaceRepository @Inject constructor(
 
 @Singleton
 class AnnouncementRepository @Inject constructor(
-    private val api: OroRutaApi, private val dao: AnnouncementDao
+    private val api: OroRutaApi,
+    private val dao: AnnouncementDao,
+    private val json: Json
 ) {
-    fun getAnnouncements(status: String = ""): Flow<Resource<List<Announcement>>> = flow {
+    fun getAnnouncements(status: String? = null): Flow<Resource<List<Announcement>>> = flow {
         emit(Resource.Loading)
+        val queryStatus = status?.takeIf { it.isNotBlank() } ?: ""
         try {
-            val remote = api.getAnnouncements(status)
-            dao.insertAll(remote.map { CachedAnnouncement(it.id, it.title, it.date, it.category, it.status, "") })
+            val remote = api.getAnnouncements(queryStatus)
+            dao.insertAll(remote.map {
+                CachedAnnouncement(
+                    id = it.id,
+                    title = it.title,
+                    date = it.date,
+                    category = it.category,
+                    status = it.status,
+                    jsonData = json.encodeToString(it)
+                )
+            })
             emit(Resource.Success(remote))
         } catch (e: IOException) {
-            emit(Resource.Error("Offline", isOffline = true))
+            val cached = if (queryStatus.isNotBlank()) dao.getByStatusSync(queryStatus) else dao.getAllSync()
+            if (cached.isNotEmpty()) {
+                val list = cached.mapNotNull { safeDecode(it) }
+                emit(Resource.Success(list, isOffline = true))
+            } else {
+                emit(Resource.Error("You are offline. Connect to the internet to load transportation updates.", isOffline = true))
+            }
         } catch (e: Exception) {
-            emit(Resource.Error(e.message ?: "Error"))
+            val cached = if (queryStatus.isNotBlank()) dao.getByStatusSync(queryStatus) else dao.getAllSync()
+            if (cached.isNotEmpty()) {
+                val list = cached.mapNotNull { safeDecode(it) }
+                emit(Resource.Success(list, isOffline = true))
+            } else {
+                emit(Resource.Error(e.message ?: "Could not load updates"))
+            }
         }
     }
 
     suspend fun getAnnouncement(id: String): Resource<Announcement> = try {
         Resource.Success(api.getAnnouncement(id))
     } catch (e: Exception) { Resource.Error(e.message ?: "Error") }
+
+    private fun safeDecode(cached: CachedAnnouncement): Announcement? {
+        return try {
+            if (cached.jsonData.isNotBlank()) {
+                json.decodeFromString<Announcement>(cached.jsonData)
+            } else {
+                Announcement(id = cached.id, title = cached.title, date = cached.date, category = cached.category, status = cached.status)
+            }
+        } catch (_: Exception) {
+            Announcement(id = cached.id, title = cached.title, date = cached.date, category = cached.category, status = cached.status)
+        }
+    }
 }
 
 @Singleton

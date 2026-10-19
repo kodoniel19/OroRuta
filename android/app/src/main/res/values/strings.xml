@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">OroRuta</string>
-    <string name="google_maps_key">AIzaSyA4ng7IyKcf47FumHW2xvkT4btXcEX5PgQ</string>
 
     <!-- App core -->
     <string name="tagline">Your Guide to Jeepney Routes in Cagayan de Oro</string>

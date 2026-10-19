@@ -140,7 +140,7 @@ fun NearbyDetailScreen(
                     val sampleServedRoutes = listOf(
                         Pair("R1", "Bulua - Agora via CM Recto"),
                         Pair("R2", "Carmen - Lapasan via Divisoria"),
-                        Pair("C1", "Bonbon - Poblacion via Carmen")
+                        Pair("R-BAI", "Baikingon - Carmen Public Market")
                     )
 
                     sampleServedRoutes.forEach { r ->

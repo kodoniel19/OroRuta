@@ -1,7 +1,13 @@
 package com.ororuta.app.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,8 +15,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -108,22 +117,38 @@ fun FareScreen(
                             for (col in 0..1) {
                                 val cat = categories[row * 2 + col]
                                 val isSelected = viewModel.category == cat.first
+                                val catInteraction = remember { MutableInteractionSource() }
+                                val isCatPressed by catInteraction.collectIsPressedAsState()
+                                val catScale by animateFloatAsState(
+                                    targetValue = if (isCatPressed) 0.94f else 1f,
+                                    animationSpec = spring(dampingRatio = 0.72f, stiffness = 800f),
+                                    label = "catScale"
+                                )
+                                val animatedBg by animateColorAsState(
+                                    targetValue = if (isSelected) Brand50 else Color.White,
+                                    animationSpec = tween(180),
+                                    label = "catBg"
+                                )
+
                                 Surface(
                                     onClick = { viewModel.changeCategory(cat.first, routeId, optionId) },
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (isSelected) Brand50 else Color.White,
-                                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, Brand600) else null,
-                                    shadowElevation = 1.dp,
-                                    modifier = Modifier.weight(1f)
+                                    interactionSource = catInteraction,
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = animatedBg,
+                                    border = if (isSelected) BorderStroke(1.5.dp, Brand600) else BorderStroke(1.dp, Line),
+                                    shadowElevation = if (isSelected) 2.dp else 1.dp,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .scale(catScale)
                                 ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
                                         Text(
                                             text = cat.first,
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = if (isSelected) Brand700 else Ink
                                         )
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Spacer(modifier = Modifier.height(3.dp))
                                         Text(
                                             text = cat.second,
                                             fontSize = 11.sp,

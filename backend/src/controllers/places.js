@@ -13,68 +13,49 @@ async function list(req, res, next) {
       sql += " AND (name LIKE ? OR area LIKE ?)";
       params.push(`%${q}%`, `%${q}%`);
     }
-    if (kind) { sql += " AND kind = ?"; params.push(kind); }
-    if (filter === "landmark" || filter === "landmarks") { sql += " AND (kind = 'landmark' OR kind = 'school' OR kind = 'government' OR kind = 'hospital')"; }
-    else if (filter === "terminal" || filter === "terminals") { sql += " AND (kind = 'terminal' OR kind = 'market')"; }
+    if (kind) {
+      sql += " AND kind = ?";
+      params.push(kind);
+    }
+    if (filter === "landmark" || filter === "landmarks") {
+      sql += " AND kind IN ('landmark', 'school', 'mall', 'government', 'hospital')";
+    } else if (filter === "terminal" || filter === "terminals") {
+      sql += " AND kind = 'terminal'";
+    }
     sql += " ORDER BY name LIMIT 50";
-    
+
     let rows = [];
     try {
       const [dbRows] = await db.execute(sql, params);
       rows = dbRows;
     } catch (_) {
-      // In case DB is not yet migrated, fallback to base places catalog
       rows = [];
     }
 
-    // Ensure all critical base places match query if DB hasn't inserted them yet
-    const queryLower = q.trim().toLowerCase();
-    const catalogMatches = CDO_BASE_PLACES.filter((p) => {
-      const matchesQ = !queryLower || p.name.toLowerCase().includes(queryLower) || (p.area && p.area.toLowerCase().includes(queryLower));
-      const matchesKind = !kind || p.kind === kind;
-      const matchesFilter = filter === "all" ||
-        ((filter === "landmark" || filter === "landmarks") && ["landmark", "school", "government", "hospital"].includes(p.kind)) ||
-        ((filter === "terminal" || filter === "terminals") && ["terminal", "market"].includes(p.kind));
-      return matchesQ && matchesKind && matchesFilter;
-    });
+    // Deduplicate by normalized name and ID
+    const seenIds = new Set();
+    const seenNames = new Set();
+    const uniqueRows = [];
 
-    // Merge and deduplicate by name or id
-    const seenNames = new Set(rows.map(r => r.name.toLowerCase()));
-    
-    // Include all strictly verified locations from locations table
-    try {
-      let locSql = "SELECT id, name, barangay, city, latitude, longitude FROM locations WHERE verificationStatus = 'VERIFIED' AND latitude IS NOT NULL AND longitude IS NOT NULL";
-      const locParams = [];
-      if (q) {
-        locSql += " AND (name LIKE ? OR barangay LIKE ? OR city LIKE ?)";
-        locParams.push(`%${q}%`, `%${q}%`, `%${q}%`);
-      }
-      const [locRows] = await db.execute(locSql, locParams);
-      for (const loc of locRows) {
-        if (!seenNames.has(loc.name.toLowerCase())) {
-          rows.push({
-            id: loc.id,
-            name: loc.name,
-            area: loc.barangay || loc.city || "Cagayan de Oro",
-            kind: "landmark",
-            map_x: 0,
-            map_y: 0,
-            lat: parseFloat(loc.latitude),
-            lng: parseFloat(loc.longitude)
-          });
-          seenNames.add(loc.name.toLowerCase());
-        }
-      }
-    } catch (_) {}
-
-    for (const cp of catalogMatches) {
-      if (!seenNames.has(cp.name.toLowerCase())) {
-        rows.push(cp);
-        seenNames.add(cp.name.toLowerCase());
+    for (const r of rows) {
+      const normName = (r.name || "").toLowerCase().trim();
+      if (!seenIds.has(r.id) && !seenNames.has(normName)) {
+        seenIds.add(r.id);
+        seenNames.add(normName);
+        uniqueRows.push({
+          id: r.id,
+          name: r.name,
+          area: r.area || "Cagayan de Oro",
+          kind: r.kind || "landmark",
+          map_x: r.map_x || 0,
+          map_y: r.map_y || 0,
+          lat: parseFloat(r.lat),
+          lng: parseFloat(r.lng)
+        });
       }
     }
 
-    res.json(rows);
+    res.json(uniqueRows);
   } catch (err) { next(err); }
 }
 

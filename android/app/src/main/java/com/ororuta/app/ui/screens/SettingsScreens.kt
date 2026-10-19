@@ -43,8 +43,6 @@ fun NotificationsScreen(viewModel: MoreViewModel, onBack: () -> Unit) {
                     LayerSwitchRow("Road closures & diversions", viewModel.prefs.closures) { viewModel.toggleClosures(it) }
                     HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 8.dp))
                     LayerSwitchRow("Terminal changes", viewModel.prefs.terminals) { viewModel.toggleTerminals(it) }
-                    HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 8.dp))
-                    LayerSwitchRow("Offline data update alerts", viewModel.prefs.offlineUpdates) { viewModel.toggleOfflineUpdates(it) }
                 }
             }
 
@@ -191,11 +189,10 @@ fun LanguageScreen(viewModel: MoreViewModel, onBack: () -> Unit) {
 @Composable
 fun HelpScreen(onBack: () -> Unit, onNavigateReport: () -> Unit, onNavigateAbout: () -> Unit) {
     val guides = listOf(
-        Pair("How OroRuta works", "OroRuta provides complete routes, stops, and schedules for traditional and modern jeepneys in CDO."),
-        Pair("How to search routes", "Enter your starting point and destination in the search card on Home. You can compare routes by travel time, fare, walking distance, or transfers."),
-        Pair("How to read jeepney routes", "Each route has an official code (like R1, R2, C1) matching the signage on the jeepney. Colors help distinguish modern vs traditional lines."),
-        Pair("GPS navigation guidance", "Turn on GPS for step-by-step guidance showing where to board, stay on, and get off. Jeepneys are not tracked in real-time."),
-        Pair("Using offline routes", "Download route bundles ahead of time. You can view routes and navigate without internet connection.")
+        Pair("How OroRuta works", "OroRuta provides complete routes, stops, and schedules for traditional jeepneys in CDO."),
+        Pair("How to search routes", "Find routes by searching by route code, stop, or destination in the Routes directory."),
+        Pair("How to read jeepney routes", "Each route has an official code (like R1, R2, C1) matching the signage on the jeepney."),
+        Pair("GPS navigation guidance", "Turn on GPS for step-by-step guidance showing where to board, stay on, and get off. Jeepneys are not tracked in real-time.")
     )
 
     var expandedIdx by remember { mutableIntStateOf(-1) }
@@ -286,7 +283,7 @@ fun AboutScreen(onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "OroRuta is a public transportation route guide dedicated exclusively to traditional and modern jeepneys in Cagayan de Oro City, Philippines.",
+                text = "OroRuta is a public transportation route guide dedicated exclusively to traditional jeepneys in Cagayan de Oro City, Philippines.",
                 fontSize = 14.sp,
                 color = InkSoft,
                 textAlign = TextAlign.Center,

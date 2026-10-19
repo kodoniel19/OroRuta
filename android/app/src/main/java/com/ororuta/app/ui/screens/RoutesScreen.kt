@@ -1,25 +1,34 @@
 package com.ororuta.app.ui.screens
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ororuta.app.domain.fare.PassengerCategory
+import com.ororuta.app.domain.fare.TraditionalJeepneyFareService
 import com.ororuta.app.domain.models.Resource
 import com.ororuta.app.domain.models.Route
 import com.ororuta.app.ui.components.BadgeSize
@@ -88,8 +97,8 @@ fun RoutesScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Filter chips: All routes | Traditional | Modern | With updates
-                    val filterChips = listOf("All", "Traditional", "Modern", "Updated")
+                    // Filter chips: All routes | With updates
+                    val filterChips = listOf("All", "Updated")
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -102,7 +111,7 @@ fun RoutesScreen(
                                 onClick = { viewModel.onFilterChange(chip) },
                                 label = {
                                     Text(
-                                        text = if (chip == "All") "All routes" else if (chip == "Updated") "With updates" else chip,
+                                        text = if (chip == "All") "All routes" else "With updates",
                                         fontSize = 12.sp
                                     )
                                 }
@@ -186,19 +195,36 @@ fun RoutesScreen(
                     Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
+                            Icon(
+                                imageVector = if (state.isOffline) Icons.Default.CloudOff else Icons.Default.WifiOff,
+                                contentDescription = null,
+                                tint = Warn600,
+                                modifier = Modifier.size(48.dp)
+                            )
                             Text(
                                 text = if (state.isOffline) "No cached routes available" else "Unable to load routes",
                                 color = Ink,
-                                fontSize = 16.sp,
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = state.message,
                                 color = InkMuted,
-                                fontSize = 13.sp
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
                             )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Button(
+                                onClick = { viewModel.loadRoutes() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Brand600),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Retry", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }
@@ -252,12 +278,31 @@ fun RoutesScreen(
 
 @Composable
 fun RouteDirectoryRow(route: Route, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.975f else 1f,
+        animationSpec = spring(
+            dampingRatio = 0.75f,
+            stiffness = 800f
+        ),
+        label = "routeRowScale"
+    )
+    val elevation by animateDpAsState(
+        targetValue = if (isPressed) 0.5.dp else 1.5.dp,
+        label = "routeRowElevation"
+    )
+
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         color = Color.White,
         shape = RoundedCornerShape(14.dp),
-        shadowElevation = 1.dp,
-        modifier = Modifier.fillMaxWidth()
+        shadowElevation = elevation,
+        border = BorderStroke(1.dp, Line),
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -304,11 +349,33 @@ fun RouteDirectoryRow(route: Route, onClick: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Text(
-                    text = "${route.jeepneyType} · ${route.terminalCount} terminals · ${route.stopCount} stops",
-                    fontSize = 11.sp,
-                    color = InkMuted
-                )
+                val fareRes = remember(route) {
+                    TraditionalJeepneyFareService.calculateFareForDistance(
+                        distanceKm = if (route.lengthKm > 0) route.lengthKm else 4.0,
+                        category = PassengerCategory.REGULAR,
+                        jeepneyType = route.jeepneyType
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "${route.terminalCount} terminals · ${route.stopCount} stops",
+                        fontSize = 11.sp,
+                        color = InkMuted
+                    )
+                    if (fareRes.isAvailable) {
+                        Text("·", fontSize = 11.sp, color = InkMuted)
+                        Text(
+                            text = "₱${"%.2f".format(fareRes.regularFare)} (₱${"%.2f".format(fareRes.discountedFare)} disc)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Brand700
+                        )
+                    }
+                }
             }
         }
     }

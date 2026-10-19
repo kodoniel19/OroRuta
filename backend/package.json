@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "db:export": "node scripts/export_db.js",
+    "db:restore": "node scripts/restore_db.js",
     "test": "jest --runInBand --forceExit",
     "test:watch": "jest --watch"
   },

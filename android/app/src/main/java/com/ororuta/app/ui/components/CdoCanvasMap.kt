@@ -95,6 +95,10 @@ fun CdoCanvasMap(
     routes: List<MapRouteLine> = emptyList(),
     walkLines: List<MapWalkLine> = emptyList(),
     markers: List<MapMarker> = emptyList(),
+    activeWalkToBoard: List<LatLng> = emptyList(),
+    activeJeepneyRoute: List<LatLng> = emptyList(),
+    activeWalkFromDrop: List<LatLng> = emptyList(),
+    activeTripMarkers: List<MapMarker> = emptyList(),
     userLocation: Offset? = null,
     selectedMarker: MapMarker? = null,
     onMarkerClick: ((MapMarker) -> Unit)? = null,
@@ -123,8 +127,32 @@ fun CdoCanvasMap(
     }
     var mapReady by remember { mutableStateOf(false) }
 
+    val hasActiveTrip = activeJeepneyRoute.isNotEmpty() || activeWalkToBoard.isNotEmpty() || activeWalkFromDrop.isNotEmpty() || activeTripMarkers.isNotEmpty()
+
+    // Bounding box for active navigation route
+    LaunchedEffect(activeJeepneyRoute, activeWalkToBoard, activeWalkFromDrop, activeTripMarkers, mapReady) {
+        if (!mapReady || !hasActiveTrip) return@LaunchedEffect
+        val allPoints = mutableListOf<LatLng>()
+        allPoints.addAll(activeWalkToBoard)
+        allPoints.addAll(activeJeepneyRoute)
+        allPoints.addAll(activeWalkFromDrop)
+        activeTripMarkers.forEach { m ->
+            if (m.lat != null && m.lng != null) allPoints.add(LatLng(m.lat, m.lng))
+        }
+        if (allPoints.isNotEmpty()) {
+            val builder = com.google.android.gms.maps.model.LatLngBounds.builder()
+            allPoints.forEach { builder.include(it) }
+            try {
+                cameraPositionState.animate(
+                    CameraUpdateFactory.newLatLngBounds(builder.build(), 120),
+                    600
+                )
+            } catch (_: Exception) {}
+        }
+    }
+
     LaunchedEffect(cameraPositionState.isMoving, mapReady) {
-        if (!mapReady || cameraPositionState.isMoving) return@LaunchedEffect
+        if (!mapReady || cameraPositionState.isMoving || hasActiveTrip) return@LaunchedEffect
         val t = cameraPositionState.position.target
         if (!cdoCameraBounds.contains(t)) {
             cameraPositionState.animate(
@@ -160,41 +188,80 @@ fun CdoCanvasMap(
             },
             onPOIClick = { }
         ) {
-            // Draw real CDO Jeepney Routes
-            Polyline(points = CDO_ROUTE_R1, color = Color(0xFF1471B0), width = 10f)
-            Polyline(points = CDO_ROUTE_C1, color = Color(0xFF1E8A4C), width = 10f)
-            Polyline(points = CDO_ROUTE_B1, color = Color(0xFF7A3EE6), width = 10f)
-
-            // Markers from parameters if provided with LatLng
-            if (markers.isNotEmpty()) {
-                markers.forEach { m ->
-                    val pos = if (m.lat != null && m.lng != null) {
-                        LatLng(m.lat, m.lng)
-                    } else {
-                        DEFAULT_CDO_STOPS.find { it.first.contains(m.name, ignoreCase = true) || m.name.contains(it.first, ignoreCase = true) }?.second
-                            ?: LatLng(8.4822 + (m.y - 400) * 0.0001, 124.6472 + (m.x - 200) * 0.0001)
-                    }
-                    Marker(
-                        state = rememberMarkerState(key = m.id, position = pos),
-                        title = m.name,
-                        snippet = m.note ?: "Kind: ${m.kind}",
-                        onClick = {
-                            onMarkerClick?.invoke(m)
-                            true
-                        }
+            if (hasActiveTrip) {
+                // 1. Walk from origin to boarding point (snapped to real pedestrian roads)
+                if (activeWalkToBoard.isNotEmpty()) {
+                    Polyline(
+                        points = activeWalkToBoard,
+                        color = Color(0xFF1E8A4C), // Forest green walk line
+                        width = 8f
                     )
                 }
-            } else {
-                DEFAULT_CDO_STOPS.forEach { (name, pos) ->
-                    Marker(
-                        state = rememberMarkerState(key = name, position = pos),
-                        title = name,
-                        snippet = "Jeepney Stop, CDO",
-                        onClick = {
-                            onMarkerClick?.invoke(MapMarker(id = name, name = name, kind = "stop", lat = pos.latitude, lng = pos.longitude))
-                            true
-                        }
+
+                // 2. Real Jeepney road-following polyline (snapped to actual roads and bridges)
+                if (activeJeepneyRoute.isNotEmpty()) {
+                    Polyline(
+                        points = activeJeepneyRoute,
+                        color = Color(0xFF1471B0), // OroRuta primary blue
+                        width = 12f
                     )
+                }
+
+                // 3. Walk from dropoff point to destination
+                if (activeWalkFromDrop.isNotEmpty()) {
+                    Polyline(
+                        points = activeWalkFromDrop,
+                        color = Color(0xFF1E8A4C), // Forest green walk line
+                        width = 8f
+                    )
+                }
+
+                // 4. Navigation Markers
+                activeTripMarkers.forEach { m ->
+                    if (m.lat != null && m.lng != null) {
+                        Marker(
+                            state = rememberMarkerState(key = m.id, position = LatLng(m.lat, m.lng)),
+                            title = m.name,
+                            snippet = m.note ?: m.kind,
+                            onClick = {
+                                onMarkerClick?.invoke(m)
+                                true
+                            }
+                        )
+                    }
+                }
+            } else {
+                // Default city overview markers
+                if (markers.isNotEmpty()) {
+                    markers.forEach { m ->
+                        val pos = if (m.lat != null && m.lng != null) {
+                            LatLng(m.lat, m.lng)
+                        } else {
+                            DEFAULT_CDO_STOPS.find { it.first.contains(m.name, ignoreCase = true) || m.name.contains(it.first, ignoreCase = true) }?.second
+                                ?: LatLng(8.4822 + (m.y - 400) * 0.0001, 124.6472 + (m.x - 200) * 0.0001)
+                        }
+                        Marker(
+                            state = rememberMarkerState(key = m.id, position = pos),
+                            title = m.name,
+                            snippet = m.note ?: "Kind: ${m.kind}",
+                            onClick = {
+                                onMarkerClick?.invoke(m)
+                                true
+                            }
+                        )
+                    }
+                } else {
+                    DEFAULT_CDO_STOPS.forEach { (name, pos) ->
+                        Marker(
+                            state = rememberMarkerState(key = name, position = pos),
+                            title = name,
+                            snippet = "Jeepney Stop, CDO",
+                            onClick = {
+                                onMarkerClick?.invoke(MapMarker(id = name, name = name, kind = "stop", lat = pos.latitude, lng = pos.longitude))
+                                true
+                            }
+                        )
+                    }
                 }
             }
 

@@ -18,6 +18,11 @@ import com.ororuta.app.domain.models.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 import javax.inject.Inject
 
 enum class LocationStatus { UNKNOWN, GRANTED, DENIED }
@@ -261,6 +266,11 @@ class ResultsViewModel @Inject constructor(
     var tripsState by mutableStateOf<Resource<List<TripOption>>>(Resource.Loading)
     var currentSort by mutableStateOf("time")
 
+    private var lastFromLat: Double? = null
+    private var lastFromLng: Double? = null
+    private var lastToLat: Double? = null
+    private var lastToLng: Double? = null
+
     fun searchTrips(
         from: String,
         to: String,
@@ -271,10 +281,15 @@ class ResultsViewModel @Inject constructor(
         toLng: Double? = null
     ) {
         currentSort = sort
+        if (fromLat != null) lastFromLat = fromLat
+        if (fromLng != null) lastFromLng = fromLng
+        if (toLat != null) lastToLat = toLat
+        if (toLng != null) lastToLng = toLng
+
         viewModelScope.launch {
             tripsState = Resource.Loading
-            var actualFromLat = fromLat
-            var actualFromLng = fromLng
+            var actualFromLat = fromLat ?: lastFromLat
+            var actualFromLng = fromLng ?: lastFromLng
 
             // If starting point is "Current Location", get actual GPS coordinates
             if (from.isBlank() || from.contains("Current Location", ignoreCase = true)) {
@@ -290,15 +305,15 @@ class ResultsViewModel @Inject constructor(
                 to = to,
                 fromLat = actualFromLat,
                 fromLng = actualFromLng,
-                toLat = toLat,
-                toLng = toLng,
+                toLat = toLat ?: lastToLat,
+                toLng = toLng ?: lastToLng,
                 sort = sort
             )
         }
     }
 
     fun changeSort(from: String, to: String, sort: String) {
-        searchTrips(from, to, sort)
+        searchTrips(from, to, sort, lastFromLat, lastFromLng, lastToLat, lastToLng)
     }
 }
 
@@ -350,22 +365,78 @@ class TripDetailViewModel @Inject constructor(
 // Navigation ViewModel
 @HiltViewModel
 class NavigationViewModel @Inject constructor(
-    private val tripRepo: TripRepository
+    private val tripRepo: TripRepository,
+    private val locationProvider: CdoLocationProvider
 ) : ViewModel() {
 
+    var tripState by mutableStateOf<Resource<TripOption>>(Resource.Loading)
     var trip by mutableStateOf<TripOption?>(null)
     var currentStepIndex by mutableIntStateOf(0)
     var isDestinationReached by mutableStateOf(false)
 
+    var userGpsLocation by mutableStateOf<Pair<Double, Double>?>(null)
+    var locationError by mutableStateOf<String?>(null)
+    var isPermissionDenied by mutableStateOf(false)
+    var remainingDistanceKm by mutableStateOf(0.0)
+    var remainingMinutes by mutableIntStateOf(0)
+
+    fun loadTrip(id: String) {
+        viewModelScope.launch {
+            tripState = Resource.Loading
+            val res = tripRepo.getTripOption(id)
+            if (res is Resource.Success) {
+                val t = res.data
+                trip = t
+                tripState = Resource.Success(t)
+                currentStepIndex = 0
+                remainingDistanceKm = t.totalKm
+                remainingMinutes = t.minutes
+            } else if (res is Resource.Error) {
+                tripState = Resource.Error(res.message, res.isOffline)
+            }
+            updateGpsLocation()
+        }
+    }
+
     fun initTrip(option: TripOption) {
         trip = option
+        tripState = Resource.Success(option)
         currentStepIndex = 0
+        remainingDistanceKm = option.totalKm
+        remainingMinutes = option.minutes
+        updateGpsLocation()
+    }
+
+    fun updateGpsLocation() {
+        viewModelScope.launch {
+            if (!locationProvider.hasLocationPermission()) {
+                isPermissionDenied = true
+                locationError = "Location permission is required for accurate GPS navigation."
+                return@launch
+            }
+            isPermissionDenied = false
+            val loc = locationProvider.getDeviceLocationOrNull()
+            if (loc != null) {
+                userGpsLocation = loc
+                locationError = null
+            } else {
+                locationError = "Waiting for GPS fix…"
+            }
+        }
     }
 
     fun nextStep() {
-        val legsCount = trip?.legs?.size ?: 5
+        val t = trip
+        val legsCount = t?.legs?.size ?: 5
         if (currentStepIndex < legsCount - 1) {
             currentStepIndex++
+            // Recalculate remaining distance and minutes from remaining legs
+            if (t != null && t.legs.isNotEmpty()) {
+                val remainingLegs = t.legs.drop(currentStepIndex)
+                remainingMinutes = maxOf(1, remainingLegs.sumOf { it.minutes })
+                val remainingM = remainingLegs.sumOf { it.distanceM }
+                remainingDistanceKm = Math.round((remainingM / 1000.0) * 10.0) / 10.0
+            }
         } else {
             isDestinationReached = true
             recordCompletion()
@@ -387,7 +458,11 @@ class RoutesViewModel @Inject constructor(
 
     var routesState by mutableStateOf<Resource<List<Route>>>(Resource.Loading)
     var searchQuery by mutableStateOf("")
-    var selectedFilter by mutableStateOf("All") // All, Traditional, Modern, Updated
+    var selectedFilter by mutableStateOf("All") // All, Updated
+
+    // Tracks the active load job so we can cancel it before starting a new one.
+    // This prevents multiple concurrent collectors racing to update routesState.
+    private var loadJob: kotlinx.coroutines.Job? = null
 
     init {
         loadRoutes()
@@ -404,15 +479,26 @@ class RoutesViewModel @Inject constructor(
     }
 
     fun loadRoutes() {
-        viewModelScope.launch {
-            val typeParam = when (selectedFilter) {
-                "Traditional" -> "Traditional"
-                "Modern" -> "Modern"
-                else -> ""
-            }
+        // Cancel any in-flight request so we never have two collectors racing.
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             val hasUpdates = selectedFilter == "Updated"
-            routeRepo.getRoutes(searchQuery, typeParam, hasUpdates).collect { res ->
-                routesState = res
+            // Collect: no type filter sent to server — we apply it client-side below
+            // to avoid missing routes whose jeepneyType field is blank in the bundled JSON.
+            routeRepo.getRoutes(searchQuery, "", hasUpdates).collect { res ->
+                val filteredRes = when (res) {
+                    is Resource.Success -> {
+                        // Filter traditional-only client-side.
+                        // A blank jeepneyType is treated as Traditional (legacy data).
+                        val traditionalOnly = res.data.filter {
+                            it.jeepneyType.isBlank() ||
+                            it.jeepneyType.equals("Traditional", ignoreCase = true)
+                        }
+                        Resource.Success(traditionalOnly, res.isOffline)
+                    }
+                    else -> res
+                }
+                routesState = filteredRes
             }
         }
     }
@@ -470,13 +556,36 @@ data class DirectionsGuide(
     val pathPoints: List<com.google.android.gms.maps.model.LatLng>
 )
 
+data class RouteStopPoint(
+    val id: String,
+    val name: String,
+    val type: String, // "terminal", "loading", "unloading", "transfer"
+    val lat: Double,
+    val lng: Double,
+    val note: String? = null
+)
+
+data class RouteGuidance(
+    val route: Route,
+    val direction: String, // "Inbound" or "Outbound"
+    val userLocation: com.google.android.gms.maps.model.LatLng?,
+    val nearestBoardingStop: RouteStopPoint?,
+    val distanceToBoardingMeters: Int,
+    val isUserNearStop: Boolean,
+    val walkingPathToBoarding: List<com.google.android.gms.maps.model.LatLng>,
+    val walkingTimeMinutes: Int,
+    val dropoffStop: RouteStopPoint?,
+    val guidanceMessage: String,
+    val routePoints: List<com.google.android.gms.maps.model.LatLng>
+)
+
 // Map ViewModel (Database-driven Routes, Places, Landmarks, Directions, Recommendations)
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val routeRepo: RouteRepository,
     private val placeRepo: PlaceRepository,
     private val tripRepo: TripRepository,
-    private val locationProvider: CdoLocationProvider
+    val locationProvider: CdoLocationProvider
 ) : ViewModel() {
 
     var routesState by mutableStateOf<Resource<List<Route>>>(Resource.Loading)
@@ -493,14 +602,20 @@ class MapViewModel @Inject constructor(
     var recommendedJeepneyTrip by mutableStateOf<TripOption?>(null)
     var isLoadingJeepneyRoute by mutableStateOf(false)
 
+    var routeGuidance by mutableStateOf<RouteGuidance?>(null)
+    var isCalculatingGuidance by mutableStateOf(false)
+
     init {
         loadRoutes()
         loadPlaces()
     }
 
+    private var mapLoadJob: kotlinx.coroutines.Job? = null
+
     fun loadRoutes() {
-        viewModelScope.launch {
-            routeRepo.getRoutes().collect { res ->
+        mapLoadJob?.cancel()
+        mapLoadJob = viewModelScope.launch {
+            routeRepo.getRoutes("", "", false).collect { res ->
                 routesState = res
             }
         }
@@ -513,6 +628,8 @@ class MapViewModel @Inject constructor(
         }
     }
 
+    private var directionsJob: kotlinx.coroutines.Job? = null
+
     fun calculateDirections(
         fromLat: Double,
         fromLng: Double,
@@ -521,42 +638,49 @@ class MapViewModel @Inject constructor(
         fromName: String = "Current Location",
         toName: String
     ) {
-        viewModelScope.launch {
+        // Ignore duplicate taps while a request is already in-flight
+        if (isCalculatingDirections) return
+        directionsJob?.cancel()
+        directionsJob = viewModelScope.launch {
             isCalculatingDirections = true
-            val dLat = Math.toRadians(toLat - fromLat)
-            val dLng = Math.toRadians(toLng - fromLng)
-            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(Math.toRadians(fromLat)) * Math.cos(Math.toRadians(toLat)) *
-                    Math.sin(dLng / 2) * Math.sin(dLng / 2)
-            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-            val distMeters = (6371000 * c).toInt()
-            val minutes = Math.max(1, (distMeters / 75.0).toInt())
+            try {
+            // OSRM is an open-source routing engine that follows real roads/streets.
+            val osrmResult = withContext(Dispatchers.IO) {
+                fetchOsrmRoute(fromLng, fromLat, toLng, toLat)
+            }
 
-            val points = mutableListOf<com.google.android.gms.maps.model.LatLng>()
-            points.add(com.google.android.gms.maps.model.LatLng(fromLat, fromLng))
+            val points: List<com.google.android.gms.maps.model.LatLng>
+            val distMeters: Int
+            val minutes: Int
 
-            val tripRes = tripRepo.searchTrips(fromName, toName, fromLat, fromLng, toLat, toLng)
-            if (tripRes is Resource.Success && tripRes.data.isNotEmpty()) {
-                val best = tripRes.data.first()
-                if (best.boardingLat != null && best.boardingLng != null) {
-                    points.add(com.google.android.gms.maps.model.LatLng(best.boardingLat, best.boardingLng))
-                }
-                val segRouteId = best.segments.firstOrNull()?.routeId
-                val matchedRoute = routes.find { it.id == segRouteId }
-                if (matchedRoute != null && matchedRoute.path.isNotEmpty()) {
-                    matchedRoute.path.forEach { pt ->
-                        if (pt.lat != 0.0 && pt.lng != 0.0) {
-                            points.add(com.google.android.gms.maps.model.LatLng(pt.lat, pt.lng))
-                        }
-                    }
-                }
+            if (osrmResult != null) {
+                // Use real road-following route from OSRM
+                points = osrmResult.first
+                distMeters = osrmResult.second
+                // Walking speed ~5 km/h = 83 m/min; jeepney ~25 km/h = 417 m/min
+                // For directions we show walking time since this is for pedestrian nav
+                minutes = Math.max(1, (distMeters / 83.0).toInt())
             } else {
+                // Fallback: haversine straight-line distance (with road correction factor 1.35)
+                val dLat = Math.toRadians(toLat - fromLat)
+                val dLng = Math.toRadians(toLng - fromLng)
+                val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                        Math.cos(Math.toRadians(fromLat)) * Math.cos(Math.toRadians(toLat)) *
+                        Math.sin(dLng / 2) * Math.sin(dLng / 2)
+                val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                val straightMeters = (6371000 * c).toInt()
+                distMeters = (straightMeters * 1.35).toInt()
+                minutes = Math.max(1, (distMeters / 83.0).toInt())
+                // Use two intermediate points to avoid straight river-crossing lines
                 val midLat = (fromLat + toLat) / 2
                 val midLng = (fromLng + toLng) / 2
-                points.add(com.google.android.gms.maps.model.LatLng(midLat, fromLng))
-                points.add(com.google.android.gms.maps.model.LatLng(midLat, midLng))
+                points = listOf(
+                    com.google.android.gms.maps.model.LatLng(fromLat, fromLng),
+                    com.google.android.gms.maps.model.LatLng(midLat, fromLng),
+                    com.google.android.gms.maps.model.LatLng(midLat, midLng),
+                    com.google.android.gms.maps.model.LatLng(toLat, toLng)
+                )
             }
-            points.add(com.google.android.gms.maps.model.LatLng(toLat, toLng))
 
             directionsGuide = DirectionsGuide(
                 originName = fromName,
@@ -569,7 +693,45 @@ class MapViewModel @Inject constructor(
                 estimatedMinutes = minutes,
                 pathPoints = points
             )
-            isCalculatingDirections = false
+            } finally {
+                // Always reset loading state — even if the coroutine is cancelled or throws
+                isCalculatingDirections = false
+            }
+        }
+    }
+
+    /**
+     * Fetches a road-following route from the OSRM public routing engine.
+     * Returns a Pair of (polyline points, distance in meters) or null on failure.
+     * OSRM uses OpenStreetMap road network data and returns encoded polyline geometry.
+     */
+    private fun fetchOsrmRoute(
+        fromLng: Double, fromLat: Double,
+        toLng: Double, toLat: Double
+    ): Pair<List<com.google.android.gms.maps.model.LatLng>, Int>? {
+        return try {
+            val url = "https://router.project-osrm.org/route/v1/foot/" +
+                "$fromLng,$fromLat;$toLng,$toLat" +
+                "?overview=full&geometries=geojson&steps=false"
+            val client = OkHttpClient()
+            val request = Request.Builder().url(url).build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) return null
+            val body = response.body?.string() ?: return null
+            val json = JSONObject(body)
+            if (json.getString("code") != "Ok") return null
+            val route = json.getJSONArray("routes").getJSONObject(0)
+            val distanceMeters = route.getDouble("distance").toInt()
+            val coords = route.getJSONObject("geometry").getJSONArray("coordinates")
+            val pts = mutableListOf<com.google.android.gms.maps.model.LatLng>()
+            for (i in 0 until coords.length()) {
+                val c = coords.getJSONArray(i)
+                // GeoJSON: [longitude, latitude]
+                pts.add(com.google.android.gms.maps.model.LatLng(c.getDouble(1), c.getDouble(0)))
+            }
+            if (pts.size < 2) null else Pair(pts, distanceMeters)
+        } catch (_: Exception) {
+            null
         }
     }
 
@@ -586,30 +748,120 @@ class MapViewModel @Inject constructor(
             if (res is Resource.Success && res.data.isNotEmpty()) {
                 recommendedJeepneyTrip = res.data.first()
             } else {
-                val nearbyRoute = routes.firstOrNull()
-                if (nearbyRoute != null) {
+                // Find route with closest path to destination, also considering origin proximity
+                data class RouteCandidate(
+                    val route: Route,
+                    val boardingPoint: Pair<Double, Double>,
+                    val boardingName: String,
+                    val dropoffPoint: Pair<Double, Double>,
+                    val dropoffName: String,
+                    val walkToBoard: Int,
+                    val walkFromDrop: Int,
+                    val routeKm: Double
+                )
+
+                var bestCandidate: RouteCandidate? = null
+                var bestScore = Double.MAX_VALUE
+
+                for (route in routes) {
+                    val allPts: List<Triple<Double, Double, String>> = (
+                        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }
+                            .map { Triple(it.lat, it.lng, it.name) } +
+                        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }
+                            .map { Triple(it.lat, it.lng, it.name) } +
+                        route.path.filter { it.lat != 0.0 && it.lng != 0.0 }
+                            .map { Triple(it.lat, it.lng, "") }
+                    )
+                    if (allPts.isEmpty()) continue
+
+                    // Find closest point on route to origin (boarding point)
+                    var minBoardDist = Double.MAX_VALUE
+                    var boardPt = Triple(fromLat, fromLng, "Nearest Loading Point")
+                    for (pt in allPts) {
+                        val dLat = pt.first - fromLat
+                        val dLng = pt.second - fromLng
+                        val d = dLat * dLat + dLng * dLng
+                        if (d < minBoardDist) { minBoardDist = d; boardPt = pt }
+                    }
+
+                    // Find closest point on route to destination (drop-off point)
+                    var minDropDist = Double.MAX_VALUE
+                    var dropPt = Triple(toLat, toLng, "Stop near $destName")
+                    for (pt in allPts) {
+                        val dLat = pt.first - toLat
+                        val dLng = pt.second - toLng
+                        val d = dLat * dLat + dLng * dLng
+                        if (d < minDropDist) { minDropDist = d; dropPt = pt }
+                    }
+
+                    // Haversine walk distances in meters
+                    fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+                        val r = 6371000.0
+                        val dLat = Math.toRadians(lat2 - lat1)
+                        val dLng = Math.toRadians(lng2 - lng1)
+                        val a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+                                Math.cos(Math.toRadians(lat1))*Math.cos(Math.toRadians(lat2))*
+                                Math.sin(dLng/2)*Math.sin(dLng/2)
+                        return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+                    }
+
+                    val walkToBoard = haversine(fromLat, fromLng, boardPt.first, boardPt.second)
+                    val walkFromDrop = haversine(toLat, toLng, dropPt.first, dropPt.second)
+                    // Score: weighted by walking distance + destination proximity
+                    val score = walkToBoard * 1.5 + walkFromDrop * 2.0
+                    if (score < bestScore) {
+                        bestScore = score
+                        // Estimate route distance: straight-line between board & drop * road factor
+                        val routeKm = Math.max(1.0,
+                            haversine(boardPt.first, boardPt.second, dropPt.first, dropPt.second) / 1000.0 * 1.35
+                        )
+                        bestCandidate = RouteCandidate(
+                            route = route,
+                            boardingPoint = Pair(boardPt.first, boardPt.second),
+                            boardingName = boardPt.third.ifBlank { "Loading point near origin" },
+                            dropoffPoint = Pair(dropPt.first, dropPt.second),
+                            dropoffName = dropPt.third.ifBlank { "Stop near $destName" },
+                            walkToBoard = walkToBoard.toInt(),
+                            walkFromDrop = walkFromDrop.toInt(),
+                            routeKm = routeKm
+                        )
+                    }
+                }
+
+                if (bestCandidate != null) {
+                    val cand = bestCandidate
+                    val r = cand.route
+                    // Use route's actual fare and travel time where available
+                    val regularFare = if (r.fare > 0) r.fare else Math.max(13.0, 13.0 + (cand.routeKm - 4.0).coerceAtLeast(0.0) * 1.25)
+                    val discountFare = regularFare * 0.8
+                    val totalWalk = cand.walkToBoard + cand.walkFromDrop
+                    val walkMinutes = Math.max(1, (totalWalk / 70.0).toInt())
+                    // Jeepney speed ~20 km/h in CDO traffic
+                    val rideMinutes = if (r.travelTime > 0) r.travelTime else Math.max(10, (cand.routeKm / 20.0 * 60.0).toInt())
+                    val totalMinutes = walkMinutes + rideMinutes
+
                     recommendedJeepneyTrip = TripOption(
-                        id = "rec-${nearbyRoute.id}",
+                        id = "rec-${r.id}",
                         originPlaceId = "current",
                         destinationPlaceId = "dest",
-                        minutes = 18,
-                        walkMeters = 350,
+                        minutes = totalMinutes,
+                        walkMeters = totalWalk,
                         transfers = 0,
-                        boardingName = "Loading Point near Current Location",
-                        boardingLat = fromLat,
-                        boardingLng = fromLng,
-                        dropoffName = "Stop near $destName",
-                        totalKm = 4.2,
-                        regularFare = 13.0,
-                        discountFare = 10.0,
+                        boardingName = cand.boardingName,
+                        boardingLat = cand.boardingPoint.first,
+                        boardingLng = cand.boardingPoint.second,
+                        dropoffName = cand.dropoffName,
+                        totalKm = (cand.routeKm * 10.0).toLong() / 10.0,
+                        regularFare = (regularFare * 100.0).toLong() / 100.0,
+                        discountFare = (discountFare * 100.0).toLong() / 100.0,
                         segments = listOf(
                             TripSegment(
-                                tripOptionId = "rec-${nearbyRoute.id}",
-                                routeId = nearbyRoute.id,
-                                code = nearbyRoute.code,
-                                routeName = nearbyRoute.name,
-                                color = nearbyRoute.color,
-                                km = 4.2
+                                tripOptionId = "rec-${r.id}",
+                                routeId = r.id,
+                                code = r.code,
+                                routeName = r.name,
+                                color = r.color,
+                                km = (cand.routeKm * 10.0).toLong() / 10.0
                             )
                         )
                     )
@@ -622,6 +874,202 @@ class MapViewModel @Inject constructor(
     fun clearDirections() {
         directionsGuide = null
         recommendedJeepneyTrip = null
+    }
+
+    fun clearRouteGuidance() {
+        routeGuidance = null
+    }
+
+    fun selectRouteForGuidance(
+        routeId: String,
+        direction: String = "Inbound",
+        userLoc: com.google.android.gms.maps.model.LatLng? = null
+    ) {
+        viewModelScope.launch {
+            isCalculatingGuidance = true
+            val route = routes.find { it.id == routeId || it.code.equals(routeId, ignoreCase = true) }
+                ?: when (val r = routeRepo.getRoute(routeId)) {
+                    is Resource.Success -> r.data
+                    else -> null
+                }
+            if (route != null) {
+                recalculateGuidance(route, direction, userLoc)
+            }
+            isCalculatingGuidance = false
+        }
+    }
+
+    fun updateGuidanceLocation(userLoc: com.google.android.gms.maps.model.LatLng) {
+        val current = routeGuidance ?: return
+        viewModelScope.launch {
+            recalculateGuidance(current.route, current.direction, userLoc)
+        }
+    }
+
+    fun setGuidanceDirection(
+        newDirection: String,
+        userLoc: com.google.android.gms.maps.model.LatLng? = null
+    ) {
+        val current = routeGuidance ?: return
+        viewModelScope.launch {
+            isCalculatingGuidance = true
+            recalculateGuidance(current.route, newDirection, userLoc ?: current.userLocation)
+            isCalculatingGuidance = false
+        }
+    }
+
+    private suspend fun recalculateGuidance(
+        route: Route,
+        direction: String,
+        userLoc: com.google.android.gms.maps.model.LatLng?
+    ) {
+        val routePoints = com.ororuta.app.ui.screens.parseGeometries(route, direction)
+
+        // Gather all verified boarding points: Terminals, Loading Points, Transfers
+        val boardingCandidates = mutableListOf<RouteStopPoint>()
+        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
+            boardingCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
+        }
+        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }.forEach {
+            boardingCandidates.add(RouteStopPoint(it.id, it.name, "loading", it.lat, it.lng, it.note))
+        }
+        route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
+            boardingCandidates.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
+        }
+
+        if (boardingCandidates.isEmpty() && routePoints.isNotEmpty()) {
+            boardingCandidates.add(
+                RouteStopPoint(
+                    id = "origin_${route.id}",
+                    name = route.origin,
+                    type = "terminal",
+                    lat = routePoints.first().latitude,
+                    lng = routePoints.first().longitude,
+                    note = "Route Origin Point"
+                )
+            )
+        }
+
+        // Gather verified drop-off points
+        val dropoffCandidates = mutableListOf<RouteStopPoint>()
+        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.reversed().forEach {
+            dropoffCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
+        }
+        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && it.pointType.equals("unloading", ignoreCase = true) }.forEach {
+            dropoffCandidates.add(RouteStopPoint(it.id, it.name, "unloading", it.lat, it.lng, it.note))
+        }
+        if (dropoffCandidates.isEmpty() && routePoints.isNotEmpty()) {
+            dropoffCandidates.add(
+                RouteStopPoint(
+                    id = "dest_${route.id}",
+                    name = route.destination,
+                    type = "terminal",
+                    lat = routePoints.last().latitude,
+                    lng = routePoints.last().longitude,
+                    note = "Route Destination Point"
+                )
+            )
+        }
+        val dropoffStop = dropoffCandidates.firstOrNull()
+
+        if (userLoc == null) {
+            val nearestStop = boardingCandidates.firstOrNull()
+            routeGuidance = RouteGuidance(
+                route = route,
+                direction = direction,
+                userLocation = null,
+                nearestBoardingStop = nearestStop,
+                distanceToBoardingMeters = 0,
+                isUserNearStop = false,
+                walkingPathToBoarding = emptyList(),
+                walkingTimeMinutes = 0,
+                dropoffStop = dropoffStop,
+                guidanceMessage = "Showing verified route for Route ${route.code} (${direction}). Turn on location to find your nearest boarding stop and walking directions.",
+                routePoints = routePoints
+            )
+            return
+        }
+
+        fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+            val r = 6371000.0
+            val dLat = Math.toRadians(lat2 - lat1)
+            val dLon = Math.toRadians(lon2 - lon1)
+            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2)
+            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            return r * c
+        }
+
+        val nearestStop = boardingCandidates.minByOrNull {
+            haversineMeters(userLoc.latitude, userLoc.longitude, it.lat, it.lng)
+        } ?: boardingCandidates.firstOrNull()
+
+        if (nearestStop == null) {
+            routeGuidance = RouteGuidance(
+                route = route,
+                direction = direction,
+                userLocation = userLoc,
+                nearestBoardingStop = null,
+                distanceToBoardingMeters = 0,
+                isUserNearStop = false,
+                walkingPathToBoarding = emptyList(),
+                walkingTimeMinutes = 0,
+                dropoffStop = dropoffStop,
+                guidanceMessage = "Ride Traditional Jeepney Route ${route.code} (${direction}) heading towards ${route.destination}.",
+                routePoints = routePoints
+            )
+            return
+        }
+
+        val directDist = haversineMeters(userLoc.latitude, userLoc.longitude, nearestStop.lat, nearestStop.lng).toInt()
+        val isNear = directDist <= 60
+
+        if (isNear) {
+            routeGuidance = RouteGuidance(
+                route = route,
+                direction = direction,
+                userLocation = userLoc,
+                nearestBoardingStop = nearestStop,
+                distanceToBoardingMeters = directDist,
+                isUserNearStop = true,
+                walkingPathToBoarding = emptyList(),
+                walkingTimeMinutes = 0,
+                dropoffStop = dropoffStop,
+                guidanceMessage = "You are at ${nearestStop.name}. Board Traditional Jeepney Route ${route.code} (${direction}) here heading towards ${route.destination}.",
+                routePoints = routePoints
+            )
+        } else {
+            val osrm = withContext(Dispatchers.IO) {
+                fetchOsrmRoute(userLoc.longitude, userLoc.latitude, nearestStop.lng, nearestStop.lat)
+            }
+            val walkPath: List<com.google.android.gms.maps.model.LatLng>
+            val walkDist: Int
+            val walkMins: Int
+            if (osrm != null) {
+                walkPath = osrm.first
+                walkDist = osrm.second
+                walkMins = Math.max(1, (walkDist / 83.0).toInt())
+            } else {
+                walkDist = (directDist * 1.35).toInt()
+                walkMins = Math.max(1, (walkDist / 83.0).toInt())
+                walkPath = listOf(userLoc, com.google.android.gms.maps.model.LatLng(nearestStop.lat, nearestStop.lng))
+            }
+
+            routeGuidance = RouteGuidance(
+                route = route,
+                direction = direction,
+                userLocation = userLoc,
+                nearestBoardingStop = nearestStop,
+                distanceToBoardingMeters = walkDist,
+                isUserNearStop = false,
+                walkingPathToBoarding = walkPath,
+                walkingTimeMinutes = walkMins,
+                dropoffStop = dropoffStop,
+                guidanceMessage = "Walk $walkDist m (~$walkMins min) to ${nearestStop.name} to board Traditional Jeepney Route ${route.code} (${direction}).",
+                routePoints = routePoints
+            )
+        }
     }
 }
 
@@ -659,23 +1107,62 @@ class AnnouncementsViewModel @Inject constructor(
     private val announcementRepo: AnnouncementRepository
 ) : ViewModel() {
 
+    private var allAnnouncements: List<Announcement> = emptyList()
     var announcementsState by mutableStateOf<Resource<List<Announcement>>>(Resource.Loading)
     var selectedFilter by mutableStateOf("All") // All, Active, Updated, Temporary, Expired
+    var isRefreshing by mutableStateOf(false)
 
     init {
-        loadAnnouncements("All")
+        loadAnnouncements()
     }
 
     fun setFilter(filter: String) {
         selectedFilter = filter
-        val statusParam = if (filter == "All") "" else filter
-        loadAnnouncements(statusParam)
+        applyFilter()
     }
 
-    private fun loadAnnouncements(status: String) {
+    fun refresh() {
+        loadAnnouncements(forceRefresh = true)
+    }
+
+    private fun applyFilter() {
+        if (announcementsState is Resource.Loading && allAnnouncements.isEmpty()) return
+        val filtered = if (selectedFilter.equals("All", ignoreCase = true)) {
+            allAnnouncements
+        } else {
+            allAnnouncements.filter { it.status.equals(selectedFilter, ignoreCase = true) }
+        }
+        announcementsState = Resource.Success(filtered)
+    }
+
+    private fun loadAnnouncements(forceRefresh: Boolean = false) {
         viewModelScope.launch {
-            announcementRepo.getAnnouncements(status).collect { res ->
-                announcementsState = res
+            if (forceRefresh) {
+                isRefreshing = true
+            } else if (allAnnouncements.isEmpty()) {
+                announcementsState = Resource.Loading
+            }
+
+            announcementRepo.getAnnouncements(null).collect { res ->
+                isRefreshing = false
+                when (res) {
+                    is Resource.Success -> {
+                        allAnnouncements = res.data
+                        applyFilter()
+                    }
+                    is Resource.Error -> {
+                        if (allAnnouncements.isEmpty()) {
+                            announcementsState = Resource.Error(res.message)
+                        } else {
+                            applyFilter()
+                        }
+                    }
+                    is Resource.Loading -> {
+                        if (allAnnouncements.isEmpty()) {
+                            announcementsState = Resource.Loading
+                        }
+                    }
+                }
             }
         }
     }

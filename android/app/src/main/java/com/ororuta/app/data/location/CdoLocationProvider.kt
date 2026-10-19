@@ -8,11 +8,18 @@ import android.location.Geocoder
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import android.os.Looper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -95,21 +102,77 @@ class CdoLocationProvider @Inject constructor(
         }
     }
 
+    /**
+     * Emits continuous device location updates when location permission is granted.
+     */
+    @SuppressLint("MissingPermission")
+    fun getLocationUpdates(intervalMs: Long = 4000L): Flow<android.location.Location> = callbackFlow {
+        if (!hasLocationPermission()) {
+            close()
+            return@callbackFlow
+        }
+        val request = LocationRequest.Builder(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            intervalMs
+        ).setMinUpdateDistanceMeters(5f).build()
+
+        val callback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                result.lastLocation?.let { trySend(it) }
+            }
+        }
+
+        try {
+            fusedClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
+        } catch (e: Exception) {
+            close(e)
+        }
+
+        awaitClose {
+            try {
+                fusedClient.removeLocationUpdates(callback)
+            } catch (_: Exception) {}
+        }
+    }
+
+
     @SuppressLint("MissingPermission")
     private suspend fun readDeviceLocation(): android.location.Location? {
         val cts = CancellationTokenSource()
-        return try {
-            fusedClient.getCurrentLocation(
-                Priority.PRIORITY_HIGH_ACCURACY,
-                cts.token
-            ).await() ?: fusedClient.lastLocation.await()
-        } catch (_: Exception) {
-            try {
-                fusedClient.lastLocation.await()
-            } catch (_: Exception) {
-                null
+        val fresh = try {
+            kotlinx.coroutines.withTimeoutOrNull(8000L) {
+                fusedClient.getCurrentLocation(
+                    Priority.PRIORITY_HIGH_ACCURACY,
+                    cts.token
+                ).await()
             }
+        } catch (_: Exception) {
+            null
         }
+
+        if (isValidLocation(fresh)) return fresh
+
+        // Fallbacks: FLP last location and system LocationManager
+        val candidates = mutableListOf<android.location.Location>()
+        try { fusedClient.lastLocation.await()?.let { candidates.add(it) } } catch (_: Exception) {}
+        try {
+            val lm = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            lm?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)?.let { candidates.add(it) }
+            lm?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)?.let { candidates.add(it) }
+            lm?.getLastKnownLocation(android.location.LocationManager.PASSIVE_PROVIDER)?.let { candidates.add(it) }
+        } catch (_: Exception) {}
+
+        return candidates.filter { isValidLocation(it) }.maxByOrNull { it.time }
+    }
+
+    private fun isValidLocation(loc: android.location.Location?): Boolean {
+        if (loc == null) return false
+        val lat = loc.latitude
+        val lng = loc.longitude
+        if (lat == 0.0 && lng == 0.0) return false
+        if (lat !in -90.0..90.0 || lng !in -180.0..180.0) return false
+        if (lat.isNaN() || lng.isNaN()) return false
+        return true
     }
 
     @SuppressLint("MissingPermission")
@@ -130,7 +193,7 @@ class CdoLocationProvider @Inject constructor(
                 null
             }
 
-            if (location != null && !(location.latitude == 0.0 && location.longitude == 0.0)) {
+            if (location != null && isValidLocation(location)) {
                 val lat = location.latitude
                 val lng = location.longitude
                 val inCdo = isWithinCdo(lat, lng)
@@ -164,28 +227,23 @@ class CdoLocationProvider @Inject constructor(
     private fun reverseGeocode(lat: Double, lng: Double): String {
         return try {
             val geocoder = Geocoder(context, Locale.getDefault())
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                var label: String? = null
-                geocoder.getFromLocation(lat, lng, 1) { addresses ->
-                    if (addresses.isNotEmpty()) {
-                        val addr = addresses[0]
-                        label = addr.thoroughfare ?: addr.subLocality ?: addr.locality
-                    }
+            @Suppress("DEPRECATION")
+            val addresses = geocoder.getFromLocation(lat, lng, 1)
+            if (!addresses.isNullOrEmpty()) {
+                val addr = addresses[0]
+                val street = addr.thoroughfare ?: addr.subLocality
+                val city = addr.locality ?: addr.subAdminArea ?: addr.adminArea
+                when {
+                    street != null && city != null -> "$street, $city"
+                    street != null -> street
+                    city != null -> city
+                    else -> if (isWithinCdo(lat, lng)) findClosestCdoLandmark(lat, lng) else "Current GPS Location"
                 }
-                label?.let { "Near $it, CDO" } ?: findClosestCdoLandmark(lat, lng)
             } else {
-                @Suppress("DEPRECATION")
-                val addresses = geocoder.getFromLocation(lat, lng, 1)
-                if (!addresses.isNullOrEmpty()) {
-                    val addr = addresses[0]
-                    val feature = addr.thoroughfare ?: addr.subLocality ?: addr.locality
-                    if (feature != null) "Near $feature, CDO" else findClosestCdoLandmark(lat, lng)
-                } else {
-                    findClosestCdoLandmark(lat, lng)
-                }
+                if (isWithinCdo(lat, lng)) findClosestCdoLandmark(lat, lng) else "Current GPS Location"
             }
         } catch (e: Exception) {
-            findClosestCdoLandmark(lat, lng)
+            if (isWithinCdo(lat, lng)) findClosestCdoLandmark(lat, lng) else "Current GPS Location"
         }
     }
 

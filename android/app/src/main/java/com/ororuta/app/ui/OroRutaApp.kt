@@ -1,8 +1,14 @@
 package com.ororuta.app.ui
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -12,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -46,7 +53,7 @@ val bottomTabs = listOf(
 )
 
 @Composable
-fun OroRutaApp() {
+fun OroRutaApp(initialRoute: String? = null) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
@@ -67,13 +74,14 @@ fun OroRutaApp() {
                 Surface(
                     color = Color.White,
                     shadowElevation = 8.dp,
+                    border = androidx.compose.foundation.BorderStroke(0.5.dp, Line),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = 6.dp, horizontal = 4.dp),
                         horizontalArrangement = Arrangement.SpaceAround,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -81,11 +89,33 @@ fun OroRutaApp() {
                             val currentRouteStr = currentDestination?.route ?: ""
                             val isSelected = currentRouteStr == tab.route || (tab.route == "map" && currentRouteStr.startsWith("map"))
 
+                            val tabInteraction = remember { MutableInteractionSource() }
+                            val isTabPressed by tabInteraction.collectIsPressedAsState()
+                            val tabScale by animateFloatAsState(
+                                targetValue = if (isTabPressed) 0.90f else 1f,
+                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 800f),
+                                label = "tabScale"
+                            )
+                            val animatedBgColor by animateColorAsState(
+                                targetValue = if (isSelected) Brand50 else Color.Transparent,
+                                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                                label = "tabBgColor"
+                            )
+                            val animatedContentColor by animateColorAsState(
+                                targetValue = if (isSelected) Brand600 else InkMuted,
+                                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                                label = "tabContentColor"
+                            )
+
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable {
+                                    .scale(tabScale)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable(
+                                        interactionSource = tabInteraction,
+                                        indication = null
+                                    ) {
                                         if (!isSelected) {
                                             navController.navigate(tab.route) {
                                                 popUpTo(navController.graph.findStartDestination().id) {
@@ -96,19 +126,19 @@ fun OroRutaApp() {
                                             }
                                         }
                                     }
-                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(48.dp, 28.dp)
+                                        .size(46.dp, 28.dp)
                                         .clip(RoundedCornerShape(14.dp))
-                                        .background(if (isSelected) Brand50 else Color.Transparent),
+                                        .background(animatedBgColor),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = tab.icon,
                                         contentDescription = tab.title,
-                                        tint = if (isSelected) Brand600 else InkMuted,
+                                        tint = animatedContentColor,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -116,8 +146,8 @@ fun OroRutaApp() {
                                 Text(
                                     text = tab.title,
                                     fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (isSelected) Brand600 else InkMuted
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = animatedContentColor
                                 )
                             }
                         }
@@ -128,12 +158,24 @@ fun OroRutaApp() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = "splash",
+            startDestination = initialRoute ?: "splash",
             modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()),
-            enterTransition = { fadeIn() + slideInHorizontally { 50 } },
-            exitTransition = { fadeOut() + slideOutHorizontally { -50 } },
-            popEnterTransition = { fadeIn() + slideInHorizontally { -50 } },
-            popExitTransition = { fadeOut() + slideOutHorizontally { 50 } }
+            enterTransition = {
+                fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { (it * 0.12f).toInt() }
+            },
+            exitTransition = {
+                fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
+                slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -(it * 0.12f).toInt() }
+            },
+            popEnterTransition = {
+                fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { -(it * 0.12f).toInt() }
+            },
+            popExitTransition = {
+                fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
+                slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { (it * 0.12f).toInt() }
+            }
         ) {
             // Splash
             composable("splash") {
@@ -153,22 +195,11 @@ fun OroRutaApp() {
 
                 HomeScreen(
                     uiState = uiState,
-                    onAllowLocation = { homeVm.allowLocation() },
-                    onDenyLocation = { homeVm.denyLocation() },
-                    onSelectNearbyTab = { homeVm.selectNearbyTab(it) },
-                    onNavigateSearch = { from, to -> navController.navigate("search?from=$from&to=$to") },
-                    onNavigateResults = { from, to -> navController.navigate("results?from=$from&to=$to&sort=time") },
                     onNavigateAnnouncements = { navController.navigate("announcements") },
                     onNavigateAnnouncementDetail = { id -> navController.navigate("announcement_detail/$id") },
-                    onNavigateNearby = { navController.navigate("nearby") },
-                    onNavigateNearbyDetail = { id, kind -> navController.navigate("nearby_detail/$id/$kind") },
-                    onNavigateMap = { navController.navigate("map") },
-                    onNavigateRoutes = { navController.navigate("routes") },
                     onNavigateSaved = { navController.navigate("saved") },
-                    onNavigateOffline = { navController.navigate("offline_routes") },
                     onNavigateFare = { navController.navigate("fare") },
-                    onNavigateReport = { navController.navigate("report") },
-                    onNavigateSetStart = { navController.navigate("set_start_location") }
+                    onNavigateResults = { from, to -> navController.navigate("results?from=$from&to=$to&sort=time") }
                 )
             }
 
@@ -183,13 +214,15 @@ fun OroRutaApp() {
 
             // 3. Map tab
             composable(
-                "map?placeId={placeId}&placeName={placeName}&lat={lat}&lng={lng}&kind={kind}",
+                "map?placeId={placeId}&placeName={placeName}&lat={lat}&lng={lng}&kind={kind}&routeId={routeId}&direction={direction}",
                 arguments = listOf(
                     navArgument("placeId") { defaultValue = "" },
                     navArgument("placeName") { defaultValue = "" },
                     navArgument("lat") { defaultValue = "0.0" },
                     navArgument("lng") { defaultValue = "0.0" },
-                    navArgument("kind") { defaultValue = "landmark" }
+                    navArgument("kind") { defaultValue = "landmark" },
+                    navArgument("routeId") { defaultValue = "" },
+                    navArgument("direction") { defaultValue = "Inbound" }
                 )
             ) { backStack ->
                 val placeId = backStack.arguments?.getString("placeId")?.ifBlank { null }
@@ -197,6 +230,8 @@ fun OroRutaApp() {
                 val lat = backStack.arguments?.getString("lat")?.toDoubleOrNull()
                 val lng = backStack.arguments?.getString("lng")?.toDoubleOrNull()
                 val kind = backStack.arguments?.getString("kind")?.ifBlank { null }
+                val routeId = backStack.arguments?.getString("routeId")?.ifBlank { null }
+                val direction = backStack.arguments?.getString("direction")?.ifBlank { null }
                 MapScreen(
                     isPushed = false,
                     initialPlaceId = placeId,
@@ -204,8 +239,13 @@ fun OroRutaApp() {
                     initialLat = lat,
                     initialLng = lng,
                     initialKind = kind,
+                    initialRouteId = routeId,
+                    initialDirection = direction,
                     onSearchClick = { navController.navigate("search") },
-                    onNavigateRouteInfo = { routeId -> navController.navigate("route_info/$routeId") },
+                    onNavigateRouteInfo = { rIdOrPath ->
+                        val target = if (rIdOrPath.startsWith("route_info/")) rIdOrPath else "route_info/$rIdOrPath"
+                        navController.navigate(target)
+                    },
                     onStartNavigation = { optId -> navController.navigate("navigation/$optId") }
                 )
             }
@@ -228,7 +268,6 @@ fun OroRutaApp() {
                     viewModel = moreVm,
                     onNavigateSaved = { navController.navigate("saved") },
                     onNavigateHistory = { navController.navigate("search_history") },
-                    onNavigateOffline = { navController.navigate("offline_routes") },
                     onNavigateNotifications = { navController.navigate("notifications") },
                     onNavigateLocationSettings = { navController.navigate("location_settings") },
                     onNavigateLanguage = { navController.navigate("language") },
@@ -349,16 +388,35 @@ fun OroRutaApp() {
             }
 
             composable(
-                "route_info/{routeId}",
-                arguments = listOf(navArgument("routeId") { type = NavType.StringType })
+                "route_info/{routeId}?destination={destination}&destLat={destLat}&destLng={destLng}&direction={direction}",
+                arguments = listOf(
+                    navArgument("routeId") { type = NavType.StringType },
+                    navArgument("destination") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("destLat") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("destLng") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("direction") { type = NavType.StringType; nullable = true; defaultValue = null }
+                )
             ) { backStack ->
                 val routeInfoVm = hiltViewModel<RouteInfoViewModel>()
                 val routeId = backStack.arguments?.getString("routeId") ?: ""
+                val rawDest = backStack.arguments?.getString("destination")
+                val destination = rawDest?.let {
+                    try { java.net.URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it }
+                }
+                val destLat = backStack.arguments?.getString("destLat")?.toDoubleOrNull()
+                val destLng = backStack.arguments?.getString("destLng")?.toDoubleOrNull()
+                val direction = backStack.arguments?.getString("direction")
                 RouteInfoScreen(
                     viewModel = routeInfoVm,
                     routeId = routeId,
+                    initialDestination = destination,
+                    initialDestLat = destLat,
+                    initialDestLng = destLng,
+                    initialDirection = direction,
                     onBack = { navController.popBackStack() },
-                    onViewOnMap = { navController.navigate("map") },
+                    onViewOnMap = { rId, dir ->
+                        navController.navigate("map?routeId=$rId&direction=$dir")
+                    },
                     onNavigateFare = { rId -> navController.navigate("fare?routeId=$rId") }
                 )
             }
@@ -526,7 +584,10 @@ fun OroRutaApp() {
                     focusedTripOptionId = tripOptionId,
                     onBack = { navController.popBackStack() },
                     onSearchClick = { navController.navigate("search") },
-                    onNavigateRouteInfo = { rId -> navController.navigate("route_info/$rId") },
+                    onNavigateRouteInfo = { rIdOrPath ->
+                        val target = if (rIdOrPath.startsWith("route_info/")) rIdOrPath else "route_info/$rIdOrPath"
+                        navController.navigate(target)
+                    },
                     onStartNavigation = { optId -> navController.navigate("navigation/$optId") }
                 )
             }

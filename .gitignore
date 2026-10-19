@@ -1,31 +1,65 @@
-# Android
+# ============================================================
+# OroRuta .gitignore - Multiplatform Transit Application
+# Covers: Android (Kotlin), Node.js (Backend), React/Vite (Admin Web)
+# ============================================================
+
+# ─── SECRETS & LOCAL CREDENTIALS (NEVER COMMIT) ─────────────
+*.env
+*.env.*
+!.env.example
+*.local
+local.properties
+android/local.properties
+!android/local.properties.example
+*.keystore
+*.jks
+credentials.json
+google-services.json
+
+# ─── ANDROID BUILD OUTPUTS & CACHES ─────────────────────────
 .gradle/
 build/
 android/.gradle/
 android/.kotlin/
 android/build/
 android/app/build/
-local.properties
+android/app/.cxx/
+android/.cxx/
+android/captures/
 *.apk
+*.ap_
 *.aab
+*.dex
+*.class
 
-# Node, Backend & Web
+# ─── NODE.JS & NPM ──────────────────────────────────────────
 node_modules/
 backend/node_modules/
-backend/.env
 admin-web/node_modules/
-admin-web/dist/
-admin-web/.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 *.log
 
-# Scratch & PDF Build Artifacts
-scratch/
-backend/scratch/
+# ─── ADMIN WEB BUILD OUTPUTS ────────────────────────────────
+admin-web/dist/
+admin-web/dist-ssr/
+*.tsbuildinfo
+
+# ─── SCRATCH & TEMPORARY FILES ──────────────────────────────
+/scratch/
 pdf_build/
 *.pdf
+backend/scratch/*.tmp
+backend/scratch/geocode_cache.json
 
-# IDE & OS
+
+# ─── IDE & SYSTEM FILES ─────────────────────────────────────
 .idea/
 *.iml
+*.iws
+*.ipr
+.vscode/
 .DS_Store
 Thumbs.db
+Desktop.ini

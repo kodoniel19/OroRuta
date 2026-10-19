@@ -7,6 +7,16 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+val localProperties = java.util.Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+
+val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY")
+    ?: System.getenv("GOOGLE_MAPS_API_KEY")
+    ?: "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+
 android {
     namespace = "com.ororuta.app"
     compileSdk = 34
@@ -18,11 +28,14 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        resValue("string", "google_maps_key", mapsApiKey)
     }
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:3000/api/v1/\"")
+            // localhost works on physical device with: adb reverse tcp:3000 tcp:3000
+            // On emulator, use 10.0.2.2 instead. Physical device + adb reverse: localhost.
+            buildConfigField("String", "BASE_URL", "\"http://localhost:3000/api/v1/\"")
         }
         release {
             isMinifyEnabled = false

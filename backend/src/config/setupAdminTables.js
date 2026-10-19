@@ -28,7 +28,11 @@ async function setupAdminTables() {
 
     await pool.query(`
       INSERT IGNORE INTO admin_users (id, username, email, password, name, role, phone)
-      VALUES ('u-01', 'admin', 'admin@ororuta.ph', 'OroRuta@2026', 'Maria Santos', 'Super Admin', '+63 917 555 0142');
+      VALUES 
+        ('u-01', 'admin', 'admin@ororuta.ph', 'OroRuta@2026', 'Maria Santos', 'Super Admin', '+63 917 555 0142'),
+        ('u-02', 'jomar', 'jomar.delacruz@ororuta.ph', 'OroRuta@2026', 'Jomar Dela Cruz', 'Route Editor', '+63 918 555 0199'),
+        ('u-03', 'ana', 'ana.villanueva@ororuta.ph', 'OroRuta@2026', 'Ana Villanueva', 'Moderator', '+63 919 555 0123'),
+        ('u-04', 'rhea', 'rhea.pabayo@cdo-rta.gov.ph', 'OroRuta@2026', 'Rhea Pabayo', 'Moderator', '+63 920 555 0177');
     `);
 
     console.log('Admin tables and seed initialized successfully.');

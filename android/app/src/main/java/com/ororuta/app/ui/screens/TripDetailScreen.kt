@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.android.gms.maps.model.LatLng
 import com.ororuta.app.domain.models.Resource
 import com.ororuta.app.domain.models.TripLeg
 import com.ororuta.app.domain.models.TripOption
@@ -145,6 +146,28 @@ fun TripDetailScreen(
                             .verticalScroll(rememberScrollState())
                     ) {
                         // 1. 220dp Map Preview
+                        val walkToBoard = remember(trip) {
+                            trip.walkToBoardCoordinates.mapNotNull { if (it.size >= 2) LatLng(it[1], it[0]) else null }
+                        }
+                        val jeepneyRoute = remember(trip) {
+                            trip.jeepneyCoordinates.mapNotNull { if (it.size >= 2) LatLng(it[1], it[0]) else null }
+                        }
+                        val walkFromDrop = remember(trip) {
+                            trip.walkFromDropCoordinates.mapNotNull { if (it.size >= 2) LatLng(it[1], it[0]) else null }
+                        }
+                        val detailMarkers = remember(trip) {
+                            val list = mutableListOf<MapMarker>()
+                            trip.originPlace?.let { list.add(MapMarker("orig", it.name, kind = "origin", lat = it.lat, lng = it.lng, note = "Origin")) }
+                            if (trip.boardingLat != null && trip.boardingLng != null) {
+                                list.add(MapMarker("board", trip.boardingName ?: "Board", kind = "loading", lat = trip.boardingLat, lng = trip.boardingLng, note = "Board here"))
+                            }
+                            if (trip.dropoffLat != null && trip.dropoffLng != null) {
+                                list.add(MapMarker("drop", trip.dropoffName ?: "Drop", kind = "unloading", lat = trip.dropoffLat, lng = trip.dropoffLng, note = "Alight here"))
+                            }
+                            trip.destPlace?.let { list.add(MapMarker("dest", it.name, kind = "destination", lat = it.lat, lng = it.lng, note = "Destination")) }
+                            list
+                        }
+
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -152,6 +175,10 @@ fun TripDetailScreen(
                                 .clickable { onOpenMapTrip(trip.id) }
                         ) {
                             CdoCanvasMap(
+                                activeWalkToBoard = walkToBoard,
+                                activeJeepneyRoute = jeepneyRoute,
+                                activeWalkFromDrop = walkFromDrop,
+                                activeTripMarkers = detailMarkers,
                                 showControls = false,
                                 modifier = Modifier.fillMaxSize()
                             )

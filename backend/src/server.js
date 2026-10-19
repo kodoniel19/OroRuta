@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
@@ -22,6 +22,11 @@ app.use((req, res) => res.status(404).json({ error: { code: "NOT_FOUND", message
 app.use(errorHandler);
 
 if (require.main === module) {
+  const setupAdminTables = require("./config/setupAdminTables");
+  const seedAnnouncements = require("./config/seedAnnouncements");
+  setupAdminTables()
+    .then(() => seedAnnouncements())
+    .catch(console.error);
   app.listen(PORT, () => console.log(`OroRuta API running on port ${PORT}`));
 }
 

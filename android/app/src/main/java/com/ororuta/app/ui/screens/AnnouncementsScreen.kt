@@ -13,9 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.NotificationsNone
 import com.ororuta.app.domain.models.Resource
-import com.ororuta.app.ui.components.AnnouncementCard
-import com.ororuta.app.ui.components.ScreenHeader
+import com.ororuta.app.ui.components.*
 import com.ororuta.app.ui.theme.Brand600
 import com.ororuta.app.ui.theme.Canvas
 import com.ororuta.app.ui.theme.InkMuted
@@ -47,7 +50,7 @@ fun AnnouncementsScreen(
                     ) {
                         filters.forEach { chip ->
                             FilterChip(
-                                selected = viewModel.selectedFilter == chip,
+                                selected = viewModel.selectedFilter.equals(chip, ignoreCase = true),
                                 onClick = { viewModel.setFilter(chip) },
                                 label = { Text(chip, fontSize = 12.sp) }
                             )
@@ -71,23 +74,83 @@ fun AnnouncementsScreen(
                 }
 
                 is Resource.Error -> {
-                    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text(state.message, color = InkMuted, fontSize = 14.sp)
+                    val isOffline = state.message.contains("Offline", ignoreCase = true)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        EmptyState(
+                            icon = if (isOffline) Icons.Default.CloudOff else Icons.Default.ErrorOutline,
+                            title = if (isOffline) "No Connection" else "Unable to Load Updates",
+                            message = state.message,
+                            tone = if (isOffline) EmptyTone.Warn else EmptyTone.Neutral,
+                            action = {
+                                OroButton(
+                                    text = "Retry",
+                                    onClick = { viewModel.refresh() },
+                                    variant = ButtonVariant.Secondary,
+                                    size = ButtonSize.Sm
+                                )
+                            }
+                        )
                     }
                 }
 
                 is Resource.Success -> {
                     val announcements = state.data
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(announcements) { ann ->
-                            AnnouncementCard(
-                                announcement = ann,
-                                compact = false,
-                                onClick = { onSelectAnnouncement(ann.id) }
-                            )
+                    if (announcements.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!viewModel.selectedFilter.equals("All", ignoreCase = true)) {
+                                EmptyState(
+                                    icon = Icons.Default.NotificationsNone,
+                                    title = "No ${viewModel.selectedFilter} Updates",
+                                    message = "There are no transportation updates currently filed under ${viewModel.selectedFilter.lowercase()}.",
+                                    tone = EmptyTone.Neutral,
+                                    action = {
+                                        OroButton(
+                                            text = "Show All Updates",
+                                            onClick = { viewModel.setFilter("All") },
+                                            variant = ButtonVariant.Secondary,
+                                            size = ButtonSize.Sm
+                                        )
+                                    }
+                                )
+                            } else {
+                                EmptyState(
+                                    icon = Icons.Default.NotificationsNone,
+                                    title = "No Updates Available",
+                                    message = "There are currently no active transportation advisories or route updates.",
+                                    tone = EmptyTone.Neutral,
+                                    action = {
+                                        OroButton(
+                                            text = "Refresh",
+                                            onClick = { viewModel.refresh() },
+                                            variant = ButtonVariant.Secondary,
+                                            size = ButtonSize.Sm
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(announcements) { ann ->
+                                AnnouncementCard(
+                                    announcement = ann,
+                                    compact = false,
+                                    onClick = { onSelectAnnouncement(ann.id) }
+                                )
+                            }
                         }
                     }
                 }
