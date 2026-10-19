@@ -257,6 +257,23 @@ fun RouteInfoScreen(
                         parseGeometries(route, selectedDirection)
                     }
 
+                    // Helper to get descriptive stop/point names instead of generic corridors
+                    fun getDescriptiveCdoStopName(lat: Double, lng: Double, defaultPrefix: String): String {
+                        return when {
+                            lat in 8.483..8.490 && lng in 124.648..124.660 -> "$defaultPrefix along CM Recto Ave (Centrio / SM Downtown area)"
+                            lat in 8.480..8.488 && lng in 124.654..124.665 -> "$defaultPrefix along Limketkai / Lapasan corridor"
+                            lat in 8.484..8.495 && lng in 124.656..124.672 -> "$defaultPrefix near Agora Terminal / Valenzuela Ave"
+                            lat in 8.473..8.482 && lng in 124.642..124.655 -> "$defaultPrefix near Cogon Market area"
+                            lat in 8.475..8.485 && lng in 124.638..124.648 -> "$defaultPrefix near Divisoria area"
+                            lat in 8.478..8.488 && lng in 124.630..124.640 -> "$defaultPrefix near Carmen Public Market area"
+                            lat in 8.500..8.512 && lng in 124.605..124.625 -> "$defaultPrefix near Bulua Westbound Terminal corridor"
+                            lat in 8.445..8.475 && lng in 124.615..124.635 -> "$defaultPrefix along Masterson Ave corridor"
+                            lat in 8.490..8.505 && lng in 124.625..124.645 -> "$defaultPrefix along Kauswagan / Bonbon corridor"
+                            lat in 8.475..8.510 && lng in 124.730..124.770 -> "$defaultPrefix along Puerto / Bugo Highway"
+                            else -> "$defaultPrefix near CDO Transit Corridor"
+                        }
+                    }
+
                     // 1. Determine destination and coordinates
                     val targetDestination = initialDestination?.ifBlank { null } ?: route.destination
                     val targetDestCoords = remember(initialDestLat, initialDestLng, route) {
@@ -298,14 +315,14 @@ fun RouteInfoScreen(
                             candidateBoardingStops.firstOrNull()
                         } ?: if (routeGeomPts.isNotEmpty()) {
                             val p = routeGeomPts.first()
-                            RouteStopPoint("start", "Route Origin Corridor", "loading", p.latitude, p.longitude, "Route Corridor Boarding")
+                            RouteStopPoint("start", getDescriptiveCdoStopName(p.latitude, p.longitude, "Boarding Point"), "loading", p.latitude, p.longitude, "Route Corridor Boarding")
                         } else {
                             RouteStopPoint("default", route.origin, "terminal", 8.4822, 124.6472, "CDO Corridor")
                         }
                     }
 
-                    // 3. Candidate verified drop-off stops
-                    val candidateDropoffStops = remember(route) {
+                    // 3. Candidate verified drop-off stops including closest verified route corridor points
+                    val candidateDropoffStops = remember(route, targetDestCoords, routeGeomPts) {
                         val list = mutableListOf<RouteStopPoint>()
                         route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
                             list.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
@@ -315,6 +332,23 @@ fun RouteInfoScreen(
                         }
                         route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
                             list.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
+                        }
+
+                        // If route passes close to destination along its geometry, add as verified roadside drop-off stop
+                        if (targetDestCoords != null && routeGeomPts.isNotEmpty()) {
+                            var minGeoDist = Double.MAX_VALUE
+                            var closestGeoPt: LatLng? = null
+                            for (pt in routeGeomPts) {
+                                val d = computeDistanceMeters(pt.latitude, pt.longitude, targetDestCoords.latitude, targetDestCoords.longitude)
+                                if (d < minGeoDist) {
+                                    minGeoDist = d
+                                    closestGeoPt = pt
+                                }
+                            }
+                            if (closestGeoPt != null && minGeoDist <= 850.0) {
+                                val desc = getDescriptiveCdoStopName(closestGeoPt.latitude, closestGeoPt.longitude, "Drop-off")
+                                list.add(RouteStopPoint("geo_dest_drop", desc, "unloading", closestGeoPt.latitude, closestGeoPt.longitude, "Near $targetDestination"))
+                            }
                         }
                         list
                     }
@@ -329,10 +363,22 @@ fun RouteInfoScreen(
                             candidateDropoffStops.lastOrNull()
                         } ?: if (routeGeomPts.isNotEmpty()) {
                             val p = routeGeomPts.last()
-                            RouteStopPoint("end", "Route Destination Corridor", "unloading", p.latitude, p.longitude, "Route Corridor Drop-off")
+                            RouteStopPoint("end", getDescriptiveCdoStopName(p.latitude, p.longitude, "Alighting Point"), "unloading", p.latitude, p.longitude, "Route Corridor Drop-off")
                         } else {
                             RouteStopPoint("dest_default", route.destination, "terminal", 8.4822, 124.6472, "CDO Destination")
                         }
+                    }
+
+                    // Verify whether destination is actually reachable within walking distance (<= 1000m)
+                    val dropoffDistanceToDestM = remember(dropoffStop, targetDestCoords) {
+                        if (targetDestCoords != null && dropoffStop != null) {
+                            computeDistanceMeters(dropoffStop.lat, dropoffStop.lng, targetDestCoords.latitude, targetDestCoords.longitude).toInt()
+                        } else {
+                            0
+                        }
+                    }
+                    val isDestinationReachable = remember(dropoffDistanceToDestM, initialDestination) {
+                        if (initialDestination.isNullOrBlank()) true else dropoffDistanceToDestM <= 1000
                     }
 
                     // 3b. Calculate distance aboard jeepney along verified route geometry
@@ -375,6 +421,11 @@ fun RouteInfoScreen(
                                 walkToBoardCoords = listOf(uLoc, LatLng(bStop.lat, bStop.lng))
                                 walkToBoardDistanceM = directDist
                                 walkToBoardMinutes = 1
+                            } else if (directDist > 1500) {
+                                // Beyond reasonable pedestrian path, do not fabricate long lines
+                                walkToBoardCoords = emptyList()
+                                walkToBoardDistanceM = directDist
+                                walkToBoardMinutes = Math.max(1, (directDist / 83.0).toInt())
                             } else {
                                 val osrm = fetchOsrmPedestrianRoute(uLoc.latitude, uLoc.longitude, bStop.lat, bStop.lng)
                                 if (osrm != null) {
@@ -399,12 +450,18 @@ fun RouteInfoScreen(
                     var walkFromDropDistanceM by remember { mutableIntStateOf(0) }
                     var walkFromDropMinutes by remember { mutableIntStateOf(0) }
 
-                    LaunchedEffect(dropoffStop, targetDestCoords) {
+                    LaunchedEffect(dropoffStop, targetDestCoords, isDestinationReachable) {
                         val dStop = dropoffStop
                         val dCoords = targetDestCoords
                         if (dStop != null && dCoords != null) {
                             val directDist = computeDistanceMeters(dStop.lat, dStop.lng, dCoords.latitude, dCoords.longitude).toInt()
-                            if (directDist < 35) {
+                            if (!isDestinationReachable || directDist > 1000) {
+                                // Destination exceeds maximum walking limit (e.g. 5.7 km problem):
+                                // Do NOT draw an unreasonable cross-city walking route!
+                                walkFromDropCoords = emptyList()
+                                walkFromDropDistanceM = directDist
+                                walkFromDropMinutes = Math.max(1, (directDist / 83.0).toInt())
+                            } else if (directDist < 35) {
                                 walkFromDropCoords = listOf(LatLng(dStop.lat, dStop.lng), dCoords)
                                 walkFromDropDistanceM = directDist
                                 walkFromDropMinutes = 1
@@ -423,6 +480,22 @@ fun RouteInfoScreen(
                                     walkFromDropCoords = listOf(LatLng(dStop.lat, dStop.lng), LatLng(midLat, dStop.lng), LatLng(midLat, midLng), dCoords)
                                 }
                             }
+                        }
+                    }
+
+                    // Real journey time calculation
+                    val rideTransitMinutes = remember(onboardDistanceKm, route.travelTime) {
+                        if (onboardDistanceKm != null && onboardDistanceKm > 0.0) {
+                            Math.max(5, Math.round(onboardDistanceKm * 3.5).toInt())
+                        } else {
+                            route.travelTime
+                        }
+                    }
+                    val totalJourneyMinutes = remember(walkToBoardMinutes, rideTransitMinutes, walkFromDropMinutes, isDestinationReachable) {
+                        if (isDestinationReachable) {
+                            walkToBoardMinutes + 3 + rideTransitMinutes + walkFromDropMinutes
+                        } else {
+                            walkToBoardMinutes + 3 + rideTransitMinutes
                         }
                     }
 
@@ -446,6 +519,7 @@ fun RouteInfoScreen(
                             destinationTitle = targetDestination,
                             walkToBoardCoords = walkToBoardCoords,
                             walkFromDropCoords = walkFromDropCoords,
+                            isDestinationReachable = isDestinationReachable,
                             onDirectionChange = {
                                 selectedDirection = it
                             },
@@ -521,13 +595,41 @@ fun RouteInfoScreen(
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
-                                                text = "Traditional Jeepney • Serving $targetDestination",
+                                                text = if (!isDestinationReachable && !initialDestination.isNullOrBlank()) {
+                                                    "Traditional Jeepney • Ends at ${dropoffStop.name}"
+                                                } else {
+                                                    "Traditional Jeepney • Serving $targetDestination"
+                                                },
                                                 fontSize = 12.sp,
                                                 color = InkMuted
                                             )
                                         }
                                     }
                                     StatusPill(status = route.status)
+                                }
+
+                                if (!isDestinationReachable && !initialDestination.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Surface(
+                                        color = Warn50,
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, Oro600.copy(alpha = 0.5f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(Icons.Default.Warning, contentDescription = null, tint = Warn600, modifier = Modifier.size(16.dp))
+                                            Text(
+                                                text = "Notice: Route terminates at ${dropoffStop.name} (~${dropoffDistanceToDestM}m away). A connecting route is needed for $targetDestination.",
+                                                fontSize = 11.sp,
+                                                color = Oro700,
+                                                lineHeight = 15.sp
+                                            )
+                                        }
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.height(10.dp))
@@ -560,7 +662,7 @@ fun RouteInfoScreen(
                                     }
                                     Text("·", color = InkMuted, fontWeight = FontWeight.Bold)
                                     Text(
-                                        text = "~${route.travelTime} mins",
+                                        text = "~$totalJourneyMinutes mins",
                                         fontSize = 12.sp,
                                         color = InkSoft
                                     )
@@ -654,14 +756,16 @@ fun RouteInfoScreen(
                                     4 -> Step4AlightCard(
                                         dropoffStop = dropoffStop,
                                         targetDestination = targetDestination,
-                                        remainingWalkMeters = walkFromDropDistanceM
+                                        remainingWalkMeters = walkFromDropDistanceM,
+                                        isDestinationReachable = isDestinationReachable
                                     )
 
                                     5 -> Step5DestinationCard(
                                         dropoffStop = dropoffStop,
                                         targetDestination = targetDestination,
                                         walkMeters = walkFromDropDistanceM,
-                                        walkMinutes = walkFromDropMinutes
+                                        walkMinutes = walkFromDropMinutes,
+                                        isDestinationReachable = isDestinationReachable
                                     )
                                 }
                             }
@@ -1401,7 +1505,8 @@ private fun Step3RideCard(
 private fun Step4AlightCard(
     dropoffStop: RouteStopPoint,
     targetDestination: String,
-    remainingWalkMeters: Int
+    remainingWalkMeters: Int,
+    isDestinationReachable: Boolean = true
 ) {
     Surface(color = Brand50, shape = RoundedCornerShape(8.dp)) {
         Text(
@@ -1459,12 +1564,20 @@ private fun Step4AlightCard(
                 )
             }
 
-            if (remainingWalkMeters > 0) {
+            if (isDestinationReachable && remainingWalkMeters > 0) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "~$remainingWalkMeters m remaining distance to $targetDestination.",
                     fontSize = 12.sp,
                     color = InkSoft
+                )
+            } else if (!isDestinationReachable) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Alight here (Terminating stop for this route). Reaching $targetDestination (~${remainingWalkMeters}m away) requires transferring to another jeepney.",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Oro700
                 )
             }
         }
@@ -1479,7 +1592,8 @@ private fun Step5DestinationCard(
     dropoffStop: RouteStopPoint,
     targetDestination: String,
     walkMeters: Int,
-    walkMinutes: Int
+    walkMinutes: Int,
+    isDestinationReachable: Boolean = true
 ) {
     Surface(color = Brand50, shape = RoundedCornerShape(8.dp)) {
         Text(
@@ -1494,7 +1608,7 @@ private fun Step5DestinationCard(
     Spacer(modifier = Modifier.height(10.dp))
 
     Text(
-        text = "Walk to Your Destination",
+        text = if (isDestinationReachable) "Walk to Your Destination" else "Destination Arrival / Transfer",
         fontSize = 18.sp,
         fontWeight = FontWeight.ExtraBold,
         color = Ink
@@ -1502,38 +1616,68 @@ private fun Step5DestinationCard(
 
     Spacer(modifier = Modifier.height(6.dp))
 
-    Surface(
-        color = Ok50,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Ok600.copy(alpha = 0.3f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Ok600, modifier = Modifier.size(20.dp))
-                Text(
-                    text = targetDestination,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Ok600
-                )
+    if (isDestinationReachable) {
+        Surface(
+            color = Ok50,
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Ok600.copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Ok600, modifier = Modifier.size(20.dp))
+                    Text(
+                        text = targetDestination,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Ok600
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                if (walkMeters > 35) {
+                    Text(
+                        text = "Walk $walkMeters m (~$walkMinutes min walk) from ${dropoffStop.name} along verified pedestrian sidewalks and designated street crossings.",
+                        fontSize = 13.sp,
+                        color = InkSoft,
+                        lineHeight = 18.sp
+                    )
+                } else {
+                    Text(
+                        text = "Direct Drop-off: The jeepney stops directly at or immediately in front of $targetDestination.",
+                        fontSize = 13.sp,
+                        color = InkSoft,
+                        lineHeight = 18.sp
+                    )
+                }
             }
+        }
+    } else {
+        Surface(
+            color = Warn50,
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Oro600.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = Warn600, modifier = Modifier.size(20.dp))
+                    Text(
+                        text = "Transfer Required for $targetDestination",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Oro700
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-            if (walkMeters > 35) {
                 Text(
-                    text = "Walk $walkMeters m (~$walkMinutes min walk) from ${dropoffStop.name} along verified pedestrian sidewalks and designated street crossings.",
-                    fontSize = 13.sp,
+                    text = "This route terminates at ${dropoffStop.name}, which is ~$walkMeters m away from $targetDestination. A continuous walk of this distance is unreasonable — please take a connecting jeepney route to reach your final destination.",
+                    fontSize = 12.sp,
                     color = InkSoft,
-                    lineHeight = 18.sp
-                )
-            } else {
-                Text(
-                    text = "Direct Drop-off: The jeepney stops directly at or immediately in front of $targetDestination.",
-                    fontSize = 13.sp,
-                    color = InkSoft,
-                    lineHeight = 18.sp
+                    lineHeight = 17.sp
                 )
             }
         }
@@ -1623,6 +1767,7 @@ private fun StepGuidanceMap(
     destinationTitle: String,
     walkToBoardCoords: List<LatLng>,
     walkFromDropCoords: List<LatLng>,
+    isDestinationReachable: Boolean = true,
     onDirectionChange: (String) -> Unit,
     onViewOnMap: () -> Unit,
     modifier: Modifier = Modifier
@@ -1642,7 +1787,7 @@ private fun StepGuidanceMap(
     val cameraPositionState = rememberCameraPositionState()
 
     // Smoothly focus map camera based on active step
-    LaunchedEffect(currentStep, userLocation, boardingStop, dropoffStop, destinationCoords, pts) {
+    LaunchedEffect(currentStep, userLocation, boardingStop, dropoffStop, destinationCoords, pts, isDestinationReachable) {
         try {
             when (currentStep) {
                 1 -> {
@@ -1679,16 +1824,25 @@ private fun StepGuidanceMap(
                     }
                 }
                 5 -> {
-                    // Focus on Drop-off + Destination + final walk path
-                    val builder = LatLngBounds.builder()
-                    var count = 0
-                    dropoffStop?.let { builder.include(LatLng(it.lat, it.lng)); count++ }
-                    destinationCoords?.let { builder.include(it); count++ }
-                    walkFromDropCoords.forEach { builder.include(it); count++ }
-                    if (count >= 2) {
-                        cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(builder.build(), 70), 500)
-                    } else if (destinationCoords != null) {
-                        cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(destinationCoords, 16f), 500)
+                    if (isDestinationReachable) {
+                        // Focus on Drop-off + Destination + final walk path
+                        val builder = LatLngBounds.builder()
+                        var count = 0
+                        dropoffStop?.let { builder.include(LatLng(it.lat, it.lng)); count++ }
+                        destinationCoords?.let { builder.include(it); count++ }
+                        walkFromDropCoords.forEach { builder.include(it); count++ }
+                        if (count >= 2) {
+                            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(builder.build(), 70), 500)
+                        } else if (destinationCoords != null) {
+                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(destinationCoords, 16f), 500)
+                        }
+                    } else {
+                        // Unreachable without transfer: focus on final drop-off stop
+                        if (dropoffStop != null) {
+                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(dropoffStop.lat, dropoffStop.lng), 16f), 500)
+                        } else if (destinationCoords != null) {
+                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(destinationCoords, 15f), 500)
+                        }
                     }
                 }
             }

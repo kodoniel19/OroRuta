@@ -736,35 +736,57 @@ fun MapScreen(
                 route.jeepneyType.equals("Traditional", ignoreCase = true) || route.jeepneyType.isBlank()
             }
 
+            // Configurable walking limits for CDO urban transit
+            val maxWalkToBoardMeters = 1000.0 // 1.0 km max walk to boarding
+            val maxWalkFromDropMeters = 1000.0 // 1.0 km max walk to destination
+
+            // Helper to get descriptive stop/point names instead of generic corridors
+            fun getDescriptiveCdoStopName(lat: Double, lng: Double, defaultPrefix: String): String {
+                return when {
+                    lat in 8.483..8.490 && lng in 124.648..124.660 -> "$defaultPrefix along CM Recto Ave (Centrio / SM Downtown area)"
+                    lat in 8.480..8.488 && lng in 124.654..124.665 -> "$defaultPrefix along Limketkai / Lapasan corridor"
+                    lat in 8.484..8.495 && lng in 124.656..124.672 -> "$defaultPrefix near Agora Terminal / Valenzuela Ave"
+                    lat in 8.473..8.482 && lng in 124.642..124.655 -> "$defaultPrefix near Cogon Market area"
+                    lat in 8.475..8.485 && lng in 124.638..124.648 -> "$defaultPrefix near Divisoria area"
+                    lat in 8.478..8.488 && lng in 124.630..124.640 -> "$defaultPrefix near Carmen Public Market area"
+                    lat in 8.500..8.512 && lng in 124.605..124.625 -> "$defaultPrefix near Bulua Westbound Terminal corridor"
+                    lat in 8.445..8.475 && lng in 124.615..124.635 -> "$defaultPrefix along Masterson Ave corridor"
+                    lat in 8.490..8.505 && lng in 124.625..124.645 -> "$defaultPrefix along Kauswagan / Bonbon corridor"
+                    lat in 8.475..8.510 && lng in 124.730..124.770 -> "$defaultPrefix along Puerto / Bugo Highway"
+                    else -> "$defaultPrefix near CDO Transit Corridor"
+                }
+            }
+
             // Filter routes that serve the requested destination (if target is a destination/landmark)
             val suitableRoutes = if (isNearMe) {
                 traditionalRoutes
             } else {
                 traditionalRoutes.filter { route ->
-                    val hasLandmarkMatch = route.landmarks.any {
-                        it.name.contains(targetClean, true) || targetClean.contains(it.name, true)
-                    }
-                    val hasStopMatch = (route.terminals.map { it.name } + route.stops.map { it.name } + route.transfers.map { it.name }).any {
-                        it.contains(targetClean, true) || targetClean.contains(it, true)
-                    }
-                    val hasEndpointMatch = route.origin.contains(targetClean, true) ||
-                            route.destination.contains(targetClean, true) ||
-                            targetClean.contains(route.origin, true) ||
-                            targetClean.contains(route.destination, true)
-                    val hasCodeInNote = if (!target.note.isNullOrBlank()) {
-                        target.note.split(",").map { it.trim().lowercase() }.contains(route.code.lowercase())
-                    } else false
-
                     val allPts = getAllRouteCoordinates(route)
                     val passesDestination = if (hasTargetCoords) {
                         allPts.any { pt ->
-                            haversine(targetLat!!, targetLng!!, pt.latitude, pt.longitude) <= 850.0
+                            haversine(targetLat!!, targetLng!!, pt.latitude, pt.longitude) <= maxWalkFromDropMeters
                         } || (route.terminals.map { LatLng(it.lat, it.lng) } + route.stops.map { LatLng(it.lat, it.lng) }).any { pt ->
-                            pt.latitude != 0.0 && pt.longitude != 0.0 && haversine(targetLat!!, targetLng!!, pt.latitude, pt.longitude) <= 850.0
+                            pt.latitude != 0.0 && pt.longitude != 0.0 && haversine(targetLat!!, targetLng!!, pt.latitude, pt.longitude) <= maxWalkFromDropMeters
                         }
                     } else false
 
-                    hasLandmarkMatch || hasStopMatch || hasEndpointMatch || hasCodeInNote || passesDestination
+                    if (hasTargetCoords) {
+                        // When coordinates are known, route MUST actually reach within walking distance
+                        passesDestination
+                    } else {
+                        val hasLandmarkMatch = route.landmarks.any {
+                            it.name.contains(targetClean, true) || targetClean.contains(it.name, true)
+                        }
+                        val hasStopMatch = (route.terminals.map { it.name } + route.stops.map { it.name } + route.transfers.map { it.name }).any {
+                            it.contains(targetClean, true) || targetClean.contains(it, true)
+                        }
+                        val hasEndpointMatch = route.origin.contains(targetClean, true) ||
+                                route.destination.contains(targetClean, true) ||
+                                targetClean.contains(route.origin, true) ||
+                                targetClean.contains(route.destination, true)
+                        hasLandmarkMatch || hasStopMatch || hasEndpointMatch
+                    }
                 }
             }
 
@@ -802,9 +824,9 @@ fun MapScreen(
                     }
                 }
 
-                // If no specific stop point was under 3.5 km, check proximity to verified route line
-                if (bestDist > 3500.0) {
-                    val geoPts = parseGeometries(route)
+                // If no specific stop was under walking threshold, check proximity to verified route line
+                val geoPts = parseGeometries(route)
+                if (bestDist > maxWalkToBoardMeters && geoPts.isNotEmpty()) {
                     var minGeoDist = Double.MAX_VALUE
                     var bestGeoPt: LatLng? = null
                     for (pt in geoPts) {
@@ -814,22 +836,27 @@ fun MapScreen(
                             bestGeoPt = pt
                         }
                     }
-                    if (minGeoDist < bestDist && minGeoDist <= 3000.0) {
+                    if (minGeoDist <= maxWalkToBoardMeters) {
                         bestDist = minGeoDist
-                        bestStopName = "Route Boarding Corridor"
-                        bestStopType = "Boarding Point"
                         bestLat = bestGeoPt?.latitude
                         bestLng = bestGeoPt?.longitude
+                        bestStopName = getDescriptiveCdoStopName(bestLat ?: 8.4822, bestLng ?: 124.6472, "Boarding Point")
+                        bestStopType = "Boarding Point"
                     }
                 }
 
+                // Reject if boarding stop exceeds maximum walking distance
+                if (bestDist > maxWalkToBoardMeters || bestLat == null || bestLng == null) {
+                    return@mapNotNull null
+                }
+
                 // Calculate onboard ride distance between boarding stop and drop-off stop
-                val geoPts = parseGeometries(route)
                 var bestDropLat = targetLat
                 var bestDropLng = targetLng
                 var bestDropName: String? = null
+                var minDropDist = Double.MAX_VALUE
+
                 if (hasTargetCoords && targetLat != null && targetLng != null) {
-                    var minDropDist = Double.MAX_VALUE
                     for (term in route.terminals) {
                         if (term.lat != 0.0 && term.lng != 0.0) {
                             val d = haversine(targetLat, targetLng, term.lat, term.lng)
@@ -852,20 +879,25 @@ fun MapScreen(
                             }
                         }
                     }
-                    if (minDropDist > 500.0 && geoPts.isNotEmpty()) {
+                    if (minDropDist > 300.0 && geoPts.isNotEmpty()) {
                         for (pt in geoPts) {
                             val d = haversine(targetLat, targetLng, pt.latitude, pt.longitude)
                             if (d < minDropDist) {
                                 minDropDist = d
                                 bestDropLat = pt.latitude
                                 bestDropLng = pt.longitude
-                                bestDropName = "Drop-off near ${target.title}"
+                                bestDropName = getDescriptiveCdoStopName(pt.latitude, pt.longitude, "Drop-off")
                             }
                         }
                     }
+
+                    // Reject if destination drop-off is beyond maximum walking distance (e.g. 5.7 km problem)
+                    if (minDropDist > maxWalkFromDropMeters || bestDropLat == null || bestDropLng == null) {
+                        return@mapNotNull null
+                    }
                 }
 
-                val onboardKm = if (hasTargetCoords && bestLat != null && bestLng != null && bestDropLat != null && bestDropLng != null && geoPts.size >= 2) {
+                val onboardKm = if (hasTargetCoords && bestDropLat != null && bestDropLng != null && geoPts.size >= 2) {
                     TraditionalJeepneyFareService.calculateOnboardDistanceKm(
                         routePoints = geoPts,
                         boardingLat = bestLat,
@@ -875,22 +907,23 @@ fun MapScreen(
                     )
                 } else null
 
-                if (bestDist <= 10000.0 && bestStopName != null) {
-                    NearbyRouteDisplayItem(
-                        route = route,
-                        nearestStopName = bestStopName,
-                        nearestStopType = bestStopType,
-                        walkDistanceMeters = bestDist.toInt(),
-                        matchReason = if (!isNearMe) "Serves ${target.title}" else "Traditional Jeepney",
-                        nearestStopLat = bestLat,
-                        nearestStopLng = bestLng,
-                        destinationServed = if (!isNearMe) target.title else null,
-                        onboardDistanceKm = onboardKm,
-                        dropoffStopName = bestDropName
-                    )
-                } else {
-                    null
+                // For destination search, must have a valid onboard ride segment (bIdx < dIdx)
+                if (!isNearMe && hasTargetCoords && (onboardKm == null || onboardKm < 0.35)) {
+                    return@mapNotNull null
                 }
+
+                NearbyRouteDisplayItem(
+                    route = route,
+                    nearestStopName = bestStopName ?: getDescriptiveCdoStopName(bestLat, bestLng, "Boarding Point"),
+                    nearestStopType = bestStopType ?: "Boarding Stop",
+                    walkDistanceMeters = bestDist.toInt(),
+                    matchReason = if (!isNearMe) "Serves ${target.title}" else "Traditional Jeepney",
+                    nearestStopLat = bestLat,
+                    nearestStopLng = bestLng,
+                    destinationServed = if (!isNearMe) target.title else null,
+                    onboardDistanceKm = onboardKm,
+                    dropoffStopName = bestDropName ?: if (hasTargetCoords) getDescriptiveCdoStopName(bestDropLat ?: 8.4822, bestDropLng ?: 124.6472, "Drop-off Point") else null
+                )
             }
 
             // De-duplicate, sort by walking distance from user's current GPS location, take top 3–5
@@ -1181,11 +1214,11 @@ fun MapScreen(
                     matchedRoutesWithDetails.isEmpty() -> {
                         EmptyState(
                             icon = if (target.isGpsBasedNearMe) Icons.Default.NearMe else Icons.Default.DirectionsBus,
-                            title = if (target.isGpsBasedNearMe) "No Nearby Routes Found" else "No Matching Routes Found",
+                            title = if (target.isGpsBasedNearMe) "No Nearby Routes Found" else "No verified jeepney route found for this destination",
                             message = if (target.isGpsBasedNearMe)
-                                "No traditional jeepney boarding stops found within walking distance of your current location. Please verify that you are within Cagayan de Oro transit corridors."
+                                "No traditional jeepney boarding stops found within walking distance (maximum 1.0 km) of your current location. Please verify that you are within Cagayan de Oro transit corridors."
                             else
-                                "No traditional jeepney routes near your location directly serve ${target.title}. You may need to transfer at Agora, Carmen, or Bulua terminals.",
+                                "No verified jeepney route found for this destination directly from your location within walking distance (maximum 1.0 km). You may need to transfer at Agora, Carmen, or Bulua terminals.",
                             tone = EmptyTone.Neutral,
                             action = {
                                 OroButton(

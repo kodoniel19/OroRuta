@@ -184,18 +184,17 @@ object TraditionalJeepneyFareService {
             }
         }
 
-        // Must be reasonably near the route corridor (< 1500m)
-        if (minBDist > 1500 || minDDist > 1500 || bIdx == -1 || dIdx == -1) {
+        // Must be reasonably near the route corridor (<= 1000m)
+        if (minBDist > 1000.0 || minDDist > 1000.0 || bIdx == -1 || dIdx == -1) {
             return null
         }
 
-        val polylineSegment = if (bIdx <= dIdx) {
-            routePoints.subList(bIdx, dIdx + 1)
-        } else {
-            // Loop route wrapping around terminal
-            routePoints.subList(bIdx, routePoints.size) + routePoints.subList(0, dIdx + 1)
+        // Must board BEFORE drop-off along this directional path
+        if (bIdx >= dIdx || (dIdx - bIdx) < 2) {
+            return null
         }
 
+        val polylineSegment = routePoints.subList(bIdx, dIdx + 1)
         if (polylineSegment.size < 2) return null
 
         var totalMeters = 0.0

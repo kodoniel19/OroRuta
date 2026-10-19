@@ -207,8 +207,8 @@ fun ResultsScreen(
                         // 30. No Jeepney Route Found screen
                         EmptyState(
                             icon = Icons.Default.DirectionsBusFilled,
-                            title = "No jeepney route found",
-                            message = "We couldn't find a jeepney route matching your destination. Note that OroRuta only covers jeepney routes within Cagayan de Oro City.",
+                            title = "No verified jeepney route found for this destination",
+                            message = "We couldn't find a direct verified jeepney route matching your journey. Boarding or destination alighting exceeds reasonable walking distance (maximum 1.0 km). Note that OroRuta only covers verified traditional jeepney routes within Cagayan de Oro City.",
                             tone = EmptyTone.Warn,
                             action = {
                                 Column(
