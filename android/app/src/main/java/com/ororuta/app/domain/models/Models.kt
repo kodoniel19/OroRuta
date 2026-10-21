@@ -194,22 +194,14 @@ data class TripSegment(
     val color: String = "#1471B0",
     @SerialName("jeepney_type") val jeepneyType: String = "Traditional",
     @SerialName("route_status") val routeStatus: String = "Active",
-    val km: Double = 0.0,
-    val direction: String? = null,
-    @SerialName("boarding_name") val boardingName: String? = null,
-    @SerialName("boarding_lat") val boardingLat: Double? = null,
-    @SerialName("boarding_lng") val boardingLng: Double? = null,
-    @SerialName("dropoff_name") val dropoffName: String? = null,
-    @SerialName("dropoff_lat") val dropoffLat: Double? = null,
-    @SerialName("dropoff_lng") val dropoffLng: Double? = null,
-    @SerialName("geometry_coordinates") val geometryCoordinates: List<List<Double>> = emptyList()
+    val km: Double = 0.0
 )
 
 @Serializable
 data class TripLeg(
     @SerialName("trip_option_id") val tripOptionId: String = "",
     val seq: Int = 0,
-    val kind: String = "walk", // walk|board|stay|alight|transfer
+    val kind: String = "walk", // walk|board|stay|alight
     val title: String = "",
     val detail: String? = null,
     val minutes: Int = 0,
@@ -224,9 +216,7 @@ data class TripLeg(
     @SerialName("end_lat") val endLat: Double? = null,
     @SerialName("end_lng") val endLng: Double? = null,
     @SerialName("point_lat") val pointLat: Double? = null,
-    @SerialName("point_lng") val pointLng: Double? = null,
-    val direction: String? = null,
-    @SerialName("geometry_coordinates") val geometryCoordinates: List<List<Double>> = emptyList()
+    @SerialName("point_lng") val pointLng: Double? = null
 )
 
 @Serializable

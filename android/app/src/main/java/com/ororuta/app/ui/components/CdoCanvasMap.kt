@@ -98,8 +98,6 @@ fun CdoCanvasMap(
     activeWalkToBoard: List<LatLng> = emptyList(),
     activeJeepneyRoute: List<LatLng> = emptyList(),
     activeWalkFromDrop: List<LatLng> = emptyList(),
-    activeJeepneyRoutes: List<List<LatLng>> = emptyList(),
-    activeWalkingPaths: List<List<LatLng>> = emptyList(),
     activeTripMarkers: List<MapMarker> = emptyList(),
     userLocation: Offset? = null,
     selectedMarker: MapMarker? = null,
@@ -129,16 +127,14 @@ fun CdoCanvasMap(
     }
     var mapReady by remember { mutableStateOf(false) }
 
-    val hasActiveTrip = activeJeepneyRoute.isNotEmpty() || activeWalkToBoard.isNotEmpty() || activeWalkFromDrop.isNotEmpty() || activeJeepneyRoutes.isNotEmpty() || activeWalkingPaths.isNotEmpty() || activeTripMarkers.isNotEmpty()
+    val hasActiveTrip = activeJeepneyRoute.isNotEmpty() || activeWalkToBoard.isNotEmpty() || activeWalkFromDrop.isNotEmpty() || activeTripMarkers.isNotEmpty()
 
     // Bounding box for active navigation route
-    LaunchedEffect(activeJeepneyRoute, activeWalkToBoard, activeWalkFromDrop, activeJeepneyRoutes, activeWalkingPaths, activeTripMarkers, mapReady) {
+    LaunchedEffect(activeJeepneyRoute, activeWalkToBoard, activeWalkFromDrop, activeTripMarkers, mapReady) {
         if (!mapReady || !hasActiveTrip) return@LaunchedEffect
         val allPoints = mutableListOf<LatLng>()
         allPoints.addAll(activeWalkToBoard)
         allPoints.addAll(activeJeepneyRoute)
-        activeJeepneyRoutes.forEach { allPoints.addAll(it) }
-        activeWalkingPaths.forEach { allPoints.addAll(it) }
         allPoints.addAll(activeWalkFromDrop)
         activeTripMarkers.forEach { m ->
             if (m.lat != null && m.lng != null) allPoints.add(LatLng(m.lat, m.lng))
@@ -194,11 +190,7 @@ fun CdoCanvasMap(
         ) {
             if (hasActiveTrip) {
                 // 1. Walk from origin to boarding point (snapped to real pedestrian roads)
-                if (activeWalkingPaths.isNotEmpty()) {
-                    activeWalkingPaths.filter { it.size >= 2 }.forEach { path ->
-                        Polyline(points = path, color = Color(0xFF1E8A4C), width = 8f)
-                    }
-                } else if (activeWalkToBoard.isNotEmpty()) {
+                if (activeWalkToBoard.isNotEmpty()) {
                     Polyline(
                         points = activeWalkToBoard,
                         color = Color(0xFF1E8A4C), // Forest green walk line
@@ -207,11 +199,7 @@ fun CdoCanvasMap(
                 }
 
                 // 2. Real Jeepney road-following polyline (snapped to actual roads and bridges)
-                if (activeJeepneyRoutes.isNotEmpty()) {
-                    activeJeepneyRoutes.filter { it.size >= 2 }.forEachIndexed { index, path ->
-                        Polyline(points = path, color = if (index % 2 == 0) Color(0xFF1471B0) else Color(0xFF7C4DFF), width = 12f)
-                    }
-                } else if (activeJeepneyRoute.isNotEmpty()) {
+                if (activeJeepneyRoute.isNotEmpty()) {
                     Polyline(
                         points = activeJeepneyRoute,
                         color = Color(0xFF1471B0), // OroRuta primary blue
@@ -220,7 +208,7 @@ fun CdoCanvasMap(
                 }
 
                 // 3. Walk from dropoff point to destination
-                if (activeWalkingPaths.isEmpty() && activeWalkFromDrop.isNotEmpty()) {
+                if (activeWalkFromDrop.isNotEmpty()) {
                     Polyline(
                         points = activeWalkFromDrop,
                         color = Color(0xFF1E8A4C), // Forest green walk line

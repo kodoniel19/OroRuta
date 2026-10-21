@@ -322,8 +322,6 @@ class ResultsViewModel @Inject constructor(
     private var lastFromLng: Double? = null
     private var lastToLat: Double? = null
     private var lastToLng: Double? = null
-    private var lastFromName: String? = null
-    private var lastToName: String? = null
 
     fun searchTrips(
         from: String,
@@ -335,25 +333,15 @@ class ResultsViewModel @Inject constructor(
         toLng: Double? = null
     ) {
         currentSort = sort
-        val sameSearch = lastFromName == from && lastToName == to
-        if (!sameSearch) {
-            lastFromLat = fromLat
-            lastFromLng = fromLng
-            lastToLat = toLat
-            lastToLng = toLng
-            lastFromName = from
-            lastToName = to
-        } else {
-            if (fromLat != null) lastFromLat = fromLat
-            if (fromLng != null) lastFromLng = fromLng
-            if (toLat != null) lastToLat = toLat
-            if (toLng != null) lastToLng = toLng
-        }
+        if (fromLat != null) lastFromLat = fromLat
+        if (fromLng != null) lastFromLng = fromLng
+        if (toLat != null) lastToLat = toLat
+        if (toLng != null) lastToLng = toLng
 
         viewModelScope.launch {
             tripsState = Resource.Loading
-            var actualFromLat = fromLat ?: if (sameSearch) lastFromLat else null
-            var actualFromLng = fromLng ?: if (sameSearch) lastFromLng else null
+            var actualFromLat = fromLat ?: lastFromLat
+            var actualFromLng = fromLng ?: lastFromLng
 
             // If starting point is "Current Location", get actual GPS coordinates
             if (from.isBlank() || from.contains("Current Location", ignoreCase = true)) {
@@ -369,8 +357,8 @@ class ResultsViewModel @Inject constructor(
                 to = to,
                 fromLat = actualFromLat,
                 fromLng = actualFromLng,
-                toLat = toLat ?: if (sameSearch) lastToLat else null,
-                toLng = toLng ?: if (sameSearch) lastToLng else null,
+                toLat = toLat ?: lastToLat,
+                toLng = toLng ?: lastToLng,
                 sort = sort
             )
         }
@@ -394,9 +382,14 @@ class TripDetailViewModel @Inject constructor(
     fun loadTrip(id: String, from: String, to: String) {
         viewModelScope.launch {
             tripState = Resource.Loading
-            val res = tripRepo.getTripOption(id)
+            val res = tripRepo.searchTrips(from, to)
             if (res is Resource.Success) {
-                tripState = res
+                val found = res.data.find { it.id == id } ?: res.data.firstOrNull()
+                if (found != null) {
+                    tripState = Resource.Success(found)
+                } else {
+                    tripState = Resource.Error("Trip option not found")
+                }
             } else if (res is Resource.Error) {
                 tripState = Resource.Error(res.message, res.isOffline)
             }
@@ -676,9 +669,7 @@ data class MapDirectionsState(
     val isGpsOrigin: Boolean = true,
     val walkToBoardPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList(),
     val jeepneyPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList(),
-    val walkFromDropPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList(),
-    val ridePaths: List<List<com.google.android.gms.maps.model.LatLng>> = emptyList(),
-    val walkingPaths: List<List<com.google.android.gms.maps.model.LatLng>> = emptyList()
+    val walkFromDropPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList()
 ) {
     val selectedTrip: TripOption?
         get() = itineraries.getOrNull(selectedIndex)
@@ -764,10 +755,6 @@ class MapViewModel @Inject constructor(
 
         mapDirectionsJob = viewModelScope.launch {
             val res = tripRepo.searchTrips(fromName, toName, fromLat, fromLng, toLat, toLng)
-            if (res is Resource.Error) {
-                mapDirectionsState = mapDirectionsState?.copy(isLoading = false, noRouteFound = false, errorMessage = res.message)
-                return@launch
-            }
             val trips = if (res is Resource.Success) res.data else emptyList()
 
             // Filter valid trips strictly following OroRuta rules:
@@ -790,12 +777,6 @@ class MapViewModel @Inject constructor(
                 validTrips.forEach { tripRepo.cacheTripOption(it) }
                 val firstTrip = validTrips.first()
                 val (wBoard, jeep, wDrop) = resolveItineraryPoints(firstTrip, fromLat, fromLng, toLat, toLng)
-                val rides = firstTrip.segments.mapNotNull { segment -> segment.geometryCoordinates
-                    .mapNotNull { if (it.size >= 2) com.google.android.gms.maps.model.LatLng(it[1], it[0]) else null }
-                    .takeIf { it.size >= 2 } }.ifEmpty { listOfNotNull(jeep.takeIf { it.size >= 2 }) }
-                val walks = firstTrip.legs.filter { it.kind == "walk" || it.kind == "transfer" }.mapNotNull { leg -> leg.geometryCoordinates
-                    .mapNotNull { if (it.size >= 2) com.google.android.gms.maps.model.LatLng(it[1], it[0]) else null }
-                    .takeIf { it.size >= 2 } }.ifEmpty { listOfNotNull(wBoard.takeIf { it.size >= 2 }, wDrop.takeIf { it.size >= 2 }) }
 
                 mapDirectionsState = mapDirectionsState?.copy(
                     itineraries = validTrips,
@@ -805,9 +786,7 @@ class MapViewModel @Inject constructor(
                     errorMessage = null,
                     walkToBoardPoints = wBoard,
                     jeepneyPoints = jeep,
-                    walkFromDropPoints = wDrop,
-                    ridePaths = rides,
-                    walkingPaths = walks
+                    walkFromDropPoints = wDrop
                 )
             } else {
                 // No verified jeepney route found. Check if road walking route is available and reasonable
@@ -841,19 +820,11 @@ class MapViewModel @Inject constructor(
         val trip = state.itineraries.getOrNull(index) ?: return
         viewModelScope.launch {
             val (wBoard, jeep, wDrop) = resolveItineraryPoints(trip, state.originLat, state.originLng, state.destinationLat, state.destinationLng)
-            val rides = trip.segments.mapNotNull { segment -> segment.geometryCoordinates
-                .mapNotNull { if (it.size >= 2) com.google.android.gms.maps.model.LatLng(it[1], it[0]) else null }
-                .takeIf { it.size >= 2 } }.ifEmpty { listOfNotNull(jeep.takeIf { it.size >= 2 }) }
-            val walks = trip.legs.filter { it.kind == "walk" || it.kind == "transfer" }.mapNotNull { leg -> leg.geometryCoordinates
-                .mapNotNull { if (it.size >= 2) com.google.android.gms.maps.model.LatLng(it[1], it[0]) else null }
-                .takeIf { it.size >= 2 } }.ifEmpty { listOfNotNull(wBoard.takeIf { it.size >= 2 }, wDrop.takeIf { it.size >= 2 }) }
             mapDirectionsState = state.copy(
                 selectedIndex = index,
                 walkToBoardPoints = wBoard,
                 jeepneyPoints = jeep,
-                walkFromDropPoints = wDrop,
-                ridePaths = rides,
-                walkingPaths = walks
+                walkFromDropPoints = wDrop
             )
         }
     }

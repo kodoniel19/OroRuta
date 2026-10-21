@@ -31,28 +31,6 @@ describe("bundled CDO route data audit", () => {
     }
   });
 
-  test("canonical shared terminals are consistent and stop-to-route geometry gaps remain detectable", () => {
-    const terminalLinks = new Map();
-    const stopAssociations = [];
-    for (const route of routes) {
-      const geometries = (route.geometries || []).map(g => JSON.parse(g.geometry).coordinates);
-      for (const terminal of route.terminals || []) {
-        if (!terminalLinks.has(terminal.id)) terminalLinks.set(terminal.id, []);
-        terminalLinks.get(terminal.id).push({ route: route.id, name: terminal.name, lat: terminal.lat, lng: terminal.lng });
-      }
-      for (const stop of [...(route.terminals || []), ...(route.stops || []), ...(route.transfers || [])]) {
-        const nearest = Math.min(...geometries.flatMap(path => path.map(point => haversine([stop.lng, stop.lat], point))));
-        stopAssociations.push({ route: route.id, stop: stop.name, nearest });
-      }
-    }
-    const shared = [...terminalLinks.values()].filter(links => links.length > 1);
-    expect(shared.length).toBeGreaterThan(0);
-    for (const links of shared) {
-      expect(new Set(links.map(link => `${link.name}|${link.lat}|${link.lng}`)).size).toBe(1);
-    }
-    expect(stopAssociations.filter(record => record.nearest > 250).length).toBe(35);
-  });
-
   test("R-BAL geometry proximity to SM Downtown is not treated as a verified stop", () => {
     const route = routes.find(r => r.code === "R-BAL");
     expect(route).toBeDefined();

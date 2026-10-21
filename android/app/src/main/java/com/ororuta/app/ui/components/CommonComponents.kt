@@ -712,15 +712,6 @@ fun TripCard(
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
-            trip.segments.forEach { segment ->
-                Text(
-                    text = "${segment.code} · ${segment.direction ?: "direction unavailable"} · ${segment.boardingName ?: "Board at verified stop"} → ${segment.dropoffName ?: "Alight at verified stop"}",
-                    fontSize = 11.sp,
-                    color = InkSoft,
-                    maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
-            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -799,10 +790,10 @@ fun TripCard(
                             Text("Board at ${trip.boardingName}", fontSize = 12.sp, color = InkSoft, maxLines = 1)
                         }
                     }
-                    if (trip.transfers > 0) {
+                    if (trip.transferName != null) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(modifier = Modifier.size(8.dp).rotate(45f).background(Oro500))
-                            Text("Transfer ${trip.transferName?.let { "at $it" } ?: "between routes"}", fontSize = 12.sp, color = InkSoft, maxLines = 1)
+                            Text("Transfer at ${trip.transferName}", fontSize = 12.sp, color = InkSoft, maxLines = 1)
                         }
                     }
                     if (trip.dropoffName != null) {
