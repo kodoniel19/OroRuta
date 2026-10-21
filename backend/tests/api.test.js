@@ -116,14 +116,12 @@ describe("Routes", () => {
 });
 
 describe("Trips", () => {
-  it("GET /api/v1/trips/search returns options for Liceo to Limketkai", async () => {
+  it("GET /api/v1/trips/search does not invent a route for Liceo to Limketkai when linked stops do not form a valid segment", async () => {
     const res = await request(app)
       .get("/api/v1/trips/search?from=Liceo&to=Limketkai&sort=time");
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(1);
-    expect(res.body[0]).toHaveProperty("minutes");
-    expect(res.body[0]).toHaveProperty("regularFare");
+    expect(res.body).toEqual([]);
   });
 
   it("GET /api/v1/trips/search returns empty for unknown destinations", async () => {
@@ -133,17 +131,24 @@ describe("Trips", () => {
     expect(res.body).toEqual([]);
   });
 
-  it("GET /api/v1/trips/search Carmen to Cogon calculates segment fare, not full route length", async () => {
+  it("GET /api/v1/trips/search recommends route-linked R5 stops for a verified Carmen to SM Downtown journey", async () => {
+    const res = await request(app)
+      .get("/api/v1/trips/search?from=Current%20Location&to=SM%20Downtown&fromLat=8.4845&fromLng=124.6335&toLat=8.4855&toLng=124.6535&sort=time");
+    expect(res.status).toBe(200);
+    const option = res.body.find(o => o.segments.some(s => s.route_id === "564269a7-bf89-4bff-a955-e8c518ba4dea"));
+    expect(option).toBeDefined();
+    expect(option.direction).toBe("Inbound");
+    expect(option.boarding_name).toBe("Carmen Market Terminal");
+    expect(option.dropoff_name).toBe("Limketkai Center Loading Bay");
+    expect(option.walk_meters).toBeLessThan(1000);
+  });
+
+  it("GET /api/v1/trips/search does not infer a Carmen to Cogon ride from mismatched terminal geometry", async () => {
     const res = await request(app)
       .get("/api/v1/trips/search?from=Carmen%20Market&to=Cogon%20Market&sort=time");
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(1);
-    const topTrip = res.body[0];
-    // Segment ride distance must not equal full 11.9km route length
-    expect(topTrip.totalKm).toBeLessThan(11.9);
-    expect(topTrip.regularFare).toBeLessThan(27.25);
-    expect(topTrip.regularFare).toBeGreaterThanOrEqual(13.00);
+    expect(res.body).toEqual([]);
   });
 });
 

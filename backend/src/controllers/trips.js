@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const { haversineMeters, estimateFare } = require("../utils");
 const { getRouteGeometry, getWalkingRoute } = require("../utils/routing");
+const { rankDirectItineraries } = require("../domain/routeItineraryPlanner");
 
 // In-memory cache for generated recommendations and trip options
 const dynamicOptionsCache = new Map();
@@ -215,18 +216,6 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
     fareRule = f;
   } catch (_) {}
 
-  let allTerminals = [];
-  try {
-    const [terms] = await db.execute("SELECT id, name, lat, lng FROM terminals");
-    allTerminals = terms;
-  } catch (_) {}
-
-  let allLoadingPoints = [];
-  try {
-    const [lps] = await db.execute("SELECT id, name, note, point_type, lat, lng FROM loading_points WHERE lat != 0 AND lng != 0");
-    allLoadingPoints = lps;
-  } catch (_) {}
-
   const candidates = [];
 
   for (const r of routes) {
@@ -244,6 +233,20 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
     const dirMap = {};
     dirs.forEach(d => { dirMap[d.direction] = d; });
 
+    let routeTerminals = [], routeStops = [], routeTransfers = [];
+    try {
+      const [rows] = await db.execute("SELECT t.id, t.name, t.lat, t.lng FROM terminals t JOIN route_terminals rt ON rt.terminal_id=t.id WHERE rt.route_id=?", [r.id]);
+      routeTerminals = rows;
+    } catch (_) {}
+    try {
+      const [rows] = await db.execute("SELECT id, name, point_type, lat, lng FROM loading_points WHERE route_id=?", [r.id]);
+      routeStops = rows;
+    } catch (_) {}
+    try {
+      const [rows] = await db.execute("SELECT id, name, lat, lng FROM transfer_points WHERE route_id=?", [r.id]);
+      routeTransfers = rows;
+    } catch (_) {}
+
     for (const g of geos) {
       const direction = g.direction;
       let geom = g.geometry;
@@ -254,121 +257,37 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
 
       const coords = geom.coordinates; // [[lng, lat], ...]
 
-      // 1. Find closest coordinate to Origin
-      let minOrigDist = Infinity;
-      let origIdx = -1;
-      for (let i = 0; i < coords.length; i++) {
-        const d = haversineMeters(origLat, origLng, coords[i][1], coords[i][0]);
-        if (d < minOrigDist) {
-          minOrigDist = d;
-          origIdx = i;
-        }
-      }
-
-      // 2. Find closest coordinate to Destination
-      let minDestDist = Infinity;
-      let destIdx = -1;
-      for (let i = 0; i < coords.length; i++) {
-        const d = haversineMeters(destLat, destLng, coords[i][1], coords[i][0]);
-        if (d < minDestDist) {
-          minDestDist = d;
-          destIdx = i;
-        }
-      }
-
-      // Proximity check: Boarding and Drop-off must be within walking distance (<= 950m)
-      if (minOrigDist > 950 || minDestDist > 950) {
-        continue;
-      }
-
-      // Direction check: Must board BEFORE drop-off along the route direction!
-      // Also require at least 5 index positions apart to prevent same-stop or U-turn matches.
-      if (origIdx >= destIdx || (destIdx - origIdx) < 5) {
-        continue;
-      }
-
-      // Extract coordinates along the route between boarding and drop-off
-      const rideCoords = coords.slice(origIdx, destIdx + 1);
-      const rideDistMeters = calculatePolylineMeters(rideCoords);
-
-      // Must be a meaningful transit ride (at least 400 meters)
-      if (rideDistMeters < 400) {
-        continue;
-      }
-
-      // Do NOT apply Math.max(0.5) — use the real computed distance for accurate fares
-      const rideKm = Math.round((rideDistMeters / 1000) * 10) / 10 || 0.5;
-      const walkToBoardM = Math.round(minOrigDist);
-      const walkFromDropM = Math.round(minDestDist);
-      const totalWalkM = walkToBoardM + walkFromDropM;
-
-      // Realistic walk and ride speeds
-      const walkMinutesToBoard = Math.max(1, Math.round(walkToBoardM / 75));
-      const walkMinutesFromDrop = Math.max(1, Math.round(walkFromDropM / 75));
-      const walkMinutes = walkMinutesToBoard + walkMinutesFromDrop;
-      const rideMinutes = Math.max(3, Math.round((rideKm / 18) * 60)); // ~18 km/h typical CDO jeepney speed
-      const totalMinutes = walkMinutes + rideMinutes;
-
-      const regularFare = fareRule ? estimateFare(rideKm, fareRule, "Regular") : 13.00;
-      const discountFare = fareRule ? estimateFare(rideKm, fareRule, "Student") : 10.40;
-
-      const boardingCoord = [rideCoords[0][0], rideCoords[0][1]]; // [lng, lat]
-      const dropoffCoord = [rideCoords[rideCoords.length - 1][0], rideCoords[rideCoords.length - 1][1]];
-
-      const boardingName = findStopLabel(boardingCoord[1], boardingCoord[0], "Loading point", originName, allTerminals, allLoadingPoints);
-      const dropoffName = findStopLabel(dropoffCoord[1], dropoffCoord[0], "Drop-off stop", destName, allTerminals, allLoadingPoints);
-
-      // Convenience penalty for having to walk far after alighting:
-      // A route dropping passenger 50m from SM Downtown gets 0 penalty.
-      // A route dropping at Cogon Market (750m walk to SM Downtown) gets a heavy penalty.
-      const dropoffPenalty = walkFromDropM > 250 ? Math.pow((walkFromDropM - 250) / 75, 1.4) * 4 : 0;
-      const convenienceScore = totalMinutes + dropoffPenalty;
-
-      candidates.push({
-        route: r,
-        direction,
-        origIdx,
-        destIdx,
-        rideCoords,
-        rideDistMeters,
-        rideKm,
-        walkToBoardM,
-        walkFromDropM,
-        totalWalkM,
-        walkMinutesToBoard,
-        walkMinutesFromDrop,
-        walkMinutes,
-        rideMinutes,
-        totalMinutes,
-        convenienceScore,
-        regularFare,
-        discountFare,
-        boardingCoord,
-        dropoffCoord,
-        boardingName,
-        dropoffName,
-        streetSequence: dirMap[direction]?.street_sequence || ""
-      });
+      const boardStops = [
+        ...routeTerminals.map(p => ({ ...p, point_type: "terminal" })),
+        ...routeStops.filter(p => String(p.point_type).toLowerCase() !== "unloading"),
+        ...routeTransfers.map(p => ({ ...p, point_type: "transfer" }))
+      ];
+      const alightStops = [
+        ...routeTerminals.map(p => ({ ...p, point_type: "terminal" })),
+        ...routeStops,
+        ...routeTransfers.map(p => ({ ...p, point_type: "transfer" }))
+      ];
+      candidates.push(...rankDirectItineraries({
+        routes: [{ route: r, direction, coordinates: coords, boardingStops: boardStops,
+          alightingStops: alightStops, streetSequence: dirMap[direction]?.street_sequence || "" }],
+        origin: { lat: origLat, lng: origLng },
+        destination: { lat: destLat, lng: destLng },
+        fareRule
+      }));
     }
   }
 
-  // If some candidates drop passenger directly near destination (<= 300m),
-  // filter out candidates that leave the passenger with > 650m walk from drop-off.
-  const hasCloseDropoff = candidates.some(c => c.walkFromDropM <= 300);
-  const viableCandidates = hasCloseDropoff
-    ? candidates.filter(c => c.walkFromDropM <= 650)
-    : candidates;
-
-  // Deduplicate candidates by route code, keeping the direction with best convenience score
-  const bestByCode = new Map();
-  for (const c of viableCandidates) {
-    const key = c.route.code;
-    if (!bestByCode.has(key) || c.convenienceScore < bestByCode.get(key).convenienceScore) {
-      bestByCode.set(key, c);
+  // Public route codes repeat across different route records; retain each route and direction.
+  const bestByRouteDirection = new Map();
+  for (const c of candidates) {
+    const key = `${c.route.id}:${c.direction}`;
+    if (!bestByRouteDirection.has(key) || c.convenienceScore < bestByRouteDirection.get(key).convenienceScore) {
+      bestByRouteDirection.set(key, c);
     }
   }
-
-  return Array.from(bestByCode.values());
+  return Array.from(bestByRouteDirection.values()).sort((a, b) =>
+    a.convenienceScore - b.convenienceScore || a.totalWalkM - b.totalWalkM || a.regularFare - b.regularFare
+  );
 }
 
 async function search(req, res, next) {
@@ -399,11 +318,44 @@ async function search(req, res, next) {
 
     // Sort according to requested criterion
     candidates.sort((a, b) => {
-      if (sort === "time") return a.totalMinutes - b.totalMinutes || a.walkFromDropM - b.walkFromDropM;
+      if (sort === "time") return a.convenienceScore - b.convenienceScore || a.totalWalkM - b.totalWalkM;
       if (sort === "fare") return a.regularFare - b.regularFare || a.walkFromDropM - b.walkFromDropM || a.totalMinutes - b.totalMinutes;
       if (sort === "walk") return a.totalWalkM - b.totalWalkM || a.walkFromDropM - b.walkFromDropM || a.totalMinutes - b.totalMinutes;
       if (sort === "transfers") return 0; // All direct routes have 0 transfers
       return a.convenienceScore - b.convenienceScore || a.totalMinutes - b.totalMinutes;
+    });
+
+    // Refine the leading candidates using real pedestrian routes when OSRM can provide them.
+    // The remaining options retain explicitly approximate walking estimates.
+    const walkRoutesByKey = new Map();
+    const refineCandidates = candidates.slice(0, 10);
+    await Promise.all(refineCandidates.map(async c => {
+      const [walkTo, walkFrom] = await Promise.all([
+        getWalkingRoute([oLng, oLat], c.boardingCoord).catch(() => null),
+        getWalkingRoute(c.dropoffCoord, [dLng, dLat]).catch(() => null)
+      ]);
+      const info = {
+        walkToCoords: walkTo?.coordinates?.length >= 2 ? walkTo.coordinates : [],
+        walkToMeters: walkTo?.coordinates?.length >= 2 ? Math.round(walkTo.distanceMeters) : c.walkToBoardM,
+        walkToIsEstimate: !(walkTo?.coordinates?.length >= 2),
+        walkFromCoords: walkFrom?.coordinates?.length >= 2 ? walkFrom.coordinates : [],
+        walkFromMeters: walkFrom?.coordinates?.length >= 2 ? Math.round(walkFrom.distanceMeters) : c.walkFromDropM,
+        walkFromIsEstimate: !(walkFrom?.coordinates?.length >= 2)
+      };
+      c.walkToBoardM = info.walkToMeters;
+      c.walkFromDropM = info.walkFromMeters;
+      c.totalWalkM = info.walkToMeters + info.walkFromMeters;
+      c.walkMinutesToBoard = Math.max(1, Math.round(info.walkToMeters / 75));
+      c.walkMinutesFromDrop = Math.max(1, Math.round(info.walkFromMeters / 75));
+      c.walkMinutes = c.walkMinutesToBoard + c.walkMinutesFromDrop;
+      c.totalMinutes = c.walkMinutes + c.rideMinutes + 3;
+      c.convenienceScore = c.totalMinutes + c.totalWalkM / 400;
+      walkRoutesByKey.set(`${c.route.id}:${c.direction}`, info);
+    }));
+    candidates.sort((a, b) => {
+      if (sort === "fare") return a.regularFare - b.regularFare || a.totalWalkM - b.totalWalkM || a.totalMinutes - b.totalMinutes;
+      if (sort === "walk") return a.totalWalkM - b.totalWalkM || a.totalMinutes - b.totalMinutes || a.regularFare - b.regularFare;
+      return a.convenienceScore - b.convenienceScore || a.totalWalkM - b.totalWalkM || a.regularFare - b.regularFare;
     });
 
     // Build rich, distinct trip option objects for top candidates
@@ -413,30 +365,13 @@ async function search(req, res, next) {
     for (let i = 0; i < topCandidates.length; i++) {
       const c = topCandidates[i];
       const r = c.route;
-
-      // Road geometry for walking from origin to boarding point
-      let walkToBoardCoords = [
-        [oLng, oLat],
-        [c.boardingCoord[0], c.boardingCoord[1]]
-      ];
-      try {
-        const osrmWalk1 = await getWalkingRoute([oLng, oLat], [c.boardingCoord[0], c.boardingCoord[1]]);
-        if (osrmWalk1 && osrmWalk1.coordinates && osrmWalk1.coordinates.length >= 2) {
-          walkToBoardCoords = osrmWalk1.coordinates;
-        }
-      } catch (_) {}
-
-      // Road geometry for walking from drop-off to destination
-      let walkFromDropCoords = [
-        [c.dropoffCoord[0], c.dropoffCoord[1]],
-        [dLng, dLat]
-      ];
-      try {
-        const osrmWalk2 = await getWalkingRoute([c.dropoffCoord[0], c.dropoffCoord[1]], [dLng, dLat]);
-        if (osrmWalk2 && osrmWalk2.coordinates && osrmWalk2.coordinates.length >= 2) {
-          walkFromDropCoords = osrmWalk2.coordinates;
-        }
-      } catch (_) {}
+      const walkInfo = walkRoutesByKey.get(`${r.id}:${c.direction}`);
+      const walkToBoardCoords = walkInfo?.walkToCoords || [];
+      const walkToBoardMeters = walkInfo?.walkToMeters ?? c.walkToBoardM;
+      const walkToBoardIsEstimate = walkInfo?.walkToIsEstimate ?? true;
+      const walkFromDropCoords = walkInfo?.walkFromCoords || [];
+      const walkFromDropMeters = walkInfo?.walkFromMeters ?? c.walkFromDropM;
+      const walkFromDropIsEstimate = walkInfo?.walkFromIsEstimate ?? true;
 
       // Complete concatenated road geometry for map rendering
       const fullGeometryCoords = [
@@ -445,16 +380,16 @@ async function search(req, res, next) {
         ...walkFromDropCoords
       ];
 
-      const optId = `trip-${r.code.toLowerCase()}-${c.direction.toLowerCase()}-${originPlace.id}-${destPlace.id}`;
+      const optId = `trip-${r.id}-${c.direction.toLowerCase()}-${originPlace.id}-${destPlace.id}`;
 
       const option = {
         id: optId,
         origin_place_id: originPlace.id,
         destination_place_id: destPlace.id,
-        minutes: c.totalMinutes,
+        minutes: c.rideMinutes + Math.max(1, Math.round(walkToBoardMeters / 75)) + Math.max(1, Math.round(walkFromDropMeters / 75)) + 3,
         transfers: 0,
-        walk_meters: c.totalWalkM,
-        walk_minutes: c.walkMinutes,
+        walk_meters: walkToBoardMeters + walkFromDropMeters,
+        walk_minutes: Math.max(1, Math.round(walkToBoardMeters / 75)) + Math.max(1, Math.round(walkFromDropMeters / 75)),
         totalKm: c.rideKm,
         regularFare: c.regularFare,
         discountFare: c.discountFare,
@@ -469,8 +404,10 @@ async function search(req, res, next) {
         dropoff_lat: c.dropoffCoord[1],
         dropoff_lng: c.dropoffCoord[0],
         walk_to_board_coordinates: walkToBoardCoords,
+        walk_to_board_is_estimate: walkToBoardIsEstimate,
         jeepney_coordinates: c.rideCoords,
         walk_from_drop_coordinates: walkFromDropCoords,
+        walk_from_drop_is_estimate: walkFromDropIsEstimate,
         geometry_coordinates: fullGeometryCoords,
         segments: [
           {
@@ -495,9 +432,9 @@ async function search(req, res, next) {
             seq: 1,
             kind: "walk",
             title: `Walk to ${c.boardingName}`,
-            detail: `About ${c.walkMinutesToBoard} min walk · ${c.walkToBoardM}m`,
-            minutes: c.walkMinutesToBoard,
-            distance_m: c.walkToBoardM,
+            detail: `About ${Math.max(1, Math.round(walkToBoardMeters / 75))} min walk · ${walkToBoardMeters}m${walkToBoardIsEstimate ? " (distance estimate; pedestrian routing unavailable)" : ""}`,
+            minutes: Math.max(1, Math.round(walkToBoardMeters / 75)),
+            distance_m: walkToBoardMeters,
             start_lat: oLat,
             start_lng: oLng,
             end_lat: c.boardingCoord[1],
@@ -547,9 +484,9 @@ async function search(req, res, next) {
             seq: 5,
             kind: "walk",
             title: `Walk to ${destPlace.name}`,
-            detail: `About ${c.walkMinutesFromDrop} min walk · ${c.walkFromDropM}m`,
-            minutes: c.walkMinutesFromDrop,
-            distance_m: c.walkFromDropM,
+            detail: `About ${Math.max(1, Math.round(walkFromDropMeters / 75))} min walk · ${walkFromDropMeters}m${walkFromDropIsEstimate ? " (distance estimate; pedestrian routing unavailable)" : ""}`,
+            minutes: Math.max(1, Math.round(walkFromDropMeters / 75)),
+            distance_m: walkFromDropMeters,
             start_lat: c.dropoffCoord[1],
             start_lng: c.dropoffCoord[0],
             end_lat: dLat,

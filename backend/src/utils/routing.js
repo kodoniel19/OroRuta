@@ -154,20 +154,7 @@ async function getWalkingRoute(fromLngLat, toLngLat) {
         durationSeconds: res.data.routes[0].duration
       };
     }
-  } catch (e) {
-    // If foot profile is slow or fails, try driving profile
-    try {
-      const driveUrl = `http://router.project-osrm.org/route/v1/driving/${fromLngLat[0]},${fromLngLat[1]};${toLngLat[0]},${toLngLat[1]}?overview=full&geometries=geojson`;
-      const driveRes = await axios.get(driveUrl, { timeout: 6000 });
-      if (driveRes.data && driveRes.data.routes && driveRes.data.routes.length > 0) {
-        return {
-          coordinates: driveRes.data.routes[0].geometry.coordinates,
-          distanceMeters: driveRes.data.routes[0].distance,
-          durationSeconds: driveRes.data.routes[0].duration
-        };
-      }
-    } catch (_) {}
-  }
+  } catch (_) {}
   return null;
 }
 

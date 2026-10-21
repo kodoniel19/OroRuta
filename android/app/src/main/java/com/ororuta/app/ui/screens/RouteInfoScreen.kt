@@ -46,7 +46,6 @@ import com.ororuta.app.ui.components.*
 import com.ororuta.app.ui.location.LocationPermissions
 import com.ororuta.app.ui.theme.*
 import com.ororuta.app.ui.viewmodels.RouteInfoViewModel
-import com.ororuta.app.ui.viewmodels.nearestVerifiedBoardingStop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -295,83 +294,87 @@ fun RouteInfoScreen(
                                     route.landmarks.map { LatLng(it.lat, it.lng) to it.name })
                                 .filter { it.first.latitude != 0.0 && it.first.longitude != 0.0 }
                                 .firstOrNull { it.second.contains(targetDestination, ignoreCase = true) || targetDestination.contains(it.second, ignoreCase = true) }
-                            matchingStop?.first ?: routeGeomPts.lastOrNull()
+                            matchingStop?.first
                         }
                     }
 
                     // 2. Candidate verified boarding stops (Terminals, Loading Points, Transfer Points; not pure unloading)
-                    val candidateBoardingStops = remember(route) {
+                    val candidateBoardingStops = remember(route, routeGeomPts) {
                         val list = mutableListOf<RouteStopPoint>()
-                        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
+                        route.terminals.filter { isValidCdoStopCoordinate(it.lat, it.lng) }.forEach {
                             list.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
                         }
-                        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }.forEach {
+                        route.stops.filter { isValidCdoStopCoordinate(it.lat, it.lng) && !it.pointType.equals("unloading", ignoreCase = true) }.forEach {
                             list.add(RouteStopPoint(it.id, it.name, it.pointType.ifBlank { "loading" }, it.lat, it.lng, it.note))
                         }
-                        route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
+                        route.transfers.filter { isValidCdoStopCoordinate(it.lat, it.lng) }.forEach {
                             list.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
                         }
-                        list
-                    }
-
-                    // Nearest verified boarding stop from user's current GPS location or passed initial boarding point
-                    val nearestBoardingStop = remember(initialBoardingLat, initialBoardingLng, initialBoardingName, candidateBoardingStops, userLocation, routeGeomPts) {
-                        if (initialBoardingLat != null && initialBoardingLng != null && initialBoardingLat != 0.0 && initialBoardingLng != 0.0) {
-                            RouteStopPoint("initial_board", initialBoardingName ?: "Boarding Stop", "loading", initialBoardingLat, initialBoardingLng, "Selected Boarding Point")
-                        } else {
-                            nearestVerifiedBoardingStop(userLocation, candidateBoardingStops)
-                        }
+                        list.filter { routePointIndex(it, routeGeomPts) != null }
                     }
 
                     // 3. Candidate verified drop-off stops including closest verified route corridor points
                     val candidateDropoffStops = remember(route, targetDestCoords, routeGeomPts) {
                         val list = mutableListOf<RouteStopPoint>()
-                        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
+                        route.terminals.filter { isValidCdoStopCoordinate(it.lat, it.lng) }.forEach {
                             list.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
                         }
-                        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
+                        route.stops.filter { isValidCdoStopCoordinate(it.lat, it.lng) }.forEach {
                             list.add(RouteStopPoint(it.id, it.name, it.pointType.ifBlank { "loading" }, it.lat, it.lng, it.note))
                         }
-                        route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
+                        route.transfers.filter { isValidCdoStopCoordinate(it.lat, it.lng) }.forEach {
                             list.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
                         }
 
-                        // If route passes close to destination along its geometry, add as verified roadside drop-off stop
-                        if (targetDestCoords != null && routeGeomPts.isNotEmpty()) {
-                            var minGeoDist = Double.MAX_VALUE
-                            var closestGeoPt: LatLng? = null
-                            for (pt in routeGeomPts) {
-                                val d = computeDistanceMeters(pt.latitude, pt.longitude, targetDestCoords.latitude, targetDestCoords.longitude)
-                                if (d < minGeoDist) {
-                                    minGeoDist = d
-                                    closestGeoPt = pt
-                                }
-                            }
-                            if (closestGeoPt != null && minGeoDist <= 850.0) {
-                                val desc = getDescriptiveCdoStopName(closestGeoPt.latitude, closestGeoPt.longitude, "Drop-off")
-                                list.add(RouteStopPoint("geo_dest_drop", desc, "unloading", closestGeoPt.latitude, closestGeoPt.longitude, "Near $targetDestination"))
-                            }
-                        }
-                        list
+                        list.filter { routePointIndex(it, routeGeomPts) != null }
                     }
 
-                    // Suitable drop-off stop closest to the destination or passed initial drop-off point
-                    val dropoffStop = remember(initialDropoffLat, initialDropoffLng, initialDropoffName, candidateDropoffStops, targetDestCoords, routeGeomPts) {
-                        if (initialDropoffLat != null && initialDropoffLng != null && initialDropoffLat != 0.0 && initialDropoffLng != 0.0) {
-                            RouteStopPoint("initial_drop", initialDropoffName ?: targetDestination, "unloading", initialDropoffLat, initialDropoffLng, "Selected Drop-off Point")
-                        } else if (targetDestCoords != null && candidateDropoffStops.isNotEmpty()) {
-                            candidateDropoffStops.minByOrNull {
-                                computeDistanceMeters(it.lat, it.lng, targetDestCoords.latitude, targetDestCoords.longitude)
-                            }
-                        } else {
-                            candidateDropoffStops.lastOrNull()
-                        } ?: if (routeGeomPts.isNotEmpty()) {
-                            val p = routeGeomPts.last()
-                            RouteStopPoint("end", getDescriptiveCdoStopName(p.latitude, p.longitude, "Alighting Point"), "unloading", p.latitude, p.longitude, "Route Corridor Drop-off")
-                        } else {
-                            RouteStopPoint("dest_default", route.destination, "terminal", 8.4822, 124.6472, "CDO Destination")
+                    // Select boarding and alighting as a pair on this exact direction. A nearby
+                    // stop is not valid if the vehicle reaches the destination stop before it.
+                    val selectedStopPair = remember(
+                        initialBoardingLat, initialBoardingLng, initialDropoffLat, initialDropoffLng,
+                        candidateBoardingStops, candidateDropoffStops, targetDestCoords, userLocation, routeGeomPts
+                    ) {
+                        val boardRequestWasPassed = initialBoardingLat != null || initialBoardingLng != null
+                        val dropRequestWasPassed = initialDropoffLat != null || initialDropoffLng != null
+                        val requestedBoard = if (boardRequestWasPassed && initialBoardingLat != null && initialBoardingLng != null &&
+                            isValidCdoStopCoordinate(initialBoardingLat, initialBoardingLng)) {
+                            candidateBoardingStops.minByOrNull { computeDistanceMeters(initialBoardingLat, initialBoardingLng, it.lat, it.lng) }
+                                ?.takeIf { computeDistanceMeters(initialBoardingLat, initialBoardingLng, it.lat, it.lng) <= 250 }
+                        } else null
+                        val requestedDrop = if (dropRequestWasPassed && initialDropoffLat != null && initialDropoffLng != null &&
+                            isValidCdoStopCoordinate(initialDropoffLat, initialDropoffLng)) {
+                            candidateDropoffStops.minByOrNull { computeDistanceMeters(initialDropoffLat, initialDropoffLng, it.lat, it.lng) }
+                                ?.takeIf { computeDistanceMeters(initialDropoffLat, initialDropoffLng, it.lat, it.lng) <= 250 }
+                        } else null
+                        val boardOptions = if (boardRequestWasPassed) listOfNotNull(requestedBoard) else candidateBoardingStops
+                        val dropOptions = when {
+                            dropRequestWasPassed -> listOfNotNull(requestedDrop)
+                            targetDestCoords != null -> candidateDropoffStops
+                            else -> listOfNotNull(candidateDropoffStops.lastOrNull())
                         }
+                        var bestPair: Pair<RouteStopPoint, RouteStopPoint>? = null
+                        var bestWalk = Double.MAX_VALUE
+                        for (board in boardOptions) {
+                            val boardIndex = routePointIndex(board, routeGeomPts) ?: continue
+                            val walkToBoard = userLocation?.let { computeDistanceMeters(it.latitude, it.longitude, board.lat, board.lng) } ?: 0.0
+                            if (walkToBoard > 1000) continue
+                            for (drop in dropOptions) {
+                                val dropIndex = routePointIndex(drop, routeGeomPts) ?: continue
+                                if (boardIndex >= dropIndex) continue
+                                val walkFromDrop = targetDestCoords?.let { computeDistanceMeters(drop.lat, drop.lng, it.latitude, it.longitude) } ?: 0.0
+                                if (targetDestCoords != null && walkFromDrop > 1000) continue
+                                val totalWalk = walkToBoard + walkFromDrop
+                                if (totalWalk < bestWalk) {
+                                    bestWalk = totalWalk
+                                    bestPair = board to drop
+                                }
+                            }
+                        }
+                        bestPair
                     }
+                    val nearestBoardingStop = selectedStopPair?.first
+                    val dropoffStop = selectedStopPair?.second
 
                     // Verify whether destination is actually reachable within walking distance (<= 1000m)
                     val dropoffDistanceToDestM = remember(dropoffStop, targetDestCoords) {
@@ -381,15 +384,13 @@ fun RouteInfoScreen(
                             0
                         }
                     }
-                    val isDestinationReachable = remember(dropoffDistanceToDestM, initialDestination) {
-                        if (initialDestination.isNullOrBlank()) true else dropoffDistanceToDestM <= 1000
+                    val isDestinationReachable = remember(dropoffStop, dropoffDistanceToDestM, initialDestination, targetDestCoords) {
+                        dropoffStop != null && (initialDestination.isNullOrBlank() || targetDestCoords == null || dropoffDistanceToDestM <= 1000)
                     }
 
                     // 3b. Calculate distance aboard jeepney along verified route geometry
-                    val onboardDistanceKm = remember(initialOnboardDistanceKm, routeGeomPts, nearestBoardingStop, dropoffStop) {
-                        if (initialOnboardDistanceKm != null && initialOnboardDistanceKm > 0.0) {
-                            initialOnboardDistanceKm
-                        } else if (nearestBoardingStop != null && dropoffStop != null && routeGeomPts.size >= 2) {
+                    val onboardDistanceKm = remember(routeGeomPts, nearestBoardingStop, dropoffStop) {
+                        if (nearestBoardingStop != null && dropoffStop != null && routeGeomPts.size >= 2) {
                             TraditionalJeepneyFareService.calculateOnboardDistanceKm(
                                 routePoints = routeGeomPts,
                                 boardingLat = nearestBoardingStop.lat,
@@ -417,8 +418,13 @@ fun RouteInfoScreen(
                     var walkToBoardCoords by remember { mutableStateOf<List<LatLng>>(emptyList()) }
                     var walkToBoardDistanceM by remember { mutableIntStateOf(0) }
                     var walkToBoardMinutes by remember { mutableIntStateOf(0) }
+                    var walkToBoardIsPedestrianPath by remember { mutableStateOf(false) }
 
                     LaunchedEffect(userLocation, nearestBoardingStop) {
+                        walkToBoardCoords = emptyList()
+                        walkToBoardDistanceM = 0
+                        walkToBoardMinutes = 0
+                        walkToBoardIsPedestrianPath = false
                         val uLoc = userLocation
                         val bStop = nearestBoardingStop
                         if (uLoc != null && bStop != null) {
@@ -427,6 +433,7 @@ fun RouteInfoScreen(
                                 walkToBoardCoords = listOf(uLoc, LatLng(bStop.lat, bStop.lng))
                                 walkToBoardDistanceM = directDist
                                 walkToBoardMinutes = 1
+                                walkToBoardIsPedestrianPath = true
                             } else if (directDist > 1500) {
                                 // Beyond reasonable pedestrian path, do not fabricate long lines
                                 walkToBoardCoords = emptyList()
@@ -438,14 +445,12 @@ fun RouteInfoScreen(
                                     walkToBoardCoords = osrm.first
                                     walkToBoardDistanceM = osrm.second
                                     walkToBoardMinutes = Math.max(1, (osrm.second / 83.0).toInt())
+                                    walkToBoardIsPedestrianPath = true
                                 } else {
-                                    // Fallback: Haversine distance with pedestrian road factor 1.35
+                                    // Estimate distance only. Do not draw a fabricated pedestrian path.
                                     val roadDist = (directDist * 1.35).toInt()
                                     walkToBoardDistanceM = roadDist
                                     walkToBoardMinutes = Math.max(1, (roadDist / 83.0).toInt())
-                                    val midLat = (uLoc.latitude + bStop.lat) / 2
-                                    val midLng = (uLoc.longitude + bStop.lng) / 2
-                                    walkToBoardCoords = listOf(uLoc, LatLng(midLat, uLoc.longitude), LatLng(midLat, midLng), LatLng(bStop.lat, bStop.lng))
                                 }
                             }
                         }
@@ -455,8 +460,13 @@ fun RouteInfoScreen(
                     var walkFromDropCoords by remember { mutableStateOf<List<LatLng>>(emptyList()) }
                     var walkFromDropDistanceM by remember { mutableIntStateOf(0) }
                     var walkFromDropMinutes by remember { mutableIntStateOf(0) }
+                    var walkFromDropIsPedestrianPath by remember { mutableStateOf(false) }
 
                     LaunchedEffect(dropoffStop, targetDestCoords, isDestinationReachable) {
+                        walkFromDropCoords = emptyList()
+                        walkFromDropDistanceM = 0
+                        walkFromDropMinutes = 0
+                        walkFromDropIsPedestrianPath = false
                         val dStop = dropoffStop
                         val dCoords = targetDestCoords
                         if (dStop != null && dCoords != null) {
@@ -471,19 +481,19 @@ fun RouteInfoScreen(
                                 walkFromDropCoords = listOf(LatLng(dStop.lat, dStop.lng), dCoords)
                                 walkFromDropDistanceM = directDist
                                 walkFromDropMinutes = 1
+                                walkFromDropIsPedestrianPath = true
                             } else {
                                 val osrm = fetchOsrmPedestrianRoute(dStop.lat, dStop.lng, dCoords.latitude, dCoords.longitude)
                                 if (osrm != null) {
                                     walkFromDropCoords = osrm.first
                                     walkFromDropDistanceM = osrm.second
                                     walkFromDropMinutes = Math.max(1, (osrm.second / 83.0).toInt())
+                                    walkFromDropIsPedestrianPath = true
                                 } else {
+                                    // Estimate distance only. Do not draw a fabricated pedestrian path.
                                     val roadDist = (directDist * 1.35).toInt()
                                     walkFromDropDistanceM = roadDist
                                     walkFromDropMinutes = Math.max(1, (roadDist / 83.0).toInt())
-                                    val midLat = (dStop.lat + dCoords.latitude) / 2
-                                    val midLng = (dStop.lng + dCoords.longitude) / 2
-                                    walkFromDropCoords = listOf(LatLng(dStop.lat, dStop.lng), LatLng(midLat, dStop.lng), LatLng(midLat, midLng), dCoords)
                                 }
                             }
                         }
@@ -602,7 +612,7 @@ fun RouteInfoScreen(
                                             )
                                             Text(
                                                 text = if (!isDestinationReachable && !initialDestination.isNullOrBlank()) {
-                                                    "Traditional Jeepney • Ends at ${dropoffStop.name}"
+                                                    "Traditional Jeepney • Ends at ${dropoffStop?.name ?: "no verified alighting stop"}"
                                                 } else {
                                                     "Traditional Jeepney • Serving $targetDestination"
                                                 },
@@ -629,7 +639,8 @@ fun RouteInfoScreen(
                                         ) {
                                             Icon(Icons.Default.Warning, contentDescription = null, tint = Warn600, modifier = Modifier.size(16.dp))
                                             Text(
-                                                text = "Notice: Route terminates at ${dropoffStop.name} (~${dropoffDistanceToDestM}m away). A connecting route is needed for $targetDestination.",
+                                                text = dropoffStop?.let { "Notice: Route terminates at ${it.name} (~${dropoffDistanceToDestM}m away). A connecting route is needed for $targetDestination." }
+                                                    ?: "No verified alighting stop is linked to this route direction, so the destination cannot be confirmed.",
                                                 fontSize = 11.sp,
                                                 color = Oro700,
                                                 lineHeight = 15.sp
@@ -717,6 +728,7 @@ fun RouteInfoScreen(
                                         boardingStop = nearestBoardingStop,
                                         walkMeters = walkToBoardDistanceM,
                                         walkMinutes = walkToBoardMinutes,
+                                        hasPedestrianPath = walkToBoardIsPedestrianPath,
                                         hasLocationPermission = hasLocationPermission,
                                         isDetectingLocation = isDetectingLocation,
                                         onRequestPermission = {
@@ -771,6 +783,7 @@ fun RouteInfoScreen(
                                         targetDestination = targetDestination,
                                         walkMeters = walkFromDropDistanceM,
                                         walkMinutes = walkFromDropMinutes,
+                                        hasPedestrianPath = walkFromDropIsPedestrianPath,
                                         isDestinationReachable = isDestinationReachable
                                     )
                                 }
@@ -896,6 +909,7 @@ private fun Step1WalkCard(
     boardingStop: RouteStopPoint?,
     walkMeters: Int,
     walkMinutes: Int,
+    hasPedestrianPath: Boolean,
     hasLocationPermission: Boolean,
     isDetectingLocation: Boolean,
     onRequestPermission: () -> Unit,
@@ -1006,7 +1020,7 @@ private fun Step1WalkCard(
                         color = Ink
                     )
                     Text(
-                        text = if (walkMinutes > 0) "~$walkMinutes min walk along pedestrian streets" else "Walk to verified stop",
+                        text = if (walkMinutes > 0) "~$walkMinutes min walk${if (hasPedestrianPath) " · pedestrian route" else " · distance estimate only"}" else "Walk to verified stop",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = Ok600
@@ -1509,7 +1523,7 @@ private fun Step3RideCard(
  */
 @Composable
 private fun Step4AlightCard(
-    dropoffStop: RouteStopPoint,
+    dropoffStop: RouteStopPoint?,
     targetDestination: String,
     remainingWalkMeters: Int,
     isDestinationReachable: Boolean = true
@@ -1527,7 +1541,7 @@ private fun Step4AlightCard(
     Spacer(modifier = Modifier.height(10.dp))
 
     Text(
-        text = "Get Off at ${dropoffStop.name}",
+        text = dropoffStop?.let { "Get Off at ${it.name}" } ?: "Verified alighting stop unavailable",
         fontSize = 18.sp,
         fontWeight = FontWeight.ExtraBold,
         color = Ink
@@ -1545,16 +1559,14 @@ private fun Step4AlightCard(
                 Icon(Icons.Default.Place, contentDescription = null, tint = Bad600, modifier = Modifier.size(20.dp))
                 Column {
                     Text(
-                        text = dropoffStop.name,
+                        text = dropoffStop?.name ?: "This route has no verified alighting location for the selected trip.",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Ink
                     )
-                    Text(
-                        text = "${dropoffStop.type.replaceFirstChar { it.uppercase() }} Area • ${dropoffStop.note ?: "Official Drop-off Area"}",
-                        fontSize = 12.sp,
-                        color = InkMuted
-                    )
+                    dropoffStop?.let {
+                        Text("${it.type.replaceFirstChar { c -> c.uppercase() }} Area • ${it.note ?: "Verified passenger stop"}", fontSize = 12.sp, color = InkMuted)
+                    }
                 }
             }
 
@@ -1563,7 +1575,7 @@ private fun Step4AlightCard(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.Campaign, contentDescription = null, tint = Brand600, modifier = Modifier.size(18.dp))
                 Text(
-                    text = "Notify the driver before arriving by clearly saying \"Lugar lang, nong!\"",
+                    text = if (dropoffStop != null) "Notify the driver before arriving by clearly saying \"Lugar lang, nong!\"" else "Confirm a legal alighting location with the route operator before boarding.",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Brand700
@@ -1595,10 +1607,11 @@ private fun Step4AlightCard(
  */
 @Composable
 private fun Step5DestinationCard(
-    dropoffStop: RouteStopPoint,
+    dropoffStop: RouteStopPoint?,
     targetDestination: String,
     walkMeters: Int,
     walkMinutes: Int,
+    hasPedestrianPath: Boolean,
     isDestinationReachable: Boolean = true
 ) {
     Surface(color = Brand50, shape = RoundedCornerShape(8.dp)) {
@@ -1644,7 +1657,7 @@ private fun Step5DestinationCard(
 
                 if (walkMeters > 35) {
                     Text(
-                        text = "Walk $walkMeters m (~$walkMinutes min walk) from ${dropoffStop.name} along verified pedestrian sidewalks and designated street crossings.",
+                        text = if (dropoffStop != null) "Walk about $walkMeters m (~$walkMinutes min) from ${dropoffStop.name}${if (hasPedestrianPath) " along the mapped pedestrian route." else ". A pedestrian route is unavailable; distance is estimated."}" else "A verified alighting stop is unavailable, so walking directions cannot be confirmed.",
                         fontSize = 13.sp,
                         color = InkSoft,
                         lineHeight = 18.sp
@@ -1680,7 +1693,7 @@ private fun Step5DestinationCard(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "This route terminates at ${dropoffStop.name}, which is ~$walkMeters m away from $targetDestination. A continuous walk of this distance is unreasonable — please take a connecting jeepney route to reach your final destination.",
+                    text = dropoffStop?.let { "This route terminates at ${it.name}, which is about $walkMeters m away from $targetDestination. A connecting jeepney route is needed." } ?: "This route has no verified alighting stop for $targetDestination. A connecting route cannot be confirmed from the available data.",
                     fontSize = 12.sp,
                     color = InkSoft,
                     lineHeight = 17.sp
@@ -2018,6 +2031,19 @@ private fun StepGuidanceMap(
 /**
  * Calculates pedestrian distance in meters using Haversine formula.
  */
+private fun isValidCdoStopCoordinate(lat: Double, lng: Double): Boolean =
+    lat.isFinite() && lng.isFinite() && lat in 8.30..8.70 && lng in 124.40..124.90 && (lat != 0.0 || lng != 0.0)
+
+private fun routePointIndex(stop: RouteStopPoint, points: List<LatLng>): Int? {
+    if (points.isEmpty()) return null
+    val nearest = points.indices.minByOrNull {
+        computeDistanceMeters(stop.lat, stop.lng, points[it].latitude, points[it].longitude)
+    } ?: return null
+    return nearest.takeIf {
+        computeDistanceMeters(stop.lat, stop.lng, points[it].latitude, points[it].longitude) <= 250.0
+    }
+}
+
 private fun computeDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6371000.0
     val dLat = Math.toRadians(lat2 - lat1)
