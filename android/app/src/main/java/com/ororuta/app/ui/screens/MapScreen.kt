@@ -91,11 +91,6 @@ data class CdoGeoStop(
 private val routeGeometriesCache = java.util.concurrent.ConcurrentHashMap<String, List<LatLng>>()
 private val allRouteCoordinatesCache = java.util.concurrent.ConcurrentHashMap<String, List<LatLng>>()
 
-internal fun isCdoMapDoubleTap(deltaMs: Long, dx: Float, dy: Float, pointerCount: Int): Boolean {
-    val distance = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-    return pointerCount == 1 && deltaMs in 40..350 && distance < 80f
-}
-
 /** Returns the index of the element with the minimum selector value, or 0 if list is empty. */
 private fun <T> List<T>.indexOfMinBy(selector: (T) -> Double): Int {
     if (isEmpty()) return 0
@@ -860,9 +855,26 @@ fun MapScreen(
                     }
                 }
 
-                // A route corridor is not itself a boarding location. Only recommend
-                // published terminals/loading points/transfers with known coordinates.
+                // If no specific stop was under walking threshold, check proximity to verified route line
                 val geoPts = parseGeometries(route)
+                if (bestDist > maxWalkToBoardMeters && geoPts.isNotEmpty()) {
+                    var minGeoDist = Double.MAX_VALUE
+                    var bestGeoPt: LatLng? = null
+                    for (pt in geoPts) {
+                        val d = haversine(uLat!!, uLng!!, pt.latitude, pt.longitude)
+                        if (d < minGeoDist) {
+                            minGeoDist = d
+                            bestGeoPt = pt
+                        }
+                    }
+                    if (minGeoDist <= maxWalkToBoardMeters) {
+                        bestDist = minGeoDist
+                        bestLat = bestGeoPt?.latitude
+                        bestLng = bestGeoPt?.longitude
+                        bestStopName = getDescriptiveCdoStopName(bestLat ?: 8.4822, bestLng ?: 124.6472, "Boarding Point")
+                        bestStopType = "Boarding Point"
+                    }
+                }
 
                 // Reject if boarding stop exceeds maximum walking distance
                 if (bestDist > maxWalkToBoardMeters || bestLat == null || bestLng == null) {
@@ -1621,7 +1633,8 @@ fun MapScreen(
                         val dt = now - lastTapDownTime
                         val dx = event.x - lastTapDownX
                         val dy = event.y - lastTapDownY
-                        if (isCdoMapDoubleTap(dt, dx, dy, event.pointerCount)) {
+                        val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+                        if (event.pointerCount == 1 && dt in 40..350 && dist < 80f) {
                             // Detected a double-tap — animate to city-wide CDO view and consume
                             lastTapDownTime = 0L
                             coroutineScope.launch {
