@@ -46,6 +46,7 @@ import com.ororuta.app.ui.components.*
 import com.ororuta.app.ui.location.LocationPermissions
 import com.ororuta.app.ui.theme.*
 import com.ororuta.app.ui.viewmodels.RouteInfoViewModel
+import com.ororuta.app.ui.viewmodels.nearestVerifiedBoardingStop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -317,17 +318,8 @@ fun RouteInfoScreen(
                     val nearestBoardingStop = remember(initialBoardingLat, initialBoardingLng, initialBoardingName, candidateBoardingStops, userLocation, routeGeomPts) {
                         if (initialBoardingLat != null && initialBoardingLng != null && initialBoardingLat != 0.0 && initialBoardingLng != 0.0) {
                             RouteStopPoint("initial_board", initialBoardingName ?: "Boarding Stop", "loading", initialBoardingLat, initialBoardingLng, "Selected Boarding Point")
-                        } else if (userLocation != null && candidateBoardingStops.isNotEmpty()) {
-                            candidateBoardingStops.minByOrNull {
-                                computeDistanceMeters(userLocation!!.latitude, userLocation!!.longitude, it.lat, it.lng)
-                            }
                         } else {
-                            candidateBoardingStops.firstOrNull()
-                        } ?: if (routeGeomPts.isNotEmpty()) {
-                            val p = routeGeomPts.first()
-                            RouteStopPoint("start", getDescriptiveCdoStopName(p.latitude, p.longitude, "Boarding Point"), "loading", p.latitude, p.longitude, "Route Corridor Boarding")
-                        } else {
-                            RouteStopPoint("default", route.origin, "terminal", 8.4822, 124.6472, "CDO Corridor")
+                            nearestVerifiedBoardingStop(userLocation, candidateBoardingStops)
                         }
                     }
 
@@ -901,7 +893,7 @@ fun RouteInfoScreen(
 @Composable
 private fun Step1WalkCard(
     userLocation: LatLng?,
-    boardingStop: RouteStopPoint,
+    boardingStop: RouteStopPoint?,
     walkMeters: Int,
     walkMinutes: Int,
     hasLocationPermission: Boolean,
@@ -956,7 +948,7 @@ private fun Step1WalkCard(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Enable GPS to calculate walking distance and get pedestrian directions from where you are standing to ${boardingStop.name}.",
+                    text = if (boardingStop != null) "Enable GPS to calculate walking distance and get pedestrian directions from where you are standing to ${boardingStop.name}." else "A verified boarding point is not available for this route yet.",
                     fontSize = 12.sp,
                     color = InkSoft
                 )
@@ -1029,13 +1021,13 @@ private fun Step1WalkCard(
                 Icon(Icons.Default.Place, contentDescription = null, tint = Brand600, modifier = Modifier.size(18.dp))
                 Column {
                     Text(
-                        text = boardingStop.name,
+                        text = boardingStop?.name ?: "Verified boarding point unavailable",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Ink
                     )
                     Text(
-                        text = "${boardingStop.type.replaceFirstChar { it.uppercase() }} Point • ${boardingStop.note ?: "Official Boarding Area"}",
+                        text = boardingStop?.let { "${it.type.replaceFirstChar { c -> c.uppercase() }} Point • ${it.note ?: "Official Boarding Area"}" } ?: "No stop data is available; follow posted local boarding rules.",
                         fontSize = 12.sp,
                         color = InkMuted
                     )
@@ -1103,7 +1095,7 @@ private fun PassengerCategorySelector(
 @Composable
 private fun Step2WaitCard(
     route: Route,
-    boardingStop: RouteStopPoint,
+    boardingStop: RouteStopPoint?,
     dropoffStop: RouteStopPoint?,
     signboardDestination: String,
     selectedDirection: String,
@@ -1133,7 +1125,7 @@ private fun Step2WaitCard(
     Spacer(modifier = Modifier.height(4.dp))
 
     Text(
-        text = "Wait at ${boardingStop.name} and check the front windshield signboard before boarding.",
+        text = boardingStop?.let { "Wait at ${it.name} and check the front windshield signboard before boarding." } ?: "Verified boarding location unavailable. Confirm a legal boarding point locally before waiting.",
         fontSize = 13.sp,
         color = InkSoft,
         lineHeight = 18.sp

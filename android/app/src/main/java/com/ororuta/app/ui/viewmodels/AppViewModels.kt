@@ -617,6 +617,26 @@ data class RouteStopPoint(
     val note: String? = null
 )
 
+/** Selects only from supplied, known boarding stops; route geometry is never promoted to a stop. */
+fun nearestVerifiedBoardingStop(
+    location: com.google.android.gms.maps.model.LatLng?,
+    candidates: List<RouteStopPoint>
+): RouteStopPoint? {
+    val validCandidates = candidates.asSequence()
+        .filter { it.lat.isFinite() && it.lng.isFinite() && it.lat in -90.0..90.0 && it.lng in -180.0..180.0 && (it.lat != 0.0 || it.lng != 0.0) }
+        .toList()
+    if (location == null) return validCandidates.firstOrNull()
+    return validCandidates.minByOrNull { stop ->
+        val lat1 = Math.toRadians(location.latitude)
+        val lat2 = Math.toRadians(stop.lat)
+        val dLat = lat2 - lat1
+        val dLng = Math.toRadians(stop.lng - location.longitude)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+        6_371_000.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    }
+}
+
 data class RouteGuidance(
     val route: Route,
     val direction: String, // "Inbound" or "Outbound"
@@ -1243,19 +1263,6 @@ class MapViewModel @Inject constructor(
             boardingCandidates.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
         }
 
-        if (boardingCandidates.isEmpty() && routePoints.isNotEmpty()) {
-            boardingCandidates.add(
-                RouteStopPoint(
-                    id = "origin_${route.id}",
-                    name = route.origin,
-                    type = "terminal",
-                    lat = routePoints.first().latitude,
-                    lng = routePoints.first().longitude,
-                    note = "Route Origin Point"
-                )
-            )
-        }
-
         // Gather verified drop-off points
         val dropoffCandidates = mutableListOf<RouteStopPoint>()
         route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.reversed().forEach {
@@ -1307,9 +1314,7 @@ class MapViewModel @Inject constructor(
             return r * c
         }
 
-        val nearestStop = boardingCandidates.minByOrNull {
-            haversineMeters(userLoc.latitude, userLoc.longitude, it.lat, it.lng)
-        } ?: boardingCandidates.firstOrNull()
+        val nearestStop = nearestVerifiedBoardingStop(userLoc, boardingCandidates)
 
         if (nearestStop == null) {
             routeGuidance = RouteGuidance(
