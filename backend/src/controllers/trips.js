@@ -1,7 +1,7 @@
 const db = require("../config/db");
 const { haversineMeters, estimateFare } = require("../utils");
 const { getRouteGeometry, getWalkingRoute } = require("../utils/routing");
-const { rankDirectItineraries } = require("../domain/routeItineraryPlanner");
+const { rankItineraries } = require("../domain/routeItineraryPlanner");
 
 // In-memory cache for generated recommendations and trip options
 const dynamicOptionsCache = new Map();
@@ -25,7 +25,7 @@ const CDO_ALIASES = [
   { keywords: ["centrio", "ayala centrio", "centrio mall"], name: "Centrio Mall", area: "Poblacion", kind: "mall", lat: 8.4877, lng: 124.6517 },
   { keywords: ["limketkai", "ketkai"], name: "Limketkai Center", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6568 },
   { keywords: ["gaisano", "gaisano city"], name: "Gaisano City Mall", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6515 },
-  { keywords: ["cogon", "cogon market"], name: "Cogon Market", area: "Cogon", kind: "market", lat: 8.4735, lng: 124.6497 },
+  { keywords: ["cogon public market", "cogon market", "cogon"], name: "Cogon Public Market", area: "Cogon", kind: "market", lat: 8.4735, lng: 124.6497 },
   { keywords: ["carmen market", "carmen public market"], name: "Carmen Market", area: "Carmen", kind: "market", lat: 8.4845, lng: 124.6335 },
   { keywords: ["agora", "agora terminal"], name: "Agora Terminal", area: "Lapasan", kind: "terminal", lat: 8.4857, lng: 124.6589 },
   { keywords: ["bulua", "bulua terminal", "wtpm", "westbound"], name: "Bulua Terminal", area: "Bulua", kind: "terminal", lat: 8.5040, lng: 124.6115 },
@@ -46,6 +46,7 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
   if (lat !== undefined && lng !== undefined && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng))) {
     const fLat = parseFloat(lat);
     const fLng = parseFloat(lng);
+    if (!Number.isFinite(fLat) || !Number.isFinite(fLng) || fLat < 8.3 || fLat > 8.7 || fLng < 124.4 || fLng > 124.9) return null;
     let bestName = queryStr && queryStr.trim() ? queryStr.trim() : (isOrigin ? "Current Location" : "Destination");
     
     // Check if close to a known canonical place (< 150m)
@@ -83,7 +84,8 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
 
   // Check alias table first
   for (const alias of CDO_ALIASES) {
-    if (alias.keywords.some(k => q.includes(k) || k.includes(q))) {
+    const normalizedQuery = q.replace(/[^a-z0-9]+/g, " ").trim();
+    if (alias.keywords.some(k => normalizedQuery === k || normalizedQuery.includes(k))) {
       return {
         id: `alias-${alias.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
         name: alias.name,
@@ -95,7 +97,6 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
     }
   }
 
-  try {
     const [places] = await db.execute("SELECT * FROM places ORDER BY name");
     // 1. Exact match
     const exact = places.find(p => p.name.toLowerCase() === q);
@@ -134,8 +135,6 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
         return { ...matched, lat: parseFloat(matched.lat), lng: parseFloat(matched.lng) };
       }
     }
-  } catch (_) {}
-
   return null;
 }
 
@@ -198,15 +197,9 @@ function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, 
  * ensuring correct direction of travel and valid walking distances.
  */
 async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, originName, destName) {
-  let routes = [];
-  try {
-    const [dbRoutes] = await db.execute(
-      "SELECT * FROM routes WHERE status != 'Inactive' AND (jeepney_type = 'Traditional' OR jeepney_type IS NULL OR jeepney_type = '')"
-    );
-    routes = dbRoutes;
-  } catch (_) {
-    routes = [];
-  }
+  const [routes] = await db.execute(
+    "SELECT * FROM routes WHERE status != 'Inactive' AND (jeepney_type = 'Traditional' OR jeepney_type IS NULL OR jeepney_type = '')"
+  );
 
   if (!routes.length) return [];
 
@@ -216,36 +209,18 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
     fareRule = f;
   } catch (_) {}
 
-  const candidates = [];
+  const directionalRoutes = [];
 
   for (const r of routes) {
-    let geos = [];
-    try {
-      const [gRows] = await db.execute("SELECT direction, geometry FROM route_geometry WHERE route_id = ?", [r.id]);
-      geos = gRows;
-    } catch (_) {}
+    const [geos] = await db.execute("SELECT direction, geometry FROM route_geometry WHERE route_id = ?", [r.id]);
 
-    let dirs = [];
-    try {
-      const [dRows] = await db.execute("SELECT direction, distance_km, street_sequence FROM route_directions WHERE route_id = ?", [r.id]);
-      dirs = dRows;
-    } catch (_) {}
+    const [dirs] = await db.execute("SELECT direction, distance_km, street_sequence FROM route_directions WHERE route_id = ?", [r.id]);
     const dirMap = {};
     dirs.forEach(d => { dirMap[d.direction] = d; });
 
-    let routeTerminals = [], routeStops = [], routeTransfers = [];
-    try {
-      const [rows] = await db.execute("SELECT t.id, t.name, t.lat, t.lng FROM terminals t JOIN route_terminals rt ON rt.terminal_id=t.id WHERE rt.route_id=?", [r.id]);
-      routeTerminals = rows;
-    } catch (_) {}
-    try {
-      const [rows] = await db.execute("SELECT id, name, point_type, lat, lng FROM loading_points WHERE route_id=?", [r.id]);
-      routeStops = rows;
-    } catch (_) {}
-    try {
-      const [rows] = await db.execute("SELECT id, name, lat, lng FROM transfer_points WHERE route_id=?", [r.id]);
-      routeTransfers = rows;
-    } catch (_) {}
+    const [routeTerminals] = await db.execute("SELECT t.id, t.name, t.lat, t.lng FROM terminals t JOIN route_terminals rt ON rt.terminal_id=t.id WHERE rt.route_id=?", [r.id]);
+    const [routeStops] = await db.execute("SELECT id, name, point_type, lat, lng FROM loading_points WHERE route_id=?", [r.id]);
+    const [routeTransfers] = await db.execute("SELECT id, name, lat, lng FROM transfer_points WHERE route_id=?", [r.id]);
 
     for (const g of geos) {
       const direction = g.direction;
@@ -258,36 +233,88 @@ async function findJeepneyRoutesForOD(origLat, origLng, destLat, destLng, origin
       const coords = geom.coordinates; // [[lng, lat], ...]
 
       const boardStops = [
-        ...routeTerminals.map(p => ({ ...p, point_type: "terminal" })),
+        ...routeTerminals.map(p => ({ ...p, point_type: "terminal", transfer_key: `terminal:${p.id}` })),
         ...routeStops.filter(p => String(p.point_type).toLowerCase() !== "unloading"),
         ...routeTransfers.map(p => ({ ...p, point_type: "transfer" }))
       ];
       const alightStops = [
-        ...routeTerminals.map(p => ({ ...p, point_type: "terminal" })),
+        ...routeTerminals.map(p => ({ ...p, point_type: "terminal", transfer_key: `terminal:${p.id}` })),
         ...routeStops,
         ...routeTransfers.map(p => ({ ...p, point_type: "transfer" }))
       ];
-      candidates.push(...rankDirectItineraries({
-        routes: [{ route: r, direction, coordinates: coords, boardingStops: boardStops,
-          alightingStops: alightStops, streetSequence: dirMap[direction]?.street_sequence || "" }],
-        origin: { lat: origLat, lng: origLng },
-        destination: { lat: destLat, lng: destLng },
-        fareRule
-      }));
+      directionalRoutes.push({ route: r, direction, coordinates: coords, boardingStops: boardStops,
+        alightingStops: alightStops, streetSequence: dirMap[direction]?.street_sequence || "" });
     }
   }
+  return rankItineraries({ routes: directionalRoutes, origin: { lat: origLat, lng: origLng },
+    destination: { lat: destLat, lng: destLng }, fareRule, maxTransfers: 2 });
+}
 
-  // Public route codes repeat across different route records; retain each route and direction.
-  const bestByRouteDirection = new Map();
-  for (const c of candidates) {
-    const key = `${c.route.id}:${c.direction}`;
-    if (!bestByRouteDirection.has(key) || c.convenienceScore < bestByRouteDirection.get(key).convenienceScore) {
-      bestByRouteDirection.set(key, c);
+function buildTransferTripOption({ c, id, originPlace, destPlace, origin, destination, walkInfo }) {
+  const rides = c.rideLegs;
+  const first = rides[0], last = rides.at(-1);
+  const legs = [];
+  const add = leg => legs.push({ id: `leg-${id}-${legs.length + 1}`, trip_option_id: id, seq: legs.length + 1, ...leg });
+  const walkTo = walkInfo?.walkToCoords || [];
+  const walkFrom = walkInfo?.walkFromCoords || [];
+  const walkToM = walkInfo?.walkToMeters ?? c.accessWalkM;
+  const walkFromM = walkInfo?.walkFromMeters ?? c.finalWalkM;
+  const walkToEstimate = walkInfo?.walkToIsEstimate ?? true;
+  const walkFromEstimate = walkInfo?.walkFromIsEstimate ?? true;
+  add({ kind: "walk", title: `Walk to ${first.boardingStop.name}`,
+    detail: `About ${Math.max(1, Math.round(walkToM / 75))} min · ${walkToM}m${walkToEstimate ? " (estimate; pedestrian routing unavailable)" : ""}`,
+    minutes: Math.max(1, Math.round(walkToM / 75)), distance_m: walkToM, start_lat: origin.lat, start_lng: origin.lng,
+    end_lat: Number(first.boardingStop.lat), end_lng: Number(first.boardingStop.lng), geometry_coordinates: walkTo });
+  rides.forEach((ride, index) => {
+    const route = ride.route;
+    add({ kind: "board", title: `Board ${route.code} · ${ride.direction}`,
+      detail: `Wait at ${ride.boardingStop.name} and follow the ${ride.direction.toLowerCase()} route direction.`,
+      minutes: index === 0 ? 3 : 0, distance_m: 0, route_id: route.id, route_code: route.code, route_color: route.color,
+      direction: ride.direction, point_lat: Number(ride.boardingStop.lat), point_lng: Number(ride.boardingStop.lng) });
+    add({ kind: "stay", title: `Ride ${route.code} to ${ride.alightingStop.name}`,
+      detail: `${ride.rideKm.toFixed(1)} km · ${ride.rideMinutes} min · estimated fare ₱${ride.regularFare.toFixed(2)}`,
+      minutes: ride.rideMinutes, distance_m: Math.round(ride.rideDistMeters), route_id: route.id,
+      route_code: route.code, route_color: route.color, direction: ride.direction,
+      start_lat: Number(ride.boardingStop.lat), start_lng: Number(ride.boardingStop.lng),
+      end_lat: Number(ride.alightingStop.lat), end_lng: Number(ride.alightingStop.lng), geometry_coordinates: ride.rideCoords });
+    add({ kind: "alight", title: `Alight at ${ride.alightingStop.name}`,
+      detail: index < rides.length - 1 ? "Transfer here to the next route." : "Alight at this verified passenger stop.",
+      minutes: 0, distance_m: 0, route_id: route.id, route_code: route.code, route_color: route.color,
+      direction: ride.direction, point_lat: Number(ride.alightingStop.lat), point_lng: Number(ride.alightingStop.lng) });
+    if (index < rides.length - 1) {
+      const next = rides[index + 1];
+      const gapM = Math.round(haversineMeters(Number(ride.alightingStop.lat), Number(ride.alightingStop.lng),
+        Number(next.boardingStop.lat), Number(next.boardingStop.lng)));
+      add({ kind: "transfer", title: `Transfer at ${ride.alightingStop.name}`,
+        detail: `Board ${next.route.code} (${next.direction}) at ${next.boardingStop.name}${gapM > 20 ? ` · ${gapM}m between verified stops` : ""}`,
+        minutes: 5 + Math.max(0, Math.round(gapM / 75)), distance_m: gapM,
+        start_lat: Number(ride.alightingStop.lat), start_lng: Number(ride.alightingStop.lng),
+        end_lat: Number(next.boardingStop.lat), end_lng: Number(next.boardingStop.lng),
+        point_lat: Number(ride.alightingStop.lat), point_lng: Number(ride.alightingStop.lng) });
     }
-  }
-  return Array.from(bestByRouteDirection.values()).sort((a, b) =>
-    a.convenienceScore - b.convenienceScore || a.totalWalkM - b.totalWalkM || a.regularFare - b.regularFare
-  );
+  });
+  add({ kind: "walk", title: `Walk to ${destPlace.name}`,
+    detail: `About ${Math.max(1, Math.round(walkFromM / 75))} min · ${walkFromM}m${walkFromEstimate ? " (estimate; pedestrian routing unavailable)" : ""}`,
+    minutes: Math.max(1, Math.round(walkFromM / 75)), distance_m: walkFromM,
+    start_lat: Number(last.alightingStop.lat), start_lng: Number(last.alightingStop.lng), end_lat: destination.lat, end_lng: destination.lng,
+    geometry_coordinates: walkFrom });
+  const segments = rides.map((ride, index) => ({ id: `seg-${id}-${index + 1}`, trip_option_id: id, seq: index + 1,
+    route_id: ride.route.id, code: ride.route.code, route_name: `${ride.route.code}: ${ride.route.origin} ↔ ${ride.route.destination}`,
+    color: ride.route.color, jeepney_type: ride.route.jeepney_type || "Traditional", route_status: ride.route.status || "Active",
+    direction: ride.direction, boarding_name: ride.boardingStop.name, boarding_lat: Number(ride.boardingStop.lat), boarding_lng: Number(ride.boardingStop.lng),
+    dropoff_name: ride.alightingStop.name, dropoff_lat: Number(ride.alightingStop.lat), dropoff_lng: Number(ride.alightingStop.lng),
+    km: ride.rideKm, minutes: ride.rideMinutes, geometry_coordinates: ride.rideCoords }));
+  return {
+    id, origin_place_id: originPlace.id, destination_place_id: destPlace.id, originPlace, destPlace,
+    minutes: c.totalMinutes, transfers: c.transfers, transfer_name: rides.slice(0, -1).map(ride => ride.alightingStop.name).join(", "),
+    walk_meters: walkToM + c.transferWalkM + walkFromM, walk_minutes: c.walkMinutes,
+    totalKm: c.rideKm, regularFare: c.regularFare, discountFare: c.discountFare, direction: "Multi-route", status: "Active",
+    boarding_name: first.boardingStop.name, boarding_lat: Number(first.boardingStop.lat), boarding_lng: Number(first.boardingStop.lng),
+    dropoff_name: last.alightingStop.name, dropoff_lat: Number(last.alightingStop.lat), dropoff_lng: Number(last.alightingStop.lng),
+    walk_to_board_coordinates: walkTo, walk_to_board_is_estimate: walkToEstimate,
+    jeepney_coordinates: rides[0].rideCoords, walk_from_drop_coordinates: walkFrom, walk_from_drop_is_estimate: walkFromEstimate,
+    geometry_coordinates: [...walkTo, ...rides.flatMap(ride => ride.rideCoords), ...walkFrom], segments, legs
+  };
 }
 
 async function search(req, res, next) {
@@ -297,20 +324,32 @@ async function search(req, res, next) {
       return res.status(400).json({ error: { code: "BAD_REQUEST", message: "to destination is required" } });
     }
 
+    if ((fromLat !== undefined) !== (fromLng !== undefined) || (toLat !== undefined) !== (toLng !== undefined)) {
+      return res.status(400).json({ error: { code: "INVALID_COORDINATES", message: "Provide both latitude and longitude for each selected coordinate." } });
+    }
+    const providedCoords = [fromLat, fromLng, toLat, toLng].filter(value => value !== undefined).map(Number);
+    if (providedCoords.some(value => !Number.isFinite(value)) ||
+      (fromLat !== undefined && (Number(fromLat) < 8.3 || Number(fromLat) > 8.7 || Number(fromLng) < 124.4 || Number(fromLng) > 124.9)) ||
+      (toLat !== undefined && (Number(toLat) < 8.3 || Number(toLat) > 8.7 || Number(toLng) < 124.4 || Number(toLng) > 124.9))) {
+      return res.status(400).json({ error: { code: "INVALID_COORDINATES", message: "Origin and destination coordinates must be within the supported Cagayan de Oro area." } });
+    }
     const originPlace = await resolvePlace(from, fromLat, fromLng, true);
     let destPlace = await resolvePlace(to, toLat, toLng, false);
 
     if (!originPlace || !destPlace) {
-      return res.json([]);
+      return res.status(404).json({ error: { code: "PLACE_NOT_RESOLVED", message: "Choose a supported Cagayan de Oro origin and destination, or provide valid coordinates." } });
     }
 
-    const oLat = fromLat ? parseFloat(fromLat) : originPlace.lat;
-    const oLng = fromLng ? parseFloat(fromLng) : originPlace.lng;
-    const dLat = toLat ? parseFloat(toLat) : destPlace.lat;
-    const dLng = toLng ? parseFloat(toLng) : destPlace.lng;
+    const oLat = fromLat !== undefined ? parseFloat(fromLat) : originPlace.lat;
+    const oLng = fromLng !== undefined ? parseFloat(fromLng) : originPlace.lng;
+    const dLat = toLat !== undefined ? parseFloat(toLat) : destPlace.lat;
+    const dLng = toLng !== undefined ? parseFloat(toLng) : destPlace.lng;
+    if (![oLat, oLng, dLat, dLng].every(Number.isFinite) || oLat < 8.3 || oLat > 8.7 || dLat < 8.3 || dLat > 8.7 || oLng < 124.4 || oLng > 124.9 || dLng < 124.4 || dLng > 124.9) {
+      return res.status(400).json({ error: { code: "INVALID_COORDINATES", message: "Origin and destination coordinates must be within the supported Cagayan de Oro area." } });
+    }
 
     // Find verified candidates along actual jeepney routes
-    const candidates = await findJeepneyRoutesForOD(oLat, oLng, dLat, dLng, originPlace.name, destPlace.name);
+    let candidates = await findJeepneyRoutesForOD(oLat, oLng, dLat, dLng, originPlace.name, destPlace.name);
 
     if (candidates.length === 0) {
       return res.json([]);
@@ -319,15 +358,16 @@ async function search(req, res, next) {
     // Sort according to requested criterion
     candidates.sort((a, b) => {
       if (sort === "time") return a.convenienceScore - b.convenienceScore || a.totalWalkM - b.totalWalkM;
-      if (sort === "fare") return a.regularFare - b.regularFare || a.walkFromDropM - b.walkFromDropM || a.totalMinutes - b.totalMinutes;
+      if (sort === "fare") return a.regularFare - b.regularFare || a.totalWalkM - b.totalWalkM || a.totalMinutes - b.totalMinutes;
       if (sort === "walk") return a.totalWalkM - b.totalWalkM || a.walkFromDropM - b.walkFromDropM || a.totalMinutes - b.totalMinutes;
-      if (sort === "transfers") return 0; // All direct routes have 0 transfers
+      if (sort === "transfers") return a.transfers - b.transfers || a.convenienceScore - b.convenienceScore;
       return a.convenienceScore - b.convenienceScore || a.totalMinutes - b.totalMinutes;
     });
 
     // Refine the leading candidates using real pedestrian routes when OSRM can provide them.
     // The remaining options retain explicitly approximate walking estimates.
     const walkRoutesByKey = new Map();
+    const itineraryKey = c => c.rideLegs.map(leg => `${leg.route.id}:${leg.direction}:${leg.boardingStop.id}>${leg.alightingStop.id}`).join("|");
     const refineCandidates = candidates.slice(0, 10);
     await Promise.all(refineCandidates.map(async c => {
       const [walkTo, walkFrom] = await Promise.all([
@@ -342,19 +382,26 @@ async function search(req, res, next) {
         walkFromMeters: walkFrom?.coordinates?.length >= 2 ? Math.round(walkFrom.distanceMeters) : c.walkFromDropM,
         walkFromIsEstimate: !(walkFrom?.coordinates?.length >= 2)
       };
-      c.walkToBoardM = info.walkToMeters;
-      c.walkFromDropM = info.walkFromMeters;
-      c.totalWalkM = info.walkToMeters + info.walkFromMeters;
+      c.walkToBoardM = c.accessWalkM = info.walkToMeters;
+      c.walkFromDropM = c.finalWalkM = info.walkFromMeters;
+      c.totalWalkM = info.walkToMeters + c.transferWalkM + info.walkFromMeters;
       c.walkMinutesToBoard = Math.max(1, Math.round(info.walkToMeters / 75));
       c.walkMinutesFromDrop = Math.max(1, Math.round(info.walkFromMeters / 75));
-      c.walkMinutes = c.walkMinutesToBoard + c.walkMinutesFromDrop;
-      c.totalMinutes = c.walkMinutes + c.rideMinutes + 3;
-      c.convenienceScore = c.totalMinutes + c.totalWalkM / 400;
-      walkRoutesByKey.set(`${c.route.id}:${c.direction}`, info);
+      const transferWalkMinutes = c.rideLegs.slice(0, -1).reduce((sum, leg, index) => {
+        const next = c.rideLegs[index + 1];
+        const meters = haversineMeters(Number(leg.alightingStop.lat), Number(leg.alightingStop.lng), Number(next.boardingStop.lat), Number(next.boardingStop.lng));
+        return sum + Math.max(0, Math.round(meters / 75));
+      }, 0);
+      c.walkMinutes = Math.max(1, Math.round(info.walkToMeters / 75)) + Math.max(1, Math.round(info.walkFromMeters / 75)) + transferWalkMinutes;
+      c.totalMinutes = c.walkMinutes + c.rideMinutes + c.transfers * 5 + 3;
+      c.convenienceScore = c.totalMinutes + c.totalWalkM / 400 + c.transfers * 2;
+      walkRoutesByKey.set(itineraryKey(c), info);
     }));
+    candidates = candidates.filter(c => c.accessWalkM <= 1000 && c.finalWalkM <= 1000);
     candidates.sort((a, b) => {
       if (sort === "fare") return a.regularFare - b.regularFare || a.totalWalkM - b.totalWalkM || a.totalMinutes - b.totalMinutes;
       if (sort === "walk") return a.totalWalkM - b.totalWalkM || a.totalMinutes - b.totalMinutes || a.regularFare - b.regularFare;
+      if (sort === "transfers") return a.transfers - b.transfers || a.convenienceScore - b.convenienceScore;
       return a.convenienceScore - b.convenienceScore || a.totalWalkM - b.totalWalkM || a.regularFare - b.regularFare;
     });
 
@@ -365,13 +412,22 @@ async function search(req, res, next) {
     for (let i = 0; i < topCandidates.length; i++) {
       const c = topCandidates[i];
       const r = c.route;
-      const walkInfo = walkRoutesByKey.get(`${r.id}:${c.direction}`);
+      const walkInfo = walkRoutesByKey.get(itineraryKey(c));
       const walkToBoardCoords = walkInfo?.walkToCoords || [];
       const walkToBoardMeters = walkInfo?.walkToMeters ?? c.walkToBoardM;
       const walkToBoardIsEstimate = walkInfo?.walkToIsEstimate ?? true;
       const walkFromDropCoords = walkInfo?.walkFromCoords || [];
       const walkFromDropMeters = walkInfo?.walkFromMeters ?? c.walkFromDropM;
       const walkFromDropIsEstimate = walkInfo?.walkFromIsEstimate ?? true;
+
+      if (c.transfers > 0) {
+        const optionId = `trip-${c.rideLegs.map(leg => `${leg.route.id}-${leg.direction}-${leg.boardingStop.id}-${leg.alightingStop.id}`).join("-")}-${Math.round(oLat * 1e5)}-${Math.round(oLng * 1e5)}-${destPlace.id}`;
+        const option = buildTransferTripOption({ c, id: optionId, originPlace, destPlace,
+          origin: { lat: oLat, lng: oLng }, destination: { lat: dLat, lng: dLng }, walkInfo });
+        results.push(option);
+        dynamicOptionsCache.set(option.id, option);
+        continue;
+      }
 
       // Complete concatenated road geometry for map rendering
       const fullGeometryCoords = [
@@ -380,7 +436,7 @@ async function search(req, res, next) {
         ...walkFromDropCoords
       ];
 
-      const optId = `trip-${r.id}-${c.direction.toLowerCase()}-${originPlace.id}-${destPlace.id}`;
+      const optId = `trip-${r.id}-${c.direction.toLowerCase()}-${Math.round(oLat * 1e5)}-${Math.round(oLng * 1e5)}-${destPlace.id}`;
 
       const option = {
         id: optId,
@@ -421,6 +477,14 @@ async function search(req, res, next) {
             color: r.color,
             jeepney_type: r.jeepney_type || "Traditional",
             route_status: r.status || "Active",
+            direction: c.direction,
+            boarding_name: c.boardingName,
+            boarding_lat: c.boardingCoord[1],
+            boarding_lng: c.boardingCoord[0],
+            dropoff_name: c.dropoffName,
+            dropoff_lat: c.dropoffCoord[1],
+            dropoff_lng: c.dropoffCoord[0],
+            geometry_coordinates: c.rideCoords,
             km: c.rideKm,
             minutes: c.rideMinutes
           }
@@ -438,7 +502,8 @@ async function search(req, res, next) {
             start_lat: oLat,
             start_lng: oLng,
             end_lat: c.boardingCoord[1],
-            end_lng: c.boardingCoord[0]
+            end_lng: c.boardingCoord[0],
+            geometry_coordinates: walkToBoardCoords
           },
           {
             id: `leg-${optId}-2`,
@@ -451,7 +516,10 @@ async function search(req, res, next) {
             distance_m: 0,
             route_id: r.id,
             route_code: r.code,
-            route_color: r.color
+            route_color: r.color,
+            direction: c.direction,
+            point_lat: c.boardingCoord[1],
+            point_lng: c.boardingCoord[0]
           },
           {
             id: `leg-${optId}-3`,
@@ -464,7 +532,13 @@ async function search(req, res, next) {
             distance_m: Math.round(c.rideKm * 1000),
             route_id: r.id,
             route_code: r.code,
-            route_color: r.color
+            route_color: r.color,
+            direction: c.direction,
+            start_lat: c.boardingCoord[1],
+            start_lng: c.boardingCoord[0],
+            end_lat: c.dropoffCoord[1],
+            end_lng: c.dropoffCoord[0],
+            geometry_coordinates: c.rideCoords
           },
           {
             id: `leg-${optId}-4`,
@@ -476,7 +550,11 @@ async function search(req, res, next) {
             minutes: 1,
             distance_m: 0,
             point_lat: c.dropoffCoord[1],
-            point_lng: c.dropoffCoord[0]
+            point_lng: c.dropoffCoord[0],
+            route_id: r.id,
+            route_code: r.code,
+            route_color: r.color,
+            direction: c.direction
           },
           {
             id: `leg-${optId}-5`,
@@ -490,7 +568,8 @@ async function search(req, res, next) {
             start_lat: c.dropoffCoord[1],
             start_lng: c.dropoffCoord[0],
             end_lat: dLat,
-            end_lng: dLng
+            end_lng: dLng,
+            geometry_coordinates: walkFromDropCoords
           }
         ]
       };

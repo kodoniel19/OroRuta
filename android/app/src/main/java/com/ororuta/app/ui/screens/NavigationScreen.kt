@@ -82,6 +82,16 @@ fun NavigationScreen(
             if (it.size >= 2) LatLng(it[1], it[0]) else null
         } ?: emptyList()
     }
+    val ridePaths = remember(trip) {
+        trip?.segments.orEmpty().mapNotNull { segment ->
+            segment.geometryCoordinates.mapNotNull { if (it.size >= 2) LatLng(it[1], it[0]) else null }.takeIf { it.size >= 2 }
+        }.ifEmpty { listOfNotNull(jeepneyRoute.takeIf { it.size >= 2 }) }
+    }
+    val walkingPaths = remember(trip) {
+        trip?.legs.orEmpty().filter { it.kind == "walk" || it.kind == "transfer" }.mapNotNull { leg ->
+            leg.geometryCoordinates.mapNotNull { if (it.size >= 2) LatLng(it[1], it[0]) else null }.takeIf { it.size >= 2 }
+        }.ifEmpty { listOfNotNull(walkToBoard.takeIf { it.size >= 2 }, walkFromDrop.takeIf { it.size >= 2 }) }
+    }
 
     val activeMarkers = remember(trip) {
         val list = mutableListOf<MapMarker>()
@@ -89,11 +99,9 @@ fun NavigationScreen(
             trip.originPlace?.let {
                 list.add(MapMarker(id = "origin", name = it.name, kind = "origin", lat = it.lat, lng = it.lng, note = "Starting Point"))
             }
-            if (trip.boardingLat != null && trip.boardingLng != null) {
-                list.add(MapMarker(id = "boarding", name = trip.boardingName ?: "Loading Point", kind = "loading", lat = trip.boardingLat, lng = trip.boardingLng, note = "Board jeepney here"))
-            }
-            if (trip.dropoffLat != null && trip.dropoffLng != null) {
-                list.add(MapMarker(id = "dropoff", name = trip.dropoffName ?: "Drop-off Point", kind = "unloading", lat = trip.dropoffLat, lng = trip.dropoffLng, note = "Alight jeepney here"))
+            trip.segments.forEachIndexed { index, segment ->
+                if (segment.boardingLat != null && segment.boardingLng != null) list.add(MapMarker(id = "boarding-$index", name = segment.boardingName ?: "Board ${segment.code}", kind = "loading", lat = segment.boardingLat, lng = segment.boardingLng, note = "Board ${segment.code} · ${segment.direction ?: "verified direction"}"))
+                if (segment.dropoffLat != null && segment.dropoffLng != null) list.add(MapMarker(id = "dropoff-$index", name = segment.dropoffName ?: "Alight ${segment.code}", kind = if (index < trip.segments.lastIndex) "transfer" else "unloading", lat = segment.dropoffLat, lng = segment.dropoffLng, note = if (index < trip.segments.lastIndex) "Transfer to next route" else "Alight here"))
             }
             trip.destPlace?.let {
                 list.add(MapMarker(id = "dest", name = it.name, kind = "destination", lat = it.lat, lng = it.lng, note = "Destination"))
@@ -169,6 +177,8 @@ fun NavigationScreen(
             activeWalkToBoard = walkToBoard,
             activeJeepneyRoute = jeepneyRoute,
             activeWalkFromDrop = walkFromDrop,
+            activeJeepneyRoutes = ridePaths,
+            activeWalkingPaths = walkingPaths,
             activeTripMarkers = activeMarkers,
             showControls = true,
             modifier = Modifier.fillMaxSize()
@@ -357,6 +367,7 @@ fun NavigationScreen(
                     currentStep.kind == "board" -> "I'm on the jeepney"
                     currentStep.kind == "stay" -> "Approaching drop-off"
                     currentStep.kind == "alight" -> "I got off"
+                    currentStep.kind == "transfer" -> "I've reached the transfer point"
                     else -> "Next step"
                 }
 

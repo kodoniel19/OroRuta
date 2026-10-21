@@ -91,6 +91,33 @@ describe("Places", () => {
 });
 
 describe("Routes", () => {
+  it("audits all live route directions, coordinates, associated stops, and landmarks", async () => {
+    const [[routes], [geometries], [directions], [stops], [landmarks], [sharedTerminals]] = await Promise.all([
+      db.execute("SELECT id FROM routes WHERE status != 'Inactive' AND (jeepney_type='Traditional' OR jeepney_type IS NULL OR jeepney_type='')"),
+      db.execute("SELECT route_id,direction,geometry FROM route_geometry"),
+      db.execute("SELECT route_id,direction FROM route_directions"),
+      db.execute("SELECT route_id,lat,lng FROM loading_points UNION ALL SELECT rt.route_id,t.lat,t.lng FROM terminals t JOIN route_terminals rt ON rt.terminal_id=t.id UNION ALL SELECT route_id,lat,lng FROM transfer_points"),
+      db.execute("SELECT lat,lng FROM landmarks"),
+      db.execute("SELECT terminal_id,COUNT(DISTINCT route_id) AS n FROM route_terminals GROUP BY terminal_id HAVING n>1")
+    ]);
+    expect(routes.length).toBeGreaterThan(0);
+    const routeIds = new Set(routes.map(route => route.id));
+    for (const routeId of routeIds) {
+      expect(new Set(geometries.filter(g => g.route_id === routeId).map(g => g.direction))).toEqual(new Set(["Inbound", "Outbound"]));
+      expect(new Set(directions.filter(d => d.route_id === routeId).map(d => d.direction))).toEqual(new Set(["Inbound", "Outbound"]));
+    }
+    for (const entry of geometries.filter(g => routeIds.has(g.route_id))) {
+      const geometry = typeof entry.geometry === "string" ? JSON.parse(entry.geometry) : entry.geometry;
+      expect(geometry.coordinates.length).toBeGreaterThan(1);
+      for (const [lng, lat] of geometry.coordinates) expect(lat >= 8.3 && lat <= 8.7 && lng >= 124.4 && lng <= 124.9).toBe(true);
+    }
+    for (const point of [...stops, ...landmarks]) {
+      expect(Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng))).toBe(true);
+      expect(Number(point.lat) >= 8.3 && Number(point.lat) <= 8.7 && Number(point.lng) >= 124.4 && Number(point.lng) <= 124.9).toBe(true);
+    }
+    expect(sharedTerminals.length).toBeGreaterThan(0);
+  });
+
   it("GET /api/v1/routes returns all routes", async () => {
     const res = await request(app).get("/api/v1/routes");
     expect(res.status).toBe(200);
@@ -124,11 +151,11 @@ describe("Trips", () => {
     expect(res.body).toEqual([]);
   });
 
-  it("GET /api/v1/trips/search returns empty for unknown destinations", async () => {
+  it("GET /api/v1/trips/search reports unresolved places instead of disguising them as no-route results", async () => {
     const res = await request(app)
       .get("/api/v1/trips/search?from=UnknownPlace123&to=AnotherPlace456");
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual([]);
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe("PLACE_NOT_RESOLVED");
   });
 
   it("GET /api/v1/trips/search recommends route-linked R5 stops for a verified Carmen to SM Downtown journey", async () => {
@@ -143,12 +170,38 @@ describe("Trips", () => {
     expect(option.walk_meters).toBeLessThan(1000);
   });
 
-  it("GET /api/v1/trips/search does not infer a Carmen to Cogon ride from mismatched terminal geometry", async () => {
+  it("GET /api/v1/trips/search does not suggest a backtracking transfer from Carmen to Cogon", async () => {
     const res = await request(app)
-      .get("/api/v1/trips/search?from=Carmen%20Market&to=Cogon%20Market&sort=time");
+      .get("/api/v1/trips/search?from=Current%20Location&to=Cogon%20Public%20Market&fromLat=8.4845&fromLng=124.6335&sort=time");
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body).toEqual([]);
+  });
+
+  it("GET /api/v1/trips/search returns a verified two-route journey when a transfer beats the direct option", async () => {
+    const res = await request(app)
+      .get("/api/v1/trips/search?from=Current%20Location&to=Divisoria&fromLat=8.504&fromLng=124.6115&toLat=8.4777&toLng=124.6452&sort=time");
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    const option = res.body.find(o => o.transfers === 1 && o.segments.length === 2);
+    expect(option).toBeDefined();
+    expect(new Set(res.body.map(o => o.id)).size).toBe(res.body.length);
+    expect(option.transfer_name).toBe("Cogon Market Jeepney Terminal");
+    expect(option.legs.some(l => l.kind === "transfer")).toBe(true);
+    expect(option.segments[0].dropoff_name).toBe(option.segments[1].boarding_name);
+    expect(option.segments.every(s => s.geometry_coordinates.length > 1 && s.direction)).toBe(true);
+    expect(res.body.some(o => o.transfers === 0)).toBe(true);
+    expect(option.minutes).toBeLessThan(res.body.find(o => o.transfers === 0).minutes);
+    const fewestTransfers = await request(app)
+      .get("/api/v1/trips/search?from=Current%20Location&to=Divisoria&fromLat=8.504&fromLng=124.6115&toLat=8.4777&toLng=124.6452&sort=transfers");
+    expect(fewestTransfers.status).toBe(200);
+    expect(fewestTransfers.body[0].transfers).toBe(0);
+  });
+
+  it("GET /api/v1/trips/search rejects out-of-area coordinates", async () => {
+    const res = await request(app).get("/api/v1/trips/search?from=Current%20Location&to=Cogon&fromLat=0&fromLng=0");
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("INVALID_COORDINATES");
   });
 });
 

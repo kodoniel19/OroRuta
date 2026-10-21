@@ -155,14 +155,24 @@ fun TripDetailScreen(
                         val walkFromDrop = remember(trip) {
                             trip.walkFromDropCoordinates.mapNotNull { if (it.size >= 2) LatLng(it[1], it[0]) else null }
                         }
+                        val ridePaths = remember(trip) {
+                            trip.segments.mapNotNull { segment ->
+                                segment.geometryCoordinates.mapNotNull { if (it.size >= 2) LatLng(it[1], it[0]) else null }
+                                    .takeIf { it.size >= 2 }
+                            }.ifEmpty { listOfNotNull(jeepneyRoute.takeIf { it.size >= 2 }) }
+                        }
+                        val allWalkPaths = remember(trip) {
+                            trip.legs.filter { it.kind == "walk" || it.kind == "transfer" }.mapNotNull { leg ->
+                                leg.geometryCoordinates.mapNotNull { if (it.size >= 2) LatLng(it[1], it[0]) else null }
+                                    .takeIf { it.size >= 2 }
+                            }.ifEmpty { listOfNotNull(walkToBoard.takeIf { it.size >= 2 }, walkFromDrop.takeIf { it.size >= 2 }) }
+                        }
                         val detailMarkers = remember(trip) {
                             val list = mutableListOf<MapMarker>()
                             trip.originPlace?.let { list.add(MapMarker("orig", it.name, kind = "origin", lat = it.lat, lng = it.lng, note = "Origin")) }
-                            if (trip.boardingLat != null && trip.boardingLng != null) {
-                                list.add(MapMarker("board", trip.boardingName ?: "Board", kind = "loading", lat = trip.boardingLat, lng = trip.boardingLng, note = "Board here"))
-                            }
-                            if (trip.dropoffLat != null && trip.dropoffLng != null) {
-                                list.add(MapMarker("drop", trip.dropoffName ?: "Drop", kind = "unloading", lat = trip.dropoffLat, lng = trip.dropoffLng, note = "Alight here"))
+                            trip.segments.forEachIndexed { index, segment ->
+                                if (segment.boardingLat != null && segment.boardingLng != null) list.add(MapMarker("board-$index", segment.boardingName ?: "Board ${segment.code}", kind = "loading", lat = segment.boardingLat, lng = segment.boardingLng, note = "Board ${segment.code} · ${segment.direction ?: "verified route direction"}"))
+                                if (segment.dropoffLat != null && segment.dropoffLng != null) list.add(MapMarker("drop-$index", segment.dropoffName ?: "Alight ${segment.code}", kind = if (index < trip.segments.lastIndex) "transfer" else "unloading", lat = segment.dropoffLat, lng = segment.dropoffLng, note = if (index < trip.segments.lastIndex) "Transfer to next route" else "Alight here"))
                             }
                             trip.destPlace?.let { list.add(MapMarker("dest", it.name, kind = "destination", lat = it.lat, lng = it.lng, note = "Destination")) }
                             list
@@ -178,6 +188,8 @@ fun TripDetailScreen(
                                 activeWalkToBoard = walkToBoard,
                                 activeJeepneyRoute = jeepneyRoute,
                                 activeWalkFromDrop = walkFromDrop,
+                                activeJeepneyRoutes = ridePaths,
+                                activeWalkingPaths = allWalkPaths,
                                 activeTripMarkers = detailMarkers,
                                 showControls = false,
                                 modifier = Modifier.fillMaxSize()
@@ -231,7 +243,7 @@ fun TripDetailScreen(
                                 )
 
                                 Text(
-                                    text = "Jeepney · ${trip.direction ?: "Loop route"}",
+                                    text = trip.segments.joinToString(" · ") { "${it.code} ${it.direction ?: "direction unavailable"}" },
                                     fontSize = 13.sp,
                                     color = InkMuted
                                 )
@@ -480,6 +492,7 @@ fun TripLegItem(leg: TripLeg, isLast: Boolean) {
                 "board" -> Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Ok600))
                 "stay" -> Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Brand500))
                 "alight" -> Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Bad600))
+                "transfer" -> Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Oro500))
                 else -> Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Line))
             }
 

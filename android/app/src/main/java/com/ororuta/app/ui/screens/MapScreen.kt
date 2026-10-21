@@ -1310,7 +1310,7 @@ fun MapScreen(
                             message = if (target.isGpsBasedNearMe)
                                 "No traditional jeepney boarding stops found within walking distance (maximum 1.0 km) of your current location. Please verify that you are within Cagayan de Oro transit corridors."
                             else
-                                "No verified jeepney route found for this destination directly from your location within walking distance (maximum 1.0 km). You may need to transfer at Agora, Carmen, or Bulua terminals.",
+                                "No verified direct route option is available in the map's loaded stop data. This nearby-route view does not plan transfers; use Trip Search to check route-linked transfer itineraries.",
                             tone = EmptyTone.Neutral,
                             action = {
                                 OroButton(
@@ -2114,60 +2114,20 @@ fun MapScreen(
                     )
                 } else if (mapDir.selectedTrip != null) {
                     val trip = mapDir.selectedTrip!!
-                    val rColor = try {
-                        Color(android.graphics.Color.parseColor(trip.segments.firstOrNull()?.color ?: "#1471B0"))
-                    } catch (_: Exception) {
-                        Brand600
+                    val walkPaths = mapDir.walkingPaths.ifEmpty { listOf(mapDir.walkToBoardPoints, mapDir.walkFromDropPoints) }
+                    walkPaths.filter { it.size >= 2 }.forEach { path ->
+                        Polyline(points = path, color = Color(0x66000000), width = 14f, zIndex = 8f)
+                        Polyline(points = path, color = Color(0xFF1565C0), width = 10f,
+                            pattern = listOf(Dash(20f), Gap(12f)), zIndex = 9f)
                     }
 
-                    // Leg 1: Walk to boarding stop (dashed road-following)
-                    if (mapDir.walkToBoardPoints.size >= 2) {
-                        Polyline(
-                            points = mapDir.walkToBoardPoints,
-                            color = Color(0x66000000),
-                            width = 14f,
-                            zIndex = 8f
-                        )
-                        Polyline(
-                            points = mapDir.walkToBoardPoints,
-                            color = Color(0xFF1565C0),
-                            width = 10f,
-                            pattern = listOf(Dash(20f), Gap(12f)),
-                            zIndex = 9f
-                        )
-                    }
-
-                    // Leg 2: Jeepney ride segment (solid, visibly colored line using verified route geometry)
-                    if (mapDir.jeepneyPoints.size >= 2) {
-                        Polyline(
-                            points = mapDir.jeepneyPoints,
-                            color = Color.White,
-                            width = 18f,
-                            zIndex = 10f
-                        )
-                        Polyline(
-                            points = mapDir.jeepneyPoints,
-                            color = rColor,
-                            width = 12f,
-                            zIndex = 11f
-                        )
-                    }
-
-                    // Leg 3: Walk from drop-off to destination (dashed road-following)
-                    if (mapDir.walkFromDropPoints.size >= 2) {
-                        Polyline(
-                            points = mapDir.walkFromDropPoints,
-                            color = Color(0x66000000),
-                            width = 14f,
-                            zIndex = 8f
-                        )
-                        Polyline(
-                            points = mapDir.walkFromDropPoints,
-                            color = Color(0xFF1565C0),
-                            width = 10f,
-                            pattern = listOf(Dash(20f), Gap(12f)),
-                            zIndex = 9f
-                        )
+                    val ridePaths = mapDir.ridePaths.ifEmpty { listOf(mapDir.jeepneyPoints) }
+                    ridePaths.forEachIndexed { index, path ->
+                        if (path.size >= 2) {
+                            val color = try { Color(android.graphics.Color.parseColor(trip.segments.getOrNull(index)?.color ?: "#1471B0")) } catch (_: Exception) { Brand600 }
+                            Polyline(points = path, color = Color.White, width = 18f, zIndex = 10f)
+                            Polyline(points = path, color = color, width = 12f, zIndex = 11f)
+                        }
                     }
 
                     // Markers
@@ -2181,25 +2141,17 @@ fun MapScreen(
                     )
 
                     // 2. Boarding stop marker with label
-                    if (trip.boardingLat != null && trip.boardingLng != null && (trip.boardingLat != 0.0 || trip.boardingLng != 0.0)) {
-                        Marker(
-                            state = rememberMarkerState(key = "dir_board_pt", position = LatLng(trip.boardingLat, trip.boardingLng)),
-                            title = "Board: ${trip.boardingName ?: "Loading Point"}",
-                            snippet = "Board Route ${trip.segments.firstOrNull()?.code ?: ""}",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
-                            zIndex = 13f
-                        )
-                    }
-
-                    // 3. Alighting stop marker with label
-                    if (trip.dropoffLat != null && trip.dropoffLng != null && (trip.dropoffLat != 0.0 || trip.dropoffLng != 0.0)) {
-                        Marker(
-                            state = rememberMarkerState(key = "dir_drop_pt", position = LatLng(trip.dropoffLat, trip.dropoffLng)),
-                            title = "Alight: ${trip.dropoffName ?: "Drop-off Point"}",
-                            snippet = "Alight here ('Lugar lang')",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
-                            zIndex = 13f
-                        )
+                    trip.segments.forEachIndexed { index, segment ->
+                        if (segment.boardingLat != null && segment.boardingLng != null) Marker(
+                            state = rememberMarkerState(key = "dir_board_$index", position = LatLng(segment.boardingLat, segment.boardingLng)),
+                            title = "Board ${segment.code}: ${segment.boardingName ?: "verified stop"}",
+                            snippet = segment.direction ?: "Verified route direction",
+                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN), zIndex = 13f)
+                        if (segment.dropoffLat != null && segment.dropoffLng != null) Marker(
+                            state = rememberMarkerState(key = "dir_drop_$index", position = LatLng(segment.dropoffLat, segment.dropoffLng)),
+                            title = if (index < trip.segments.lastIndex) "Transfer: ${segment.dropoffName ?: "terminal"}" else "Alight: ${segment.dropoffName ?: "verified stop"}",
+                            snippet = if (index < trip.segments.lastIndex) "Change to ${trip.segments.getOrNull(index + 1)?.code ?: "next route"}" else "Final jeepney stop",
+                            icon = BitmapDescriptorFactory.defaultMarker(if (index < trip.segments.lastIndex) BitmapDescriptorFactory.HUE_ORANGE else BitmapDescriptorFactory.HUE_ROSE), zIndex = 13f)
                     }
 
                     // 4. Destination marker
@@ -2818,6 +2770,8 @@ fun MapScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text("Finding verified jeepney routes…", fontSize = 13.sp, color = InkSoft)
                             }
+                        } else if (mapDir.errorMessage != null && !mapDir.noRouteFound) {
+                            Text(mapDir.errorMessage, fontSize = 13.sp, color = Bad600, modifier = Modifier.padding(vertical = 18.dp))
                         } else if (mapDir.noRouteFound) {
                             Column(
                                 modifier = Modifier
@@ -2839,7 +2793,7 @@ fun MapScreen(
                                     )
                                 }
                                 Text(
-                                    text = "No traditional jeepney routes directly serve this trip between ${mapDir.originName} and ${mapDir.destinationName}.",
+                                    text = "No verified jeepney itinerary was found between ${mapDir.originName} and ${mapDir.destinationName} after checking direct routes and available linked-terminal transfers.",
                                     fontSize = 12.sp,
                                     color = InkSoft
                                 )
@@ -2911,7 +2865,7 @@ fun MapScreen(
                                         color = Ink
                                     )
                                     Text(
-                                        text = "${(trip.totalKm * 10).toInt() / 10.0} km total distance",
+                                        text = "${(trip.totalKm * 10).toInt() / 10.0} km by jeepney · ${trip.walkMeters} m walking",
                                         fontSize = 11.sp,
                                         color = InkMuted
                                     )
@@ -2931,6 +2885,13 @@ fun MapScreen(
                                 }
                             }
 
+                            Text(
+                                text = if (trip.transfers == 0) "Direct itinerary" else "${trip.transfers} transfer${if (trip.transfers == 1) "" else "s"} · ${trip.segments.joinToString(" → ") { "${it.code} ${it.direction ?: ""}" }}",
+                                fontSize = 11.sp,
+                                color = InkMuted,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+
                             Spacer(modifier = Modifier.height(10.dp))
 
                             // Step-by-step Ordered itinerary:
@@ -2942,6 +2903,7 @@ fun MapScreen(
                                     .padding(vertical = 4.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
+                                if (trip.segments.size <= 1) {
                                 // Step 1: Origin
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -3076,6 +3038,23 @@ fun MapScreen(
                                             fontSize = 11.sp,
                                             color = InkMuted
                                         )
+                                    }
+                                }
+                                } else {
+                                    trip.legs.forEach { leg ->
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            if (leg.routeCode != null) {
+                                                RouteBadge(code = leg.routeCode, colorHex = leg.routeColor ?: "#1471B0", size = BadgeSize.Sm)
+                                            } else {
+                                                Icon(if (leg.kind == "walk") Icons.Default.DirectionsWalk else Icons.Default.Place,
+                                                    contentDescription = null, tint = if (leg.kind == "walk") Color(0xFF1565C0) else Warn600,
+                                                    modifier = Modifier.size(20.dp))
+                                            }
+                                            Column {
+                                                Text(leg.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                                                leg.detail?.takeIf { it.isNotBlank() }?.let { Text(it, fontSize = 11.sp, color = InkMuted) }
+                                            }
+                                        }
                                     }
                                 }
                             }
