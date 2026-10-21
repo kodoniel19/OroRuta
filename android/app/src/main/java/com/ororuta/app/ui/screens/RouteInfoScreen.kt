@@ -71,6 +71,14 @@ fun RouteInfoScreen(
     initialDestLat: Double? = null,
     initialDestLng: Double? = null,
     initialDirection: String? = null,
+    initialBoardingName: String? = null,
+    initialBoardingLat: Double? = null,
+    initialBoardingLng: Double? = null,
+    initialDropoffName: String? = null,
+    initialDropoffLat: Double? = null,
+    initialDropoffLng: Double? = null,
+    initialWalkDistanceMeters: Int? = null,
+    initialOnboardDistanceKm: Double? = null,
     onBack: () -> Unit,
     onViewOnMap: (routeId: String, direction: String) -> Unit,
     onNavigateFare: (routeId: String) -> Unit
@@ -305,9 +313,11 @@ fun RouteInfoScreen(
                         list
                     }
 
-                    // Nearest verified boarding stop from user's current GPS location
-                    val nearestBoardingStop = remember(candidateBoardingStops, userLocation, routeGeomPts) {
-                        if (userLocation != null && candidateBoardingStops.isNotEmpty()) {
+                    // Nearest verified boarding stop from user's current GPS location or passed initial boarding point
+                    val nearestBoardingStop = remember(initialBoardingLat, initialBoardingLng, initialBoardingName, candidateBoardingStops, userLocation, routeGeomPts) {
+                        if (initialBoardingLat != null && initialBoardingLng != null && initialBoardingLat != 0.0 && initialBoardingLng != 0.0) {
+                            RouteStopPoint("initial_board", initialBoardingName ?: "Boarding Stop", "loading", initialBoardingLat, initialBoardingLng, "Selected Boarding Point")
+                        } else if (userLocation != null && candidateBoardingStops.isNotEmpty()) {
                             candidateBoardingStops.minByOrNull {
                                 computeDistanceMeters(userLocation!!.latitude, userLocation!!.longitude, it.lat, it.lng)
                             }
@@ -353,9 +363,11 @@ fun RouteInfoScreen(
                         list
                     }
 
-                    // Suitable drop-off stop closest to the destination
-                    val dropoffStop = remember(candidateDropoffStops, targetDestCoords, routeGeomPts) {
-                        if (targetDestCoords != null && candidateDropoffStops.isNotEmpty()) {
+                    // Suitable drop-off stop closest to the destination or passed initial drop-off point
+                    val dropoffStop = remember(initialDropoffLat, initialDropoffLng, initialDropoffName, candidateDropoffStops, targetDestCoords, routeGeomPts) {
+                        if (initialDropoffLat != null && initialDropoffLng != null && initialDropoffLat != 0.0 && initialDropoffLng != 0.0) {
+                            RouteStopPoint("initial_drop", initialDropoffName ?: targetDestination, "unloading", initialDropoffLat, initialDropoffLng, "Selected Drop-off Point")
+                        } else if (targetDestCoords != null && candidateDropoffStops.isNotEmpty()) {
                             candidateDropoffStops.minByOrNull {
                                 computeDistanceMeters(it.lat, it.lng, targetDestCoords.latitude, targetDestCoords.longitude)
                             }
@@ -382,8 +394,10 @@ fun RouteInfoScreen(
                     }
 
                     // 3b. Calculate distance aboard jeepney along verified route geometry
-                    val onboardDistanceKm = remember(routeGeomPts, nearestBoardingStop, dropoffStop) {
-                        if (nearestBoardingStop != null && dropoffStop != null && routeGeomPts.size >= 2) {
+                    val onboardDistanceKm = remember(initialOnboardDistanceKm, routeGeomPts, nearestBoardingStop, dropoffStop) {
+                        if (initialOnboardDistanceKm != null && initialOnboardDistanceKm > 0.0) {
+                            initialOnboardDistanceKm
+                        } else if (nearestBoardingStop != null && dropoffStop != null && routeGeomPts.size >= 2) {
                             TraditionalJeepneyFareService.calculateOnboardDistanceKm(
                                 routePoints = routeGeomPts,
                                 boardingLat = nearestBoardingStop.lat,

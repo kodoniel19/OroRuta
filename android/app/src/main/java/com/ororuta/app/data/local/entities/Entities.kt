@@ -83,3 +83,16 @@ data class LocalSavedDestination(
     val icon: String,
     val createdAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "recent_place_searches")
+data class RecentSearchEntity(
+    @PrimaryKey val id: String,
+    val placeId: String? = null,
+    val name: String,
+    val address: String? = null,
+    val category: String = "place",
+    val lat: Double,
+    val lng: Double,
+    val timestamp: Long = System.currentTimeMillis()
+)
+

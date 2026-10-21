@@ -13,9 +13,10 @@ import com.ororuta.app.data.local.entities.*
         PendingReport::class,
         LocalHistory::class,
         LocalSavedTrip::class,
-        LocalSavedDestination::class
+        LocalSavedDestination::class,
+        RecentSearchEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class OroRutaDatabase : RoomDatabase() {
@@ -26,4 +27,6 @@ abstract class OroRutaDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao
     abstract fun savedTripsDao(): SavedTripsDao
     abstract fun savedDestinationsDao(): SavedDestinationsDao
+    abstract fun recentSearchDao(): RecentSearchDao
 }
+

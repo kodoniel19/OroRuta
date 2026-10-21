@@ -140,3 +140,28 @@ interface SavedDestinationsDao {
     @Query("DELETE FROM local_saved_destinations WHERE id = :id")
     suspend fun delete(id: String)
 }
+
+@Dao
+interface RecentSearchDao {
+    @Query("SELECT * FROM recent_place_searches WHERE lat != 0.0 AND lng != 0.0 AND lat IS NOT NULL AND lng IS NOT NULL ORDER BY timestamp DESC LIMIT 10")
+    fun getAll(): Flow<List<RecentSearchEntity>>
+
+    @Query("SELECT * FROM recent_place_searches WHERE lat != 0.0 AND lng != 0.0 AND lat IS NOT NULL AND lng IS NOT NULL ORDER BY timestamp DESC LIMIT 10")
+    suspend fun getAllSync(): List<RecentSearchEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(item: RecentSearchEntity)
+
+    @Query("DELETE FROM recent_place_searches WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM recent_place_searches")
+    suspend fun clearAll()
+
+    @Query("DELETE FROM recent_place_searches WHERE id NOT IN (SELECT id FROM recent_place_searches ORDER BY timestamp DESC LIMIT 10)")
+    suspend fun pruneOld()
+
+    @Query("DELETE FROM recent_place_searches WHERE lat = 0.0 OR lng = 0.0 OR lat IS NULL OR lng IS NULL")
+    suspend fun removeStale()
+}
+

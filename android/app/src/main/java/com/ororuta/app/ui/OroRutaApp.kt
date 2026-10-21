@@ -35,6 +35,8 @@ import androidx.navigation.navArgument
 import com.ororuta.app.ui.screens.*
 import com.ororuta.app.ui.theme.*
 import com.ororuta.app.ui.viewmodels.*
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 sealed class BottomTab(val route: String, val title: String, val icon: ImageVector) {
     object Home : BottomTab("home", "Home", Icons.Default.Home)
@@ -241,12 +243,16 @@ fun OroRutaApp(initialRoute: String? = null) {
                     initialKind = kind,
                     initialRouteId = routeId,
                     initialDirection = direction,
-                    onSearchClick = { navController.navigate("search") },
+                    onSearchClick = {},
                     onNavigateRouteInfo = { rIdOrPath ->
                         val target = if (rIdOrPath.startsWith("route_info/")) rIdOrPath else "route_info/$rIdOrPath"
                         navController.navigate(target)
                     },
-                    onStartNavigation = { optId -> navController.navigate("navigation/$optId") }
+                    onStartNavigation = { optId -> navController.navigate("navigation/$optId") },
+                    onPlanTrip = { toName, toLat, toLng ->
+                        val encoded = try { URLEncoder.encode(toName, "UTF-8") } catch (_: Exception) { toName }
+                        navController.navigate("results?from=Current+Location&to=$encoded&toLat=$toLat&toLng=$toLng")
+                    }
                 )
             }
 
@@ -256,7 +262,7 @@ fun OroRutaApp(initialRoute: String? = null) {
                 SavedScreen(
                     viewModel = savedVm,
                     onNavigateResults = { from, to -> navController.navigate("results?from=$from&to=$to") },
-                    onNavigateSearchPrefilled = { to -> navController.navigate("search?to=$to") },
+                    onNavigateSearchPrefilled = { _ -> navController.navigate("map") },
                     onStartNav = { optId -> navController.navigate("navigation/$optId") }
                 )
             }
@@ -276,35 +282,6 @@ fun OroRutaApp(initialRoute: String? = null) {
                     onNavigateAbout = { navController.navigate("about") },
                     onNavigatePrivacy = { navController.navigate("content/privacy") },
                     onNavigateTerms = { navController.navigate("content/terms") }
-                )
-            }
-
-            // Pushed Screens
-            composable(
-                "search?from={from}&to={to}",
-                arguments = listOf(
-                    navArgument("from") { defaultValue = "" },
-                    navArgument("to") { defaultValue = "" }
-                )
-            ) { backStack ->
-                val searchVm = hiltViewModel<SearchViewModel>()
-                val prefillFrom = backStack.arguments?.getString("from") ?: ""
-                val prefillTo = backStack.arguments?.getString("to") ?: ""
-                SearchScreen(
-                    viewModel = searchVm,
-                    prefillFrom = prefillFrom,
-                    prefillTo = prefillTo,
-                    onBack = { navController.popBackStack() },
-                    onSearchSubmit = { from, to, fromLat, fromLng, toLat, toLng ->
-                        val coordParams = buildString {
-                            if (fromLat != null && fromLng != null) append("&fromLat=$fromLat&fromLng=$fromLng")
-                            if (toLat != null && toLng != null) append("&toLat=$toLat&toLng=$toLng")
-                        }
-                        navController.navigate("results?from=$from&to=$to&sort=time$coordParams")
-                    },
-                    onViewPlaceOnMap = { place ->
-                        navController.navigate("map?placeId=${place.id}&placeName=${place.name}&lat=${place.lat}&lng=${place.lng}&kind=${place.kind}")
-                    }
                 )
             }
 
@@ -337,7 +314,7 @@ fun OroRutaApp(initialRoute: String? = null) {
                     toLat = toLat,
                     toLng = toLng,
                     onBack = { navController.popBackStack() },
-                    onEditSearch = { navController.navigate("search?from=$from&to=$to") },
+                    onEditSearch = { navController.navigate("map") },
                     onSelectTrip = { tripId, f, t -> navController.navigate("trip_detail/$tripId?from=$f&to=$t") },
                     onStartNavigation = { tripId -> navController.navigate("navigation/$tripId") },
                     onNavigateOffline = { navController.navigate("offline_routes") },
@@ -405,13 +382,21 @@ fun OroRutaApp(initialRoute: String? = null) {
             }
 
             composable(
-                "route_info/{routeId}?destination={destination}&destLat={destLat}&destLng={destLng}&direction={direction}",
+                "route_info/{routeId}?destination={destination}&destLat={destLat}&destLng={destLng}&direction={direction}&boardingName={boardingName}&boardingLat={boardingLat}&boardingLng={boardingLng}&dropoffName={dropoffName}&dropoffLat={dropoffLat}&dropoffLng={dropoffLng}&walkDistanceMeters={walkDistanceMeters}&onboardDistanceKm={onboardDistanceKm}",
                 arguments = listOf(
                     navArgument("routeId") { type = NavType.StringType },
                     navArgument("destination") { type = NavType.StringType; nullable = true; defaultValue = null },
                     navArgument("destLat") { type = NavType.StringType; nullable = true; defaultValue = null },
                     navArgument("destLng") { type = NavType.StringType; nullable = true; defaultValue = null },
-                    navArgument("direction") { type = NavType.StringType; nullable = true; defaultValue = null }
+                    navArgument("direction") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("boardingName") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("boardingLat") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("boardingLng") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("dropoffName") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("dropoffLat") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("dropoffLng") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("walkDistanceMeters") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("onboardDistanceKm") { type = NavType.StringType; nullable = true; defaultValue = null }
                 )
             ) { backStack ->
                 val routeInfoVm = hiltViewModel<RouteInfoViewModel>()
@@ -423,6 +408,21 @@ fun OroRutaApp(initialRoute: String? = null) {
                 val destLat = backStack.arguments?.getString("destLat")?.toDoubleOrNull()
                 val destLng = backStack.arguments?.getString("destLng")?.toDoubleOrNull()
                 val direction = backStack.arguments?.getString("direction")
+                val rawBName = backStack.arguments?.getString("boardingName")
+                val boardingName = rawBName?.let {
+                    try { URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it }
+                }
+                val boardingLat = backStack.arguments?.getString("boardingLat")?.toDoubleOrNull()
+                val boardingLng = backStack.arguments?.getString("boardingLng")?.toDoubleOrNull()
+                val rawDName = backStack.arguments?.getString("dropoffName")
+                val dropoffName = rawDName?.let {
+                    try { URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it }
+                }
+                val dropoffLat = backStack.arguments?.getString("dropoffLat")?.toDoubleOrNull()
+                val dropoffLng = backStack.arguments?.getString("dropoffLng")?.toDoubleOrNull()
+                val walkDistanceMeters = backStack.arguments?.getString("walkDistanceMeters")?.toIntOrNull()
+                val onboardDistanceKm = backStack.arguments?.getString("onboardDistanceKm")?.toDoubleOrNull()
+
                 RouteInfoScreen(
                     viewModel = routeInfoVm,
                     routeId = routeId,
@@ -430,6 +430,14 @@ fun OroRutaApp(initialRoute: String? = null) {
                     initialDestLat = destLat,
                     initialDestLng = destLng,
                     initialDirection = direction,
+                    initialBoardingName = boardingName,
+                    initialBoardingLat = boardingLat,
+                    initialBoardingLng = boardingLng,
+                    initialDropoffName = dropoffName,
+                    initialDropoffLat = dropoffLat,
+                    initialDropoffLng = dropoffLng,
+                    initialWalkDistanceMeters = walkDistanceMeters,
+                    initialOnboardDistanceKm = onboardDistanceKm,
                     onBack = { navController.popBackStack() },
                     onViewOnMap = { rId, dir ->
                         navController.navigate("map?routeId=$rId&direction=$dir")
@@ -605,7 +613,11 @@ fun OroRutaApp(initialRoute: String? = null) {
                         val target = if (rIdOrPath.startsWith("route_info/")) rIdOrPath else "route_info/$rIdOrPath"
                         navController.navigate(target)
                     },
-                    onStartNavigation = { optId -> navController.navigate("navigation/$optId") }
+                    onStartNavigation = { optId -> navController.navigate("navigation/$optId") },
+                    onPlanTrip = { toName, toLat, toLng ->
+                        val encoded = try { URLEncoder.encode(toName, "UTF-8") } catch (_: Exception) { toName }
+                        navController.navigate("results?from=Current+Location&to=$encoded&toLat=$toLat&toLng=$toLng")
+                    }
                 )
             }
         }

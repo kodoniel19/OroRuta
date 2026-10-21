@@ -20,8 +20,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -31,9 +33,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.ororuta.app.data.local.entities.RecentSearchEntity
+
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -56,6 +63,7 @@ import com.google.maps.android.compose.*
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ororuta.app.domain.fare.PassengerCategory
 import com.ororuta.app.domain.fare.TraditionalJeepneyFareService
+import com.ororuta.app.domain.models.Place
 import com.ororuta.app.domain.models.Resource
 import com.ororuta.app.domain.models.Route
 import com.ororuta.app.ui.components.*
@@ -67,6 +75,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import java.net.URLEncoder
 
 data class CdoGeoStop(
     val id: String,
@@ -152,7 +161,18 @@ fun getAllRouteCoordinates(route: com.ororuta.app.domain.models.Route): List<Lat
     return pts
 }
 
+private fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+    val r = 6371000.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLng = Math.toRadians(lng2 - lng1)
+    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 data class NearbyRoutesSheetTarget(
+
     val title: String,
     val subtitle: String = "Cagayan de Oro City",
     val lat: Double? = null,
@@ -198,21 +218,29 @@ fun MapScreen(
     initialRouteId: String? = null,
     initialDirection: String? = null,
     onBack: (() -> Unit)? = null,
-    onSearchClick: () -> Unit,
+    onSearchClick: (() -> Unit)? = null,
     onNavigateRouteInfo: (String) -> Unit,
     onStartNavigation: (String) -> Unit,
+    onPlanTrip: ((toName: String, toLat: Double, toLng: Double) -> Unit)? = null,
     viewModel: MapViewModel = hiltViewModel()
 ) {
     var showLayersSheet by remember { mutableStateOf(false) }
     var selectedMarker by remember { mutableStateOf<MapMarker?>(null) }
     var selectedRouteId by remember { mutableStateOf<String?>(null) }
     var nearbyRoutesTarget by remember { mutableStateOf<NearbyRoutesSheetTarget?>(null) }
+    var mapSearchQuery by remember { mutableStateOf("") }
+    var showSuggestions by remember { mutableStateOf(false) }
+    var showManualOriginDialog by remember { mutableStateOf(false) }
+
+    val recentSearches by viewModel.recentSearches.collectAsState()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     // Database-driven routes and places from backend / cache
     val dbRoutes = viewModel.routes
     val dbPlaces = viewModel.places
 
-    // Compute all routes passing by or nearby the selected marker
+    // Compute all routes passing by or nearby the selected marker (verified routes within 200m walking distance)
     val nearbyRoutesForSelectedMarker = remember(selectedMarker, dbRoutes) {
         val m = selectedMarker
         if (m == null) emptyList()
@@ -222,21 +250,23 @@ fun MapScreen(
             val markerNameClean = m.name.lowercase().trim()
 
             dbRoutes.filter { route ->
+                val isTraditional = route.jeepneyType.isBlank() || route.jeepneyType.equals("Traditional", ignoreCase = true)
+                if (!isTraditional) return@filter false
+
                 // 1. Explicit landmark association
-                val hasLandmarkMatch = route.landmarks.any {
+                val hasLandmarkMatch = markerNameClean.length >= 3 && route.landmarks.any {
                     it.name.lowercase().contains(markerNameClean) || markerNameClean.contains(it.name.lowercase())
                 }
                 // 2. Stop, terminal, or transfer point match
-                val hasStopMatch = (route.terminals.map { it.name } + route.stops.map { it.name } + route.transfers.map { it.name }).any {
+                val hasStopMatch = markerNameClean.length >= 3 && (route.terminals.map { it.name } + route.stops.map { it.name } + route.transfers.map { it.name }).any {
                     it.lowercase().contains(markerNameClean) || markerNameClean.contains(it.lowercase())
                 }
-                // 3. Distance proximity check (~650m in coordinates)
-                val allPts = getAllRouteCoordinates(route)
-                val isSpatiallyClose = if (lat != 0.0 && lng != 0.0 && allPts.isNotEmpty()) {
+                // 3. Verified route geometry or stops genuinely pass within 200m walking distance
+                val isSpatiallyClose = if (lat != 0.0 && lng != 0.0) {
+                    val allPts = getAllRouteCoordinates(route)
                     allPts.any { pt ->
-                        val dLat = Math.abs(pt.latitude - lat)
-                        val dLng = Math.abs(pt.longitude - lng)
-                        dLat < 0.006 && dLng < 0.006
+                        pt.latitude != 0.0 && pt.longitude != 0.0 &&
+                        haversine(lat, lng, pt.latitude, pt.longitude) <= 200.0
                     }
                 } else false
 
@@ -249,6 +279,7 @@ fun MapScreen(
             }
         }
     }
+
 
     // Collect both route stops and all places/landmarks from DB catalog
     val cdoStops = remember(dbRoutes, dbPlaces) {
@@ -928,7 +959,7 @@ fun MapScreen(
 
             // De-duplicate, sort by walking distance from user's current GPS location, take top 3–5
             scoredItems
-                .distinctBy { it.route.code.ifBlank { it.route.id } }
+                .distinctBy { "${it.route.id}_${it.nearestStopName}" }
                 .sortedBy { it.walkDistanceMeters ?: Int.MAX_VALUE }
                 .take(5)
         }
@@ -1236,7 +1267,7 @@ fun MapScreen(
                                             }
                                         } else {
                                             nearbyRoutesTarget = null
-                                            onSearchClick()
+                                            onSearchClick?.invoke()
                                         }
                                     },
                                     variant = ButtonVariant.Secondary,
@@ -1538,15 +1569,25 @@ fun MapScreen(
                                                     val destTitle = (if (!target.isGpsBasedNearMe) target.title else null) ?: item.destinationServed ?: r.destination
                                                     val dLat = if (!target.isGpsBasedNearMe) target.lat else null
                                                     val dLng = if (!target.isGpsBasedNearMe) target.lng else null
-                                                    val encodedDest = try {
-                                                        java.net.URLEncoder.encode(destTitle, "UTF-8")
-                                                    } catch (_: Exception) {
-                                                        destTitle
-                                                    }
+                                                    val encodedDest = try { URLEncoder.encode(destTitle, "UTF-8") } catch (_: Exception) { destTitle }
+                                                    val encodedBName = try { URLEncoder.encode(item.nearestStopName, "UTF-8") } catch (_: Exception) { item.nearestStopName }
+                                                    val dropoffName = item.dropoffStopName ?: destTitle
+                                                    val encodedDName = try { URLEncoder.encode(dropoffName, "UTF-8") } catch (_: Exception) { dropoffName }
+
                                                     val navPath = buildString {
                                                         append("route_info/${r.id}?destination=$encodedDest&direction=$detectedDirection")
+                                                        if (dLat != null && dLng != null) append("&destLat=$dLat&destLng=$dLng")
+                                                        if (item.nearestStopLat != null && item.nearestStopLng != null) {
+                                                            append("&boardingName=$encodedBName&boardingLat=${item.nearestStopLat}&boardingLng=${item.nearestStopLng}")
+                                                        }
                                                         if (dLat != null && dLng != null) {
-                                                            append("&destLat=$dLat&destLng=$dLng")
+                                                            append("&dropoffName=$encodedDName&dropoffLat=$dLat&dropoffLng=$dLng")
+                                                        }
+                                                        if (item.walkDistanceMeters != null) {
+                                                            append("&walkDistanceMeters=${item.walkDistanceMeters}")
+                                                        }
+                                                        if (item.onboardDistanceKm != null) {
+                                                            append("&onboardDistanceKm=${item.onboardDistanceKm}")
                                                         }
                                                     }
                                                     nearbyRoutesTarget = null
@@ -1643,6 +1684,7 @@ fun MapScreen(
                 }
             },
             onMapClick = {
+                showSuggestions = false
                 selectedMarker = null
                 selectedRouteId = null
                 viewModel.clearDirections()
@@ -1658,6 +1700,14 @@ fun MapScreen(
                     lat = poi.latLng.latitude,
                     lng = poi.latLng.longitude,
                     area = "Cagayan de Oro City"
+                )
+                viewModel.saveRecentSearch(
+                    placeId = poi.placeId,
+                    name = poi.name,
+                    address = "Cagayan de Oro City",
+                    category = "landmark",
+                    lat = poi.latLng.latitude,
+                    lng = poi.latLng.longitude
                 )
                 selectedRouteId = null
                 viewModel.clearDirections()
@@ -1940,6 +1990,14 @@ fun MapScreen(
                                         lng = stop.lng,
                                         area = stop.area
                                     )
+                                    viewModel.saveRecentSearch(
+                                        placeId = stop.id,
+                                        name = stop.name,
+                                        address = stop.area ?: "Cagayan de Oro City",
+                                        category = stop.kind,
+                                        lat = stop.lat,
+                                        lng = stop.lng
+                                    )
                                     coroutineScope.launch {
                                         cameraPositionState.animate(
                                             CameraUpdateFactory.newLatLngZoom(LatLng(stop.lat, stop.lng), 16f),
@@ -1954,35 +2012,167 @@ fun MapScreen(
                 }
             }
 
-            // Calculated Directions Route Polyline & Markers
-            val guide = viewModel.directionsGuide
-            if (guide != null && guide.pathPoints.size >= 2) {
-                Polyline(
-                    points = guide.pathPoints,
-                    color = Color(0x66000000),
-                    width = 18f
-                )
-                Polyline(
-                    points = guide.pathPoints,
-                    color = Color(0xFF1471B0),
-                    width = 12f
-                )
-                Marker(
-                    state = rememberMarkerState(key = "directions_origin_marker", position = LatLng(guide.originLat, guide.originLng)),
-                    title = "Starting Point (${guide.originName})",
-                    snippet = "GPS Current Location",
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
-                )
-                Marker(
-                    state = rememberMarkerState(key = "directions_dest_marker", position = LatLng(guide.destinationLat, guide.destinationLng)),
-                    title = guide.destinationName,
-                    snippet = "Selected Destination",
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
-                )
+            // Calculated Directions Line Guide (Walking & Jeepney Polyline & Markers)
+            val mapDir = viewModel.mapDirectionsState
+            if (mapDir != null) {
+                if (mapDir.noRouteFound && mapDir.walkingOnlyPoints != null && mapDir.walkingOnlyPoints.size >= 2) {
+                    // Road-network walking line guide (dashed)
+                    Polyline(
+                        points = mapDir.walkingOnlyPoints,
+                        color = Color(0x66000000),
+                        width = 14f,
+                        zIndex = 8f
+                    )
+                    Polyline(
+                        points = mapDir.walkingOnlyPoints,
+                        color = Color(0xFF1565C0),
+                        width = 10f,
+                        pattern = listOf(Dash(20f), Gap(12f)),
+                        zIndex = 9f
+                    )
+                    Marker(
+                        state = rememberMarkerState(key = "dir_origin_walk", position = LatLng(mapDir.originLat, mapDir.originLng)),
+                        title = mapDir.originName,
+                        snippet = "Trip Origin",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
+                        zIndex = 12f
+                    )
+                    Marker(
+                        state = rememberMarkerState(key = "dir_dest_walk", position = LatLng(mapDir.destinationLat, mapDir.destinationLng)),
+                        title = mapDir.destinationName,
+                        snippet = "Walking Destination",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
+                        zIndex = 12f
+                    )
+                } else if (mapDir.selectedTrip != null) {
+                    val trip = mapDir.selectedTrip!!
+                    val rColor = try {
+                        Color(android.graphics.Color.parseColor(trip.segments.firstOrNull()?.color ?: "#1471B0"))
+                    } catch (_: Exception) {
+                        Brand600
+                    }
+
+                    // Leg 1: Walk to boarding stop (dashed road-following)
+                    if (mapDir.walkToBoardPoints.size >= 2) {
+                        Polyline(
+                            points = mapDir.walkToBoardPoints,
+                            color = Color(0x66000000),
+                            width = 14f,
+                            zIndex = 8f
+                        )
+                        Polyline(
+                            points = mapDir.walkToBoardPoints,
+                            color = Color(0xFF1565C0),
+                            width = 10f,
+                            pattern = listOf(Dash(20f), Gap(12f)),
+                            zIndex = 9f
+                        )
+                    }
+
+                    // Leg 2: Jeepney ride segment (solid, visibly colored line using verified route geometry)
+                    if (mapDir.jeepneyPoints.size >= 2) {
+                        Polyline(
+                            points = mapDir.jeepneyPoints,
+                            color = Color.White,
+                            width = 18f,
+                            zIndex = 10f
+                        )
+                        Polyline(
+                            points = mapDir.jeepneyPoints,
+                            color = rColor,
+                            width = 12f,
+                            zIndex = 11f
+                        )
+                    }
+
+                    // Leg 3: Walk from drop-off to destination (dashed road-following)
+                    if (mapDir.walkFromDropPoints.size >= 2) {
+                        Polyline(
+                            points = mapDir.walkFromDropPoints,
+                            color = Color(0x66000000),
+                            width = 14f,
+                            zIndex = 8f
+                        )
+                        Polyline(
+                            points = mapDir.walkFromDropPoints,
+                            color = Color(0xFF1565C0),
+                            width = 10f,
+                            pattern = listOf(Dash(20f), Gap(12f)),
+                            zIndex = 9f
+                        )
+                    }
+
+                    // Markers
+                    // 1. Origin marker
+                    Marker(
+                        state = rememberMarkerState(key = "dir_origin_pt", position = LatLng(mapDir.originLat, mapDir.originLng)),
+                        title = mapDir.originName,
+                        snippet = "Trip Origin",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
+                        zIndex = 13f
+                    )
+
+                    // 2. Boarding stop marker with label
+                    if (trip.boardingLat != null && trip.boardingLng != null && (trip.boardingLat != 0.0 || trip.boardingLng != 0.0)) {
+                        Marker(
+                            state = rememberMarkerState(key = "dir_board_pt", position = LatLng(trip.boardingLat, trip.boardingLng)),
+                            title = "Board: ${trip.boardingName ?: "Loading Point"}",
+                            snippet = "Board Route ${trip.segments.firstOrNull()?.code ?: ""}",
+                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
+                            zIndex = 13f
+                        )
+                    }
+
+                    // 3. Alighting stop marker with label
+                    if (trip.dropoffLat != null && trip.dropoffLng != null && (trip.dropoffLat != 0.0 || trip.dropoffLng != 0.0)) {
+                        Marker(
+                            state = rememberMarkerState(key = "dir_drop_pt", position = LatLng(trip.dropoffLat, trip.dropoffLng)),
+                            title = "Alight: ${trip.dropoffName ?: "Drop-off Point"}",
+                            snippet = "Alight here ('Lugar lang')",
+                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
+                            zIndex = 13f
+                        )
+                    }
+
+                    // 4. Destination marker
+                    Marker(
+                        state = rememberMarkerState(key = "dir_dest_pt", position = LatLng(mapDir.destinationLat, mapDir.destinationLng)),
+                        title = mapDir.destinationName,
+                        snippet = "Trip Destination",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
+                        zIndex = 13f
+                    )
+                }
+            } else {
+                val guide = viewModel.directionsGuide
+                if (guide != null && guide.pathPoints.size >= 2) {
+                    Polyline(
+                        points = guide.pathPoints,
+                        color = Color(0x66000000),
+                        width = 18f
+                    )
+                    Polyline(
+                        points = guide.pathPoints,
+                        color = Color(0xFF1471B0),
+                        width = 12f
+                    )
+                    Marker(
+                        state = rememberMarkerState(key = "directions_origin_marker", position = LatLng(guide.originLat, guide.originLng)),
+                        title = "Starting Point (${guide.originName})",
+                        snippet = "GPS Current Location",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                    )
+                    Marker(
+                        state = rememberMarkerState(key = "directions_dest_marker", position = LatLng(guide.destinationLat, guide.destinationLng)),
+                        title = guide.destinationName,
+                        snippet = "Selected Destination",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
+                    )
+                }
             }
 
             // User location custom marker (alongside native Google Maps blue dot)
-            if (hasLocationPermission && userLocation != null) {
+            if (hasLocationPermission && userLocation != null && mapDir == null) {
                 Marker(
                     state = userMarkerState,
                     title = "Your Location",
@@ -1991,178 +2181,486 @@ fun MapScreen(
                 )
             }
 
+            // Selected place marker (from search or tapped marker)
+            if (mapDir == null && selectedMarker != null && selectedMarker?.lat != null && selectedMarker?.lng != null) {
+                val sm = selectedMarker!!
+                val markerHue = when (sm.kind) {
+                    "terminal" -> BitmapDescriptorFactory.HUE_AZURE
+                    "loading" -> BitmapDescriptorFactory.HUE_GREEN
+                    "unloading" -> BitmapDescriptorFactory.HUE_ROSE
+                    "transfer" -> BitmapDescriptorFactory.HUE_ORANGE
+                    else -> BitmapDescriptorFactory.HUE_RED
+                }
+                Marker(
+                    state = rememberMarkerState(
+                        key = "selected_marker_${sm.id}_${sm.lat}_${sm.lng}",
+                        position = LatLng(sm.lat!!, sm.lng!!)
+                    ),
+                    title = sm.name,
+                    snippet = sm.area ?: "Selected Location",
+                    icon = BitmapDescriptorFactory.defaultMarker(markerHue),
+                    zIndex = 20f
+                )
+            }
+
             // NOTE: We do NOT use MapEffect with setOnCameraIdleListener/
             // setOnCameraMoveStartedListener here — that would override
             // maps-compose's internal listeners and break CameraPositionState sync.
         }
 
-        // Layers button (Top-right below search pill)
-        Surface(
-            color = Color.White,
-            shape = CircleShape,
-            shadowElevation = 4.dp,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(top = 66.dp, end = 16.dp)
-                .size(40.dp)
-                .clickable { showLayersSheet = true }
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.Layers,
-                    contentDescription = "Layers",
-                    tint = Brand600,
-                    modifier = Modifier.size(22.dp)
+        // Auto-fit camera for mapDirectionsState
+        LaunchedEffect(viewModel.mapDirectionsState?.selectedTrip, viewModel.mapDirectionsState?.walkingOnlyPoints) {
+            val dir = viewModel.mapDirectionsState ?: return@LaunchedEffect
+            val pts = mutableListOf<LatLng>()
+            pts.add(LatLng(dir.originLat, dir.originLng))
+            pts.add(LatLng(dir.destinationLat, dir.destinationLng))
+            dir.selectedTrip?.boardingLat?.let { bLat ->
+                dir.selectedTrip?.boardingLng?.let { bLng ->
+                    if (bLat != 0.0 && bLng != 0.0) pts.add(LatLng(bLat, bLng))
+                }
+            }
+            dir.selectedTrip?.dropoffLat?.let { dLat ->
+                dir.selectedTrip?.dropoffLng?.let { dLng ->
+                    if (dLat != 0.0 && dLng != 0.0) pts.add(LatLng(dLat, dLng))
+                }
+            }
+            pts.addAll(dir.walkToBoardPoints)
+            pts.addAll(dir.jeepneyPoints)
+            pts.addAll(dir.walkFromDropPoints)
+            dir.walkingOnlyPoints?.let { pts.addAll(it) }
+
+            val validPts = pts.filter { it.latitude != 0.0 && it.longitude != 0.0 && !it.latitude.isNaN() && !it.longitude.isNaN() }
+            if (validPts.size >= 2) {
+                val builder = LatLngBounds.builder()
+                validPts.forEach { builder.include(it) }
+                val bounds = builder.build()
+                cameraPositionState.animate(
+                    CameraUpdateFactory.newLatLngBounds(bounds, 130),
+                    600
                 )
             }
         }
 
-        // 1. TOP FLOATING SEARCH PILL
-        Surface(
-            color = Color.White,
-            shape = RoundedCornerShape(24.dp),
-            shadowElevation = 6.dp,
+
+        // Map Controls: Layers button and GPS / My Location button (Right side, stacked below search bar)
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 66.dp, end = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Layers button
+            Surface(
+                color = Color.White,
+                shape = CircleShape,
+                shadowElevation = 4.dp,
+                modifier = Modifier
+                    .size(42.dp)
+                    .clickable { showLayersSheet = true }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Layers,
+                        contentDescription = "Layers",
+                        tint = Brand600,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            // GPS / Current Location button
+            Surface(
+                color = Color.White,
+                shape = CircleShape,
+                shadowElevation = 4.dp,
+                modifier = Modifier
+                    .size(42.dp)
+                    .clickable { requestLocationOrSettings() }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = when {
+                            isLocating -> Icons.Default.LocationSearching
+                            hasLocationPermission -> Icons.Default.MyLocation
+                            else -> Icons.Default.LocationDisabled
+                        },
+                        contentDescription = "Center on current location",
+                        tint = if (hasLocationPermission) Brand600 else InkMuted,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+
+        // 1. TOP FLOATING SEARCH BAR & SUGGESTIONS
+        var searchResultsPlaces by remember { mutableStateOf<List<Place>>(emptyList()) }
+        var isSearchingPlaces by remember { mutableStateOf(false) }
+
+        LaunchedEffect(mapSearchQuery) {
+            val q = mapSearchQuery.trim()
+            if (q.length < 2) {
+                searchResultsPlaces = emptyList()
+                isSearchingPlaces = false
+            } else {
+                isSearchingPlaces = true
+                delay(250)
+                searchResultsPlaces = viewModel.searchPlaces(q)
+                isSearchingPlaces = false
+            }
+        }
+
+        Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .fillMaxWidth()
         ) {
-            Row(
-                modifier = Modifier
-                    .clickable { onSearchClick() }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Surface(
+                color = Color.White,
+                shape = RoundedCornerShape(24.dp),
+                shadowElevation = 6.dp,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                if (isPushed && onBack != null) {
-                    IconButton(onClick = onBack, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Ink)
-                    }
-                } else {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = Brand600)
-                }
-
-                Text(
-                    text = "Search jeepney routes or places…",
-                    fontSize = 14.sp,
-                    color = InkMuted,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Box(
+                Row(
                     modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(Brand50),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Default.Tune, contentDescription = "Filter", tint = Brand600, modifier = Modifier.size(16.dp))
+                    if (isPushed && onBack != null) {
+                        IconButton(onClick = onBack, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Ink)
+                        }
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = Brand600)
+                    }
+
+                    BasicTextField(
+                        value = mapSearchQuery,
+                        onValueChange = {
+                            mapSearchQuery = it
+                            showSuggestions = true
+                        },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
+                        modifier = Modifier
+                            .weight(1f)
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused) {
+                                    showSuggestions = true
+                                }
+                            },
+                        decorationBox = { innerTextField ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (mapSearchQuery.isEmpty()) {
+                                    Text(
+                                        text = "Search jeepney routes or places...",
+                                        fontSize = 14.sp,
+                                        color = InkMuted
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+
+                    if (mapSearchQuery.isNotBlank()) {
+                        IconButton(
+                            onClick = {
+                                mapSearchQuery = ""
+                                searchResultsPlaces = emptyList()
+                                showSuggestions = true
+                            },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear", tint = InkMuted, modifier = Modifier.size(16.dp))
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Brand50),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Tune, contentDescription = "Filter", tint = Brand600, modifier = Modifier.size(16.dp))
+                    }
                 }
             }
-        }
 
-        // 2a. "ROUTES NEAR ME" PILL — above the GPS FAB
-        val routesNearMeBottomPadding = if (selectedMarker != null || viewModel.recommendedJeepneyTrip != null || viewModel.directionsGuide != null || focusedTripOptionId != null) 292.dp else 196.dp
-        Surface(
-            color = if (isLocatingForRoutes) Brand50 else Color.White,
-            shape = RoundedCornerShape(24.dp),
-            shadowElevation = 6.dp,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = routesNearMeBottomPadding)
-                .clickable(enabled = !isLocatingForRoutes) {
-                    if (!hasLocationPermission) {
-                        permissionLauncher.launch(LocationPermissions.runtimePermissions)
-                        return@clickable
-                    }
-                    isLocatingForRoutes = true
-                    coroutineScope.launch {
-                        try {
-                            val loc = obtainBestDeviceLocation(context)
-                            if (loc != null) {
-                                userLocation = LatLng(loc.latitude, loc.longitude)
-                                nearbyRoutesTarget = NearbyRoutesSheetTarget(
-                                    title = "Near My Location",
-                                    subtitle = "GPS · ${"%.4f".format(loc.latitude)}, ${"%.4f".format(loc.longitude)}",
-                                    lat = loc.latitude,
-                                    lng = loc.longitude,
-                                    isGpsBasedNearMe = true
-                                )
-                                if (viewModel.routesState is Resource.Error || dbRoutes.isEmpty()) {
-                                    viewModel.loadRoutes()
-                                }
-                            } else {
-                                snackbarHostState.showSnackbar(
-                                    "Unable to detect your location. Please enable GPS and try again."
+            // Recent Searches Panel (shown when search bar is focused and query is empty)
+            if (showSuggestions && mapSearchQuery.trim().isEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    color = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 56.dp)
+                        .imePadding()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(vertical = 8.dp)
+                            .heightIn(max = 280.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        // Header
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = null,
+                                tint = InkMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Recent searches",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = InkMuted
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            if (recentSearches.isNotEmpty()) {
+                                Text(
+                                    text = "Clear all",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Brand600,
+                                    modifier = Modifier
+                                        .clickable { viewModel.clearAllRecentSearches() }
+                                        .padding(4.dp)
                                 )
                             }
-                        } catch (_: Exception) {
-                            snackbarHostState.showSnackbar(
-                                "Location detection failed. Please check GPS settings."
+                        }
+
+                        val validRecents = remember(recentSearches) {
+                            recentSearches.filter { it.lat != 0.0 && it.lng != 0.0 && !it.lat.isNaN() && !it.lng.isNaN() }
+                        }
+
+                        if (validRecents.isEmpty()) {
+                            Text(
+                                text = "No recent searches yet",
+                                fontSize = 13.sp,
+                                color = InkMuted,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                             )
-                        } finally {
-                            isLocatingForRoutes = false
+                        } else {
+                            validRecents.forEach { recent ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            showSuggestions = false
+                                            focusManager.clearFocus()
+                                            keyboardController?.hide()
+                                            selectedRouteId = null
+                                            selectedMarker = MapMarker(
+                                                id = recent.placeId ?: recent.id,
+                                                name = recent.name,
+                                                kind = recent.category,
+                                                lat = recent.lat,
+                                                lng = recent.lng,
+                                                area = recent.address
+                                            )
+                                            viewModel.saveRecentSearch(
+                                                placeId = recent.placeId,
+                                                name = recent.name,
+                                                address = recent.address,
+                                                category = recent.category,
+                                                lat = recent.lat,
+                                                lng = recent.lng
+                                            )
+                                            coroutineScope.launch {
+                                                cameraPositionState.animate(
+                                                    CameraUpdateFactory.newLatLngZoom(LatLng(recent.lat, recent.lng), 16.5f),
+                                                    600
+                                                )
+                                            }
+                                        }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.History,
+                                        contentDescription = null,
+                                        tint = InkMuted,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = recent.name,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Ink,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = recent.address ?: recent.category,
+                                            fontSize = 12.sp,
+                                            color = InkMuted,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.removeRecentSearch(recent.id) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Remove",
+                                            tint = InkMuted,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                if (isLocatingForRoutes) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
-                        color = Brand600,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.NearMe,
-                        contentDescription = null,
-                        tint = Brand600,
-                        modifier = Modifier.size(16.dp)
-                    )
+            }
+
+            val matchingPlaces = remember(mapSearchQuery, searchResultsPlaces, dbPlaces) {
+                if (mapSearchQuery.isBlank()) emptyList()
+                else {
+                    val combined = (searchResultsPlaces + dbPlaces.filter {
+                        it.name.contains(mapSearchQuery, true) || (it.area?.contains(mapSearchQuery, true) == true)
+                    })
+                    val seen = mutableSetOf<String>()
+                    combined.filter { seen.add(it.name.lowercase().trim()) }.take(6)
                 }
-                Text(
-                    text = if (isLocatingForRoutes) "Locating…" else "Routes Near Me",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isLocatingForRoutes) Brand600 else Ink
-                )
+            }
+            val matchingRoutes = remember(mapSearchQuery, dbRoutes) {
+                if (mapSearchQuery.isBlank()) emptyList()
+                else dbRoutes.filter { it.code.contains(mapSearchQuery, true) || it.name.contains(mapSearchQuery, true) || it.destination.contains(mapSearchQuery, true) }.take(4)
+            }
+
+            if (showSuggestions && mapSearchQuery.trim().length >= 2) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    color = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 56.dp)
+                        .imePadding()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(vertical = 6.dp)
+                            .heightIn(max = 280.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        matchingPlaces.forEach { place ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showSuggestions = false
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                        selectedRouteId = null
+                                        selectedMarker = MapMarker(
+                                            id = place.id,
+                                            name = place.name,
+                                            kind = place.kind,
+                                            lat = place.lat,
+                                            lng = place.lng,
+                                            area = place.area
+                                        )
+                                        viewModel.saveRecentSearch(
+                                            placeId = place.id,
+                                            name = place.name,
+                                            address = place.area,
+                                            category = place.kind,
+                                            lat = place.lat,
+                                            lng = place.lng
+                                        )
+                                        if (place.lat != 0.0 && place.lng != 0.0) {
+                                            coroutineScope.launch {
+                                                cameraPositionState.animate(
+                                                    CameraUpdateFactory.newLatLngZoom(LatLng(place.lat, place.lng), 16.5f),
+                                                    600
+                                                )
+                                            }
+                                        }
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(Icons.Default.Place, contentDescription = null, tint = Brand600, modifier = Modifier.size(18.dp))
+                                Column {
+                                    Text(place.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                    Text(place.area ?: "Cagayan de Oro City", fontSize = 12.sp, color = InkMuted)
+                                }
+                            }
+                        }
+
+                        matchingRoutes.forEach { route ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showSuggestions = false
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                        onNavigateRouteInfo(route.id)
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                RouteBadge(code = route.code, colorHex = route.color, size = BadgeSize.Sm)
+                                Column {
+                                    Text("Route ${route.code} — ${route.name}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                    Text("${route.origin} → ${route.destination}", fontSize = 12.sp, color = InkMuted)
+                                }
+                            }
+                        }
+
+                        if (isSearchingPlaces && matchingPlaces.isEmpty() && matchingRoutes.isEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                CircularProgressIndicator(color = Brand600, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                Text("Searching locations…", fontSize = 13.sp, color = InkMuted)
+                            }
+                        } else if (!isSearchingPlaces && matchingPlaces.isEmpty() && matchingRoutes.isEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Default.SearchOff, contentDescription = null, tint = InkMuted, modifier = Modifier.size(18.dp))
+                                Text("No matching locations found", fontSize = 13.sp, color = InkMuted)
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // 2b. CURRENT-LOCATION / GPS FLOATING BUTTON
-        Surface(
-            color = Color.White,
-            shape = CircleShape,
-            shadowElevation = 6.dp,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(
-                    end = 16.dp,
-                    bottom = if (selectedMarker != null || viewModel.recommendedJeepneyTrip != null || viewModel.directionsGuide != null || focusedTripOptionId != null) 235.dp else 140.dp
-                )
-                .size(48.dp)
-                .clickable { requestLocationOrSettings() }
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = when {
-                        isLocating -> Icons.Default.LocationSearching
-                        hasLocationPermission -> Icons.Default.MyLocation
-                        else -> Icons.Default.LocationDisabled
-                    },
-                    contentDescription = "Center on current location",
-                    tint = if (hasLocationPermission) Brand600 else InkMuted,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
 
         // 3. BOTTOM CARD VARIANTS
         Box(
@@ -2171,9 +2669,366 @@ fun MapScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            if (viewModel.routeGuidance != null) {
+            if (viewModel.mapDirectionsState != null) {
+                val mapDir = viewModel.mapDirectionsState!!
+                Surface(
+                    color = Color.White,
+                    shape = RoundedCornerShape(20.dp),
+                    shadowElevation = 10.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .heightIn(max = 420.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        // Header: Back icon + Title/Subtitle + Close icon
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                IconButton(
+                                    onClick = { viewModel.clearMapDirections() },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back to place card",
+                                        tint = Ink
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "Directions to ${mapDir.destinationName}",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Ink,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = if (mapDir.isGpsOrigin) "From Your Location" else "From ${mapDir.originName}",
+                                        fontSize = 11.sp,
+                                        color = InkMuted
+                                    )
+                                }
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    viewModel.clearMapDirections()
+                                    selectedMarker = null
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Close", tint = InkMuted)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        if (mapDir.isLoading) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    color = Brand600,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text("Finding verified jeepney routes…", fontSize = 13.sp, color = InkSoft)
+                            }
+                        } else if (mapDir.noRouteFound) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFFFF8E1), RoundedCornerShape(12.dp))
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.Info, contentDescription = null, tint = Warn600, modifier = Modifier.size(18.dp))
+                                    Text(
+                                        text = "No suitable verified jeepney route found",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Ink
+                                    )
+                                }
+                                Text(
+                                    text = "No traditional jeepney routes directly serve this trip between ${mapDir.originName} and ${mapDir.destinationName}.",
+                                    fontSize = 12.sp,
+                                    color = InkSoft
+                                )
+                                if (mapDir.walkingOnlyPoints != null && mapDir.walkingOnlyPoints.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "A walking line guide is drawn on the map (~${mapDir.walkingDistanceMeters}m · ~${mapDir.walkingMinutes} min). Clearly labeled: Walking only, not a jeepney route.",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Brand700
+                                    )
+                                }
+                            }
+                        } else if (mapDir.selectedTrip != null) {
+                            val trip = mapDir.selectedTrip!!
+                            val r = trip.segments.firstOrNull()
+
+                            // Multiple valid itineraries switcher
+                            if (mapDir.itineraries.size > 1) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    mapDir.itineraries.forEachIndexed { idx, itOption ->
+                                        val isSel = idx == mapDir.selectedIndex
+                                        val itCode = itOption.segments.firstOrNull()?.code ?: "JEEP"
+                                        Surface(
+                                            onClick = { viewModel.selectDirectionsItinerary(idx) },
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isSel) Brand50 else Color(0xFFF7F9F8),
+                                            border = BorderStroke(1.dp, if (isSel) Brand600 else Line),
+                                            modifier = Modifier.padding(bottom = 6.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                RouteBadge(code = itCode, colorHex = itOption.segments.firstOrNull()?.color ?: "#1471B0", size = BadgeSize.Sm)
+                                                Text(
+                                                    text = "${itOption.minutes} min · ₱${"%.2f".format(itOption.regularFare)}",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isSel) Brand700 else Ink
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                            }
+
+                            // Summary row: Estimated time & Fare
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFF4FBF7), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "${trip.minutes} mins (estimated)",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Ink
+                                    )
+                                    Text(
+                                        text = "${(trip.totalKm * 10).toInt() / 10.0} km total distance",
+                                        fontSize = 11.sp,
+                                        color = InkMuted
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "₱${"%.2f".format(trip.regularFare)} (estimated)",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Brand600
+                                    )
+                                    Text(
+                                        text = "Traditional Jeepney",
+                                        fontSize = 11.sp,
+                                        color = InkMuted
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Step-by-step Ordered itinerary:
+                            // Origin -> walk to boarding -> ride route -> alight -> walk to dest
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.White)
+                                    .padding(vertical = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                // Step 1: Origin
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Brand50),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.MyLocation, contentDescription = null, tint = Brand600, modifier = Modifier.size(14.dp))
+                                    }
+                                    Column {
+                                        Text(
+                                            text = mapDir.originName,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Ink
+                                        )
+                                        Text(
+                                            text = "Trip Starting Point",
+                                            fontSize = 11.sp,
+                                            color = InkMuted
+                                        )
+                                    }
+                                }
+
+                                // Step 2: Walk to boarding stop
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFF0F4F8)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.DirectionsWalk, contentDescription = null, tint = Color(0xFF1565C0), modifier = Modifier.size(14.dp))
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "Walk to ${trip.boardingName ?: "Boarding Stop"}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Ink
+                                        )
+                                        Text(
+                                            text = "${trip.walkMeters / 2}m · ~${maxOf(1, trip.walkMeters / 160)} min walk",
+                                            fontSize = 11.sp,
+                                            color = InkMuted
+                                        )
+                                    }
+                                }
+
+                                // Step 3: Ride Jeepney
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    RouteBadge(code = r?.code ?: "JEEP", colorHex = r?.color ?: "#1471B0", size = BadgeSize.Sm)
+                                    Column {
+                                        Text(
+                                            text = "Ride Route ${r?.code ?: ""} (${r?.routeName ?: "Jeepney"})",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Ink
+                                        )
+                                        Text(
+                                            text = "Direction: ${trip.direction ?: "Inbound"} · ${(trip.totalKm * 10).toInt() / 10.0} km",
+                                            fontSize = 11.sp,
+                                            color = Brand700
+                                        )
+                                    }
+                                }
+
+                                // Step 4: Alight at stop
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFFF3E0)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Place, contentDescription = null, tint = Warn600, modifier = Modifier.size(14.dp))
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "Alight at ${trip.dropoffName ?: "Alighting Stop"}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Ink
+                                        )
+                                        Text(
+                                            text = "Signal driver to stop ('Lugar lang')",
+                                            fontSize = 11.sp,
+                                            color = InkMuted
+                                        )
+                                    }
+                                }
+
+                                // Step 5: Walk to destination
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFF0F4F8)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.DirectionsWalk, contentDescription = null, tint = Color(0xFF1565C0), modifier = Modifier.size(14.dp))
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "Walk to ${mapDir.destinationName}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Ink
+                                        )
+                                        Text(
+                                            text = "${trip.walkMeters / 2}m · ~${maxOf(1, trip.walkMeters / 160)} min walk",
+                                            fontSize = 11.sp,
+                                            color = InkMuted
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Start / Travel Guidance Button
+                            OroButton(
+                                text = "Start / Travel Guidance",
+                                onClick = { onStartNavigation(trip.id) },
+                                variant = ButtonVariant.Primary,
+                                size = ButtonSize.Sm,
+                                fullWidth = true
+                            )
+                        }
+                    }
+                }
+            } else if (viewModel.routeGuidance != null) {
                 val guidance = viewModel.routeGuidance!!
                 val route = guidance.route
+
 
                 Surface(
                     color = Color.White,
@@ -2635,10 +3490,10 @@ fun MapScreen(
                 val m = selectedMarker!!
                 val isLandmark = m.kind !in listOf("terminal", "loading", "unloading", "transfer")
 
-                // Selected Landmark / Place Card
+                // Selected Landmark / Place Card (Matches reference screenshot)
                 Surface(
                     color = Color.White,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(20.dp),
                     shadowElevation = 8.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -2653,7 +3508,7 @@ fun MapScreen(
                                 "loading" -> Ok600
                                 "unloading" -> Bad600
                                 "transfer" -> Warn600
-                                else -> Oro600
+                                else -> Color(0xFFE65100) // Amber/Orange as in reference screenshot
                             }
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(badgeColor))
@@ -2686,47 +3541,50 @@ fun MapScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         Text(
                             text = m.name,
-                            fontSize = 17.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Ink
+                            color = Ink,
+                            lineHeight = 22.sp
                         )
 
-                        val addressText = if (!m.area.isNullOrBlank()) "${m.area}, Cagayan de Oro City" else "Cagayan de Oro City"
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        val rawArea = m.area?.trim().orEmpty()
+                        val addressText = when {
+                            rawArea.isEmpty() -> "Cagayan de Oro City"
+                            rawArea.contains("Cagayan de Oro", ignoreCase = true) -> rawArea
+                            else -> "$rawArea, Cagayan de Oro City"
+                        }
                         Text(
                             text = addressText,
                             fontSize = 13.sp,
                             color = InkMuted
                         )
 
+                        Spacer(modifier = Modifier.height(10.dp))
+
                         // Interactive Nearby Passing Jeepneys Section
                         if (nearbyRoutesForSelectedMarker.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(10.dp))
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.DirectionsBus,
-                                        contentDescription = null,
-                                        tint = Brand600,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Text(
-                                        text = "Nearby Jeepneys (${nearbyRoutesForSelectedMarker.size} routes):",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Ink
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.DirectionsBus,
+                                    contentDescription = null,
+                                    tint = Brand600,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "Nearby Jeepneys (${nearbyRoutesForSelectedMarker.size} routes):",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Ink
+                                )
                             }
 
                             Spacer(modifier = Modifier.height(6.dp))
@@ -2749,21 +3607,21 @@ fun MapScreen(
                                             }
                                         },
                                         shape = RoundedCornerShape(10.dp),
-                                        color = if (isHighlighted) Brand50 else Canvas,
+                                        color = if (isHighlighted) Brand50 else Color(0xFFF7F9F8),
                                         border = androidx.compose.foundation.BorderStroke(
                                             1.dp,
                                             if (isHighlighted) Brand600 else Line
                                         )
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             RouteBadge(code = r.code, colorHex = r.color, size = BadgeSize.Sm)
                                             Column {
                                                 Text(
-                                                    text = r.name,
+                                                    text = "${r.name} (${r.code})",
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = Ink
@@ -2780,90 +3638,76 @@ fun MapScreen(
                                     }
                                 }
                             }
-                        } else if (!m.note.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = Brand600, modifier = Modifier.size(14.dp))
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DirectionsBus,
+                                    contentDescription = null,
+                                    tint = InkMuted,
+                                    modifier = Modifier.size(15.dp)
+                                )
                                 Text(
-                                    text = if (isLandmark) "Nearby Jeepneys: ${m.note}" else "Routes served: ${m.note}",
+                                    text = "Nearby Jeepneys:",
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = InkSoft
+                                    fontWeight = FontWeight.Bold,
+                                    color = Ink
                                 )
                             }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "No verified jeepney routes directly serve this location.",
+                                fontSize = 12.sp,
+                                color = InkMuted
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(14.dp))
 
                         // Interactive Action Buttons
-                        if (isLandmark || m.kind == "terminal") {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                // [Get Directions] Button
-                                OroButton(
-                                    text = if (viewModel.isCalculatingDirections) "Calculating…" else "Get Directions",
-                                    onClick = {
-                                        if (!hasLocationPermission) {
-                                            permissionLauncher.launch(LocationPermissions.runtimePermissions)
-                                        } else {
-                                            coroutineScope.launch {
-                                                val loc = userLocation ?: cdoCenter
-                                                val destLat = m.lat ?: cdoCenter.latitude
-                                                val destLng = m.lng ?: cdoCenter.longitude
-                                                viewModel.calculateDirections(
-                                                    fromLat = loc.latitude,
-                                                    fromLng = loc.longitude,
-                                                    toLat = destLat,
-                                                    toLng = destLng,
-                                                    fromName = "Current Location",
-                                                    toName = m.name
-                                                )
-                                                val bounds = LatLngBounds.builder()
-                                                    .include(loc)
-                                                    .include(LatLng(destLat, destLng))
-                                                    .build()
-                                                cameraPositionState.animate(
-                                                    CameraUpdateFactory.newLatLngBounds(bounds, 120),
-                                                    600
-                                                )
-                                            }
-                                        }
-                                    },
-                                    variant = ButtonVariant.Primary,
-                                    size = ButtonSize.Sm,
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                // [View Jeepney Routes] Button
-                                OroButton(
-                                    text = "View Jeepney Routes",
-                                    onClick = {
-                                        nearbyRoutesTarget = NearbyRoutesSheetTarget(
-                                            title = m.name,
-                                            subtitle = if (!m.area.isNullOrBlank()) "${m.area}, Cagayan de Oro City" else "Cagayan de Oro City",
-                                            lat = m.lat,
-                                            lng = m.lng,
-                                            note = m.note
-                                        )
-                                        if (viewModel.routesState is Resource.Error || dbRoutes.isEmpty()) {
-                                            viewModel.loadRoutes()
-                                        }
-                                    },
-                                    variant = ButtonVariant.Secondary,
-                                    size = ButtonSize.Sm,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        } else {
-                            // Loading / Unloading / Transfer Points
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // [Get Directions] Button
                             OroButton(
-                                text = "View Jeepney Routes",
+                                text = "Get Directions",
                                 onClick = {
+                                    val destLat = m.lat ?: cdoCenter.latitude
+                                    val destLng = m.lng ?: cdoCenter.longitude
+                                    if (hasLocationPermission && userLocation != null) {
+                                        viewModel.startMapDirections(
+                                            fromLat = userLocation!!.latitude,
+                                            fromLng = userLocation!!.longitude,
+                                            fromName = "Your Location",
+                                            toLat = destLat,
+                                            toLng = destLng,
+                                            toName = m.name,
+                                            isGpsOrigin = true
+                                        )
+                                    } else {
+                                        showManualOriginDialog = true
+                                    }
+                                },
+                                variant = ButtonVariant.Primary,
+                                size = ButtonSize.Sm,
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            // [View Jeepney Routes] Button (Soft mint styling matching reference)
+                            Surface(
+                                onClick = {
+                                    val rawAreaForTarget = m.area?.trim().orEmpty()
+                                    val targetSubtitle = when {
+                                        rawAreaForTarget.isEmpty() -> "Cagayan de Oro City"
+                                        rawAreaForTarget.contains("Cagayan de Oro", ignoreCase = true) -> rawAreaForTarget
+                                        else -> "$rawAreaForTarget, Cagayan de Oro City"
+                                    }
                                     nearbyRoutesTarget = NearbyRoutesSheetTarget(
                                         title = m.name,
-                                        subtitle = if (!m.area.isNullOrBlank()) "${m.area}, Cagayan de Oro City" else "Cagayan de Oro City",
+                                        subtitle = targetSubtitle,
                                         lat = m.lat,
                                         lng = m.lng,
                                         note = m.note
@@ -2872,75 +3716,21 @@ fun MapScreen(
                                         viewModel.loadRoutes()
                                     }
                                 },
-                                variant = ButtonVariant.Primary,
-                                size = ButtonSize.Sm,
-                                fullWidth = true
-                            )
-                        }
-                    }
-                }
-            } else if (viewModel.directionsGuide != null) {
-                // Active Directions Summary Card
-                val g = viewModel.directionsGuide!!
-                Surface(
-                    color = Color.White,
-                    shape = RoundedCornerShape(16.dp),
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("ROUTE TO DESTINATION", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Brand600)
-                            IconButton(onClick = { viewModel.clearDirections() }, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = "Close", tint = InkMuted)
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(g.destinationName, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink)
-                        Text(
-                            "From Current Location · ${(g.distanceMeters / 1000.0).let { "%.1f".format(it) }} km · ~${g.estimatedMinutes} mins",
-                            fontSize = 13.sp,
-                            color = InkMuted
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            OroButton(
-                                text = "View Jeepney Routes",
-                                onClick = {
-                                    nearbyRoutesTarget = NearbyRoutesSheetTarget(
-                                        title = g.destinationName,
-                                        subtitle = "Destination · Cagayan de Oro City",
-                                        lat = g.destinationLat,
-                                        lng = g.destinationLng,
-                                        note = null
+                                shape = RoundedCornerShape(10.dp),
+                                color = Brand50,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "View Jeepney Routes",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Brand700
                                     )
-                                    if (viewModel.routesState is Resource.Error || dbRoutes.isEmpty()) {
-                                        viewModel.loadRoutes()
-                                    }
-                                },
-                                variant = ButtonVariant.Primary,
-                                size = ButtonSize.Sm,
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            OroButton(
-                                text = "Clear",
-                                onClick = { viewModel.clearDirections() },
-                                variant = ButtonVariant.Ghost,
-                                size = ButtonSize.Sm,
-                                modifier = Modifier.weight(1f)
-                            )
+                                }
+                            }
                         }
                     }
                 }
@@ -2979,67 +3769,6 @@ fun MapScreen(
                         )
                     }
                 }
-            } else {
-                // Default: Horizontal Route Chips + Legend
-                Surface(
-                    color = Color.White,
-                    shape = RoundedCornerShape(16.dp),
-                    shadowElevation = 6.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        val cdoRouteChips = remember(dbRoutes) {
-                            if (dbRoutes.isNotEmpty()) {
-                                dbRoutes.map { Triple(it.id, it.code, it.color) }
-                            } else {
-                                listOf(
-                                    Triple("785b6016-46e6-4dbb-9e9d-147d2ba36ef7", "R1", "#1471B0"),
-                                    Triple("ab2932ac-f720-4ddf-b8da-d1ce269bf890", "R2", "#B45F00"),
-                                    Triple("5e26a5b7-ab6e-470e-96f9-a109990ffbe0", "R-BAI", "#1E8A4C"),
-                                    Triple("70d79bf1-bb70-4eec-9673-43b92cd1f420", "R-BAL", "#7A3EE6")
-                                )
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            cdoRouteChips.forEach { (id, code, color) ->
-                                Surface(
-                                    onClick = { onNavigateRouteInfo(id) },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Canvas,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        RouteBadge(code = code, colorHex = color, size = BadgeSize.Sm)
-                                        Text(text = "Route $code", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Map Legend
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            LegendItem(color = Brand700, label = "Terminal")
-                            LegendItem(color = Ok600, label = "Loading")
-                            LegendItem(color = Bad600, label = "Unloading")
-                            LegendItem(color = Oro500, label = "Transfer")
-                        }
-                    }
-                }
             }
         }
 
@@ -3054,7 +3783,7 @@ fun MapScreen(
                     .padding(
                         start = 16.dp,
                         end = 16.dp,
-                        bottom = if (selectedMarker != null || focusedTripOptionId != null) 195.dp else 142.dp
+                        bottom = if (selectedMarker != null || focusedTripOptionId != null) 230.dp else 16.dp
                     )
                     .fillMaxWidth()
             ) {
@@ -3087,6 +3816,118 @@ fun MapScreen(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 90.dp)
         )
+
+        // Manual Origin Selection Dialog (when GPS is unavailable or denied)
+        if (showManualOriginDialog && selectedMarker != null) {
+            val m = selectedMarker!!
+            val destLat = m.lat ?: cdoCenter.latitude
+            val destLng = m.lng ?: cdoCenter.longitude
+
+            AlertDialog(
+                onDismissRequest = { showManualOriginDialog = false },
+                title = {
+                    Text(
+                        text = "Choose Starting Point",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = Ink
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = "GPS location is unavailable or location permission was not granted. Please enable GPS or select a starting location in Cagayan de Oro to get directions to ${m.name}:",
+                            fontSize = 13.sp,
+                            color = InkSoft
+                        )
+
+                        if (!hasLocationPermission) {
+                            OroButton(
+                                text = "Enable GPS Location",
+                                onClick = {
+                                    showManualOriginDialog = false
+                                    permissionLauncher.launch(LocationPermissions.runtimePermissions)
+                                },
+                                variant = ButtonVariant.Secondary,
+                                size = ButtonSize.Sm,
+                                fullWidth = true
+                            )
+                        }
+
+                        HorizontalDivider(color = Line)
+
+                        Text(
+                            text = "Common CDO Starting Points:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = InkMuted
+                        )
+
+                        val hubs = listOf(
+                            Triple("Carmen Public Market", 8.4831, 124.6364),
+                            Triple("Cogon Public Market", 8.4772, 124.6496),
+                            Triple("Divisoria Plaza", 8.4770, 124.6444),
+                            Triple("Limketkai Center", 8.4837, 124.6567),
+                            Triple("Agora / Eastbound Terminal", 8.4907, 124.6618),
+                            Triple("Bulua / Westbound Terminal", 8.5085, 124.6190)
+                        )
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 200.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            hubs.forEach { (hubName, hLat, hLng) ->
+                                Surface(
+                                    onClick = {
+                                        showManualOriginDialog = false
+                                        viewModel.startMapDirections(
+                                            fromLat = hLat,
+                                            fromLng = hLng,
+                                            fromName = hubName,
+                                            toLat = destLat,
+                                            toLng = destLng,
+                                            toName = m.name,
+                                            isGpsOrigin = false
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Brand50,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Place,
+                                            contentDescription = null,
+                                            tint = Brand600,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = hubName,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Ink
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showManualOriginDialog = false }) {
+                        Text("Cancel", color = InkMuted)
+                    }
+                }
+            )
+        }
     }
 }
 

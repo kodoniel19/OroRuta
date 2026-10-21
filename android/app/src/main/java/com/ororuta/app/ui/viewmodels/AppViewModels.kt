@@ -13,6 +13,8 @@ import com.ororuta.app.data.local.entities.LocalSavedDestination
 import com.ororuta.app.data.local.entities.LocalSavedTrip
 import com.ororuta.app.data.local.entities.CachedRoute
 import com.ororuta.app.data.location.CdoLocationProvider
+import com.ororuta.app.data.local.dao.RecentSearchDao
+import com.ororuta.app.data.local.entities.RecentSearchEntity
 import com.ororuta.app.data.repository.*
 import com.ororuta.app.domain.models.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,6 +26,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import javax.inject.Inject
+
 
 enum class LocationStatus { UNKNOWN, GRANTED, DENIED }
 
@@ -628,14 +631,257 @@ data class RouteGuidance(
     val routePoints: List<com.google.android.gms.maps.model.LatLng>
 )
 
+data class MapDirectionsState(
+    val originName: String,
+    val originLat: Double,
+    val originLng: Double,
+    val destinationName: String,
+    val destinationLat: Double,
+    val destinationLng: Double,
+    val itineraries: List<TripOption> = emptyList(),
+    val selectedIndex: Int = 0,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null,
+    val noRouteFound: Boolean = false,
+    val walkingOnlyPoints: List<com.google.android.gms.maps.model.LatLng>? = null,
+    val walkingDistanceMeters: Int? = null,
+    val walkingMinutes: Int? = null,
+    val isGpsOrigin: Boolean = true,
+    val walkToBoardPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList(),
+    val jeepneyPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList(),
+    val walkFromDropPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList()
+) {
+    val selectedTrip: TripOption?
+        get() = itineraries.getOrNull(selectedIndex)
+}
+
 // Map ViewModel (Database-driven Routes, Places, Landmarks, Directions, Recommendations)
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val routeRepo: RouteRepository,
     private val placeRepo: PlaceRepository,
     private val tripRepo: TripRepository,
-    val locationProvider: CdoLocationProvider
+    val locationProvider: CdoLocationProvider,
+    private val recentSearchDao: RecentSearchDao
 ) : ViewModel() {
+
+    val recentSearches: StateFlow<List<RecentSearchEntity>> = recentSearchDao.getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun saveRecentSearch(
+        placeId: String?,
+        name: String,
+        address: String?,
+        category: String,
+        lat: Double,
+        lng: Double
+    ) {
+        if (lat == 0.0 && lng == 0.0) return
+        if (lat.isNaN() || lng.isNaN()) return
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            val key = if (!placeId.isNullOrBlank()) placeId else name.trim().lowercase()
+            recentSearchDao.insert(
+                RecentSearchEntity(
+                    id = key,
+                    placeId = placeId,
+                    name = name.trim(),
+                    address = address?.trim(),
+                    category = category,
+                    lat = lat,
+                    lng = lng,
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+            recentSearchDao.pruneOld()
+        }
+    }
+
+    fun removeRecentSearch(id: String) {
+        viewModelScope.launch {
+            recentSearchDao.deleteById(id)
+        }
+    }
+
+    fun clearAllRecentSearches() {
+        viewModelScope.launch {
+            recentSearchDao.clearAll()
+        }
+    }
+
+    var mapDirectionsState by mutableStateOf<MapDirectionsState?>(null)
+    private var mapDirectionsJob: kotlinx.coroutines.Job? = null
+
+    fun startMapDirections(
+        fromLat: Double,
+        fromLng: Double,
+        fromName: String,
+        toLat: Double,
+        toLng: Double,
+        toName: String,
+        isGpsOrigin: Boolean = true
+    ) {
+        mapDirectionsJob?.cancel()
+        mapDirectionsState = MapDirectionsState(
+            originName = fromName,
+            originLat = fromLat,
+            originLng = fromLng,
+            destinationName = toName,
+            destinationLat = toLat,
+            destinationLng = toLng,
+            isLoading = true,
+            isGpsOrigin = isGpsOrigin
+        )
+
+        mapDirectionsJob = viewModelScope.launch {
+            val res = tripRepo.searchTrips(fromName, toName, fromLat, fromLng, toLat, toLng)
+            val trips = if (res is Resource.Success) res.data else emptyList()
+
+            // Filter valid trips strictly following OroRuta rules:
+            // Boarding stop on selected route, alighting is a different valid stop making progress
+            val validTrips = trips.filter { trip ->
+                val hasValidBoard = trip.boardingLat != null && trip.boardingLng != null &&
+                        (trip.boardingLat != 0.0 || trip.boardingLng != 0.0)
+                val hasValidDrop = trip.dropoffLat != null && trip.dropoffLng != null &&
+                        (trip.dropoffLat != 0.0 || trip.dropoffLng != 0.0)
+                val differentStops = if (hasValidBoard && hasValidDrop) {
+                    val dLat = Math.abs(trip.boardingLat!! - trip.dropoffLat!!)
+                    val dLng = Math.abs(trip.boardingLng!! - trip.dropoffLng!!)
+                    (dLat > 0.0001 || dLng > 0.0001) &&
+                            !trip.boardingName.equals(trip.dropoffName, ignoreCase = true)
+                } else false
+                hasValidBoard && hasValidDrop && differentStops && trip.segments.isNotEmpty()
+            }
+
+            if (validTrips.isNotEmpty()) {
+                validTrips.forEach { tripRepo.cacheTripOption(it) }
+                val firstTrip = validTrips.first()
+                val (wBoard, jeep, wDrop) = resolveItineraryPoints(firstTrip, fromLat, fromLng, toLat, toLng)
+
+                mapDirectionsState = mapDirectionsState?.copy(
+                    itineraries = validTrips,
+                    selectedIndex = 0,
+                    isLoading = false,
+                    noRouteFound = false,
+                    errorMessage = null,
+                    walkToBoardPoints = wBoard,
+                    jeepneyPoints = jeep,
+                    walkFromDropPoints = wDrop
+                )
+            } else {
+                // No verified jeepney route found. Check if road walking route is available and reasonable
+                val osrmResult = withContext(Dispatchers.IO) {
+                    fetchOsrmRoute(fromLng, fromLat, toLng, toLat)
+                }
+                if (osrmResult != null && osrmResult.second <= 3500) {
+                    val mins = Math.max(1, (osrmResult.second / 83.0).toInt())
+                    mapDirectionsState = mapDirectionsState?.copy(
+                        isLoading = false,
+                        noRouteFound = true,
+                        walkingOnlyPoints = osrmResult.first,
+                        walkingDistanceMeters = osrmResult.second,
+                        walkingMinutes = mins,
+                        errorMessage = null
+                    )
+                } else {
+                    mapDirectionsState = mapDirectionsState?.copy(
+                        isLoading = false,
+                        noRouteFound = true,
+                        walkingOnlyPoints = null,
+                        errorMessage = "No suitable verified jeepney route found."
+                    )
+                }
+            }
+        }
+    }
+
+    fun selectDirectionsItinerary(index: Int) {
+        val state = mapDirectionsState ?: return
+        val trip = state.itineraries.getOrNull(index) ?: return
+        viewModelScope.launch {
+            val (wBoard, jeep, wDrop) = resolveItineraryPoints(trip, state.originLat, state.originLng, state.destinationLat, state.destinationLng)
+            mapDirectionsState = state.copy(
+                selectedIndex = index,
+                walkToBoardPoints = wBoard,
+                jeepneyPoints = jeep,
+                walkFromDropPoints = wDrop
+            )
+        }
+    }
+
+    fun clearMapDirections() {
+        mapDirectionsJob?.cancel()
+        mapDirectionsState = null
+    }
+
+    private suspend fun resolveItineraryPoints(
+        trip: TripOption,
+        originLat: Double,
+        originLng: Double,
+        destLat: Double,
+        destLng: Double
+    ): Triple<List<com.google.android.gms.maps.model.LatLng>, List<com.google.android.gms.maps.model.LatLng>, List<com.google.android.gms.maps.model.LatLng>> {
+        // 1. Walking to boarding stop (real road routing via OSRM)
+        val walkToBoard = if (trip.walkToBoardCoordinates.size >= 2) {
+            trip.walkToBoardCoordinates.map { com.google.android.gms.maps.model.LatLng(it[1], it[0]) }
+        } else {
+            val bLat = trip.boardingLat ?: originLat
+            val bLng = trip.boardingLng ?: originLng
+            withContext(Dispatchers.IO) {
+                fetchOsrmRoute(originLng, originLat, bLng, bLat)?.first ?: emptyList()
+            }
+        }
+
+        // 2. Jeepney ride polyline using verified route geometry
+        val jeepney = if (trip.jeepneyCoordinates.size >= 2) {
+            trip.jeepneyCoordinates.map { com.google.android.gms.maps.model.LatLng(it[1], it[0]) }
+        } else {
+            val seg = trip.segments.firstOrNull()
+            val r = routes.find { it.id == seg?.routeId || it.code.equals(seg?.code, ignoreCase = true) }
+            if (r != null) {
+                val direction = trip.direction ?: "Inbound"
+                val fullPts = com.ororuta.app.ui.screens.parseGeometries(r, direction)
+                if (fullPts.size >= 2) {
+                    val bLat = trip.boardingLat
+                    val bLng = trip.boardingLng
+                    val dLat = trip.dropoffLat
+                    val dLng = trip.dropoffLng
+                    if (bLat != null && bLng != null && dLat != null && dLng != null) {
+                        val startIdx = fullPts.indices.minByOrNull {
+                            val p = fullPts[it]
+                            val d1 = p.latitude - bLat
+                            val d2 = p.longitude - bLng
+                            d1 * d1 + d2 * d2
+                        } ?: 0
+                        val endIdx = fullPts.indices.minByOrNull {
+                            val p = fullPts[it]
+                            val d1 = p.latitude - dLat
+                            val d2 = p.longitude - dLng
+                            d1 * d1 + d2 * d2
+                        } ?: (fullPts.size - 1)
+                        if (startIdx < endIdx) {
+                            fullPts.subList(startIdx, endIdx + 1)
+                        } else if (startIdx > endIdx) {
+                            fullPts.subList(endIdx, startIdx + 1).reversed()
+                        } else fullPts
+                    } else fullPts
+                } else fullPts
+            } else emptyList()
+        }
+
+        // 3. Walking from dropoff stop to destination (real road routing via OSRM)
+        val walkFromDrop = if (trip.walkFromDropCoordinates.size >= 2) {
+            trip.walkFromDropCoordinates.map { com.google.android.gms.maps.model.LatLng(it[1], it[0]) }
+        } else {
+            val dLat = trip.dropoffLat ?: destLat
+            val dLng = trip.dropoffLng ?: destLng
+            withContext(Dispatchers.IO) {
+                fetchOsrmRoute(dLng, dLat, destLng, destLat)?.first ?: emptyList()
+            }
+        }
+
+        return Triple(walkToBoard, jeepney, walkFromDrop)
+    }
 
     var routesState by mutableStateOf<Resource<List<Route>>>(Resource.Loading)
     val routes: List<Route>
@@ -644,6 +890,14 @@ class MapViewModel @Inject constructor(
     var placesState by mutableStateOf<Resource<List<Place>>>(Resource.Loading)
     val places: List<Place>
         get() = (placesState as? Resource.Success<List<Place>>)?.data ?: emptyList()
+
+    suspend fun searchPlaces(query: String): List<Place> {
+        if (query.isBlank()) return emptyList()
+        return when (val res = placeRepo.search(query)) {
+            is Resource.Success -> res.data
+            else -> emptyList()
+        }
+    }
 
     var directionsGuide by mutableStateOf<DirectionsGuide?>(null)
     var isCalculatingDirections by mutableStateOf(false)
@@ -658,6 +912,7 @@ class MapViewModel @Inject constructor(
         loadRoutes()
         loadPlaces()
     }
+
 
     private var mapLoadJob: kotlinx.coroutines.Job? = null
 
@@ -923,7 +1178,9 @@ class MapViewModel @Inject constructor(
     fun clearDirections() {
         directionsGuide = null
         recommendedJeepneyTrip = null
+        clearMapDirections()
     }
+
 
     fun clearRouteGuidance() {
         routeGuidance = null

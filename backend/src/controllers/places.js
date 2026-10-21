@@ -6,11 +6,12 @@ const CDO_BASE_PLACES = [];
 
 const KEY_CDO_LANDMARKS = [
   { id: 'pl-limketkai', name: 'Limketkai Center', area: 'Lapasan', kind: 'mall', lat: 8.4842, lng: 124.6568, aliases: ['limketkai', 'limkdtkai', 'ketkai', 'limketkai mall', 'limketkai center'] },
-  { id: 'pl-sm-downtown', name: 'SM CDO Downtown Premier', area: 'Lapasan', kind: 'mall', lat: 8.4855, lng: 124.6535, aliases: ['sm downtown', 'sm cdo downtown', 'sm premier', 'sm downtown premier', 'smdt'] },
-  { id: 'pl-centrio', name: 'Centrio Mall', area: 'Poblacion', kind: 'mall', lat: 8.4877, lng: 124.6517, aliases: ['centrio', 'centrio mall', 'ayala centrio'] },
+  { id: 'pl-sm-downtown', name: 'SM CDO Downtown Premier', area: 'Lapasan', kind: 'mall', lat: 8.4855, lng: 124.6535, aliases: ['sm downtown', 'sm cdo downtown', 'sm premier', 'sm downtown premier', 'smdt', 'sm premier cdo', 'sm cdo'] },
+  { id: 'pl-centrio', name: 'Centrio Mall', area: 'Poblacion', kind: 'mall', lat: 8.4877, lng: 124.6517, aliases: ['centrio', 'centrio mall', 'ayala centrio', 'ayala mall'] },
   { id: 'pl-cogon', name: 'Cogon Market', area: 'Cogon', kind: 'market', lat: 8.4735, lng: 124.6497, aliases: ['cogon', 'cogon market', 'cogon public market'] },
   { id: 'pl-cathedral', name: 'St. Augustine Metropolitan Cathedral', area: 'Poblacion', kind: 'landmark', lat: 8.4777, lng: 124.6433, aliases: ['cathedral', 'st augustine', 'st. augustine cathedral', 'san agustin', 'san agustin church'] },
-  { id: 'pl-miami-inn', name: 'Miami Inn Carmen', area: 'Carmen', kind: 'landmark', lat: 8.477285, lng: 124.637633, aliases: ['miami inn', 'miami inn carmen', 'vamenta'] }
+  { id: 'pl-miami-inn', name: 'Miami Inn Carmen', area: 'Carmen', kind: 'landmark', lat: 8.477285, lng: 124.637633, aliases: ['miami inn', 'miami inn carmen', 'vamenta'] },
+  { id: 'pl-madonna-hospital', name: 'Madonna and Child Hospital', area: 'Carmen', kind: 'hospital', lat: 8.4772152, lng: 124.6352344, aliases: ['madonna', 'madonna hospital', 'madonna and child', 'madonna & child', 'madonna & child hospital'] }
 ];
 
 function levenshteinDistance(a, b) {
@@ -138,6 +139,46 @@ async function list(req, res, next) {
             [`%${cleanQ}%`, `%${cleanQ}%`]
           );
           rows = rows.concat(lps);
+        }
+      } catch (_) {}
+    }
+
+    if (cleanQ && cleanQ.length >= 2 && filter !== "terminals") {
+      try {
+        const nomRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQ)}&viewbox=124.40,8.65,124.85,8.30&countrycodes=ph&format=json&addressdetails=1&limit=6`,
+          { headers: { 'User-Agent': 'OroRutaApp/1.0' }, signal: AbortSignal.timeout(2500) }
+        );
+        if (nomRes.ok) {
+          const items = await nomRes.json();
+          for (const item of items) {
+            const lat = parseFloat(item.lat);
+            const lng = parseFloat(item.lon);
+            if (lat >= 8.30 && lat <= 8.65 && lng >= 124.45 && lng <= 124.85) {
+              const name = item.name || (item.display_name ? item.display_name.split(',')[0].trim() : cleanQ);
+              const addr = item.address || {};
+              const area = addr.suburb || addr.neighbourhood || addr.quarter || addr.city || "Cagayan de Oro";
+              const rawType = item.type || "";
+              let kind = "landmark";
+              if (rawType.includes("hospital") || name.toLowerCase().includes("hospital")) kind = "hospital";
+              else if (rawType.includes("mall") || name.toLowerCase().includes("mall") || name.toLowerCase().includes("sm ")) kind = "mall";
+              else if (rawType.includes("school") || rawType.includes("university") || name.toLowerCase().includes("university")) kind = "school";
+              else if (rawType.includes("market") || name.toLowerCase().includes("market")) kind = "market";
+              else if (rawType.includes("bus") || rawType.includes("terminal")) kind = "terminal";
+              else if (rawType.includes("highway") || rawType.includes("residential") || name.toLowerCase().includes("street") || name.toLowerCase().includes("avenue")) kind = "street";
+
+              rows.push({
+                id: `geo_${lat}_${lng}`,
+                name,
+                area,
+                kind,
+                map_x: lng,
+                map_y: lat,
+                lat,
+                lng
+              });
+            }
+          }
         }
       } catch (_) {}
     }

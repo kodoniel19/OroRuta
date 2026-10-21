@@ -74,4 +74,6 @@ object AppModule {
     @Provides fun provideHistoryDao(db: OroRutaDatabase): HistoryDao = db.historyDao()
     @Provides fun provideSavedTripsDao(db: OroRutaDatabase): SavedTripsDao = db.savedTripsDao()
     @Provides fun provideSavedDestinationsDao(db: OroRutaDatabase): SavedDestinationsDao = db.savedDestinationsDao()
+    @Provides fun provideRecentSearchDao(db: OroRutaDatabase): RecentSearchDao = db.recentSearchDao()
 }
+
