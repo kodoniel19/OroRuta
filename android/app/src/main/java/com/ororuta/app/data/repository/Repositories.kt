@@ -101,6 +101,11 @@ class TripRepository @Inject constructor(
             return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         }
 
+        val cleanTokens = destClean
+            .replace(Regex("[-–—\\(\\)]"), " ")
+            .split("\\s+".toRegex())
+            .filter { it.length >= 3 && it !in setOf("main", "campus", "university", "school", "center", "mall", "market", "terminal", "hospital", "area", "park", "plaza") }
+
         return try {
             val cached = routeDao.getAllSync()
             val matched = cached.mapNotNull { cachedRoute ->
@@ -108,11 +113,31 @@ class TripRepository @Inject constructor(
             }.filter { route ->
                 route.jeepneyType.equals("Traditional", ignoreCase = true) || route.jeepneyType.isBlank()
             }.filter { route ->
-                val inDest = route.destination.lowercase().contains(destClean) || destClean.contains(route.destination.lowercase()) ||
-                        route.landmarks.any { it.name.lowercase().contains(destClean) || destClean.contains(it.name.lowercase()) } ||
-                        route.stops.any { it.name.lowercase().contains(destClean) || destClean.contains(it.name.lowercase()) } ||
-                        route.terminals.any { it.name.lowercase().contains(destClean) || destClean.contains(it.name.lowercase()) }
-                inDest
+                val candidatePoints = mutableListOf<Pair<Double, Double>>()
+                route.terminals.forEach { if (it.lat != 0.0 && it.lng != 0.0) candidatePoints.add(Pair(it.lat, it.lng)) }
+                route.stops.forEach { if (it.lat != 0.0 && it.lng != 0.0) candidatePoints.add(Pair(it.lat, it.lng)) }
+                route.transfers.forEach { if (it.lat != 0.0 && it.lng != 0.0) candidatePoints.add(Pair(it.lat, it.lng)) }
+
+                val hasStopNearTarget = candidatePoints.any { (lat, lng) ->
+                    haversine(tLat, tLng, lat, lng) <= 1200.0
+                }
+                val hasGeomNearTarget = route.geometries.any { g ->
+                    try {
+                        val coords = org.json.JSONObject(g.geometry ?: "").getJSONArray("coordinates")
+                        (0 until coords.length()).any { i ->
+                            val pt = coords.getJSONArray(i)
+                            haversine(tLat, tLng, pt.getDouble(1), pt.getDouble(0)) <= 800.0
+                        }
+                    } catch (_: Exception) { false }
+                }
+                val textMatch = cleanTokens.isNotEmpty() && cleanTokens.any { token ->
+                    route.destination.lowercase().contains(token) ||
+                    route.name.lowercase().contains(token) ||
+                    route.landmarks.any { it.name.lowercase().contains(token) } ||
+                    route.stops.any { it.name.lowercase().contains(token) } ||
+                    route.terminals.any { it.name.lowercase().contains(token) }
+                }
+                hasStopNearTarget || hasGeomNearTarget || textMatch
             }.take(5)
 
             matched.mapIndexed { idx, route ->
@@ -137,6 +162,13 @@ class TripRepository @Inject constructor(
                 val rideDistKm = haversine(bestBoarding.second, bestBoarding.third, bestDrop.second, bestDrop.third) / 1000.0
                 val totalMeters = walkToBoardDist + (rideDistKm * 1000).toInt() + walkFromDropDist
                 val estMins = Math.max(10, (totalMeters / 250.0).toInt())
+
+                val effectiveKm = if (rideDistKm > 0.5) rideDistKm else 4.0
+                val fareCalc = com.ororuta.app.domain.fare.TraditionalJeepneyFareService.calculateFareForDistance(
+                    distanceKm = effectiveKm,
+                    category = com.ororuta.app.domain.fare.PassengerCategory.REGULAR,
+                    jeepneyType = route.jeepneyType
+                )
 
                 TripOption(
                     id = "local_${route.id}_$idx",
@@ -163,12 +195,16 @@ class TripRepository @Inject constructor(
                             color = route.color,
                             jeepneyType = route.jeepneyType,
                             routeStatus = route.status,
-                            km = if (rideDistKm > 0.5) rideDistKm else route.lengthKm
+                            km = effectiveKm,
+                            minutes = estMins,
+                            fare = fareCalc.regularFare,
+                            discountFare = fareCalc.discountedFare
                         )
                     ),
-                    totalKm = if (rideDistKm > 0.5) rideDistKm else route.lengthKm,
-                    regularFare = route.fare,
-                    discountFare = route.fare * 0.8
+                    totalKm = effectiveKm,
+                    regularFare = fareCalc.regularFare,
+                    discountFare = fareCalc.discountedFare,
+                    isEstimatedFare = true
                 )
             }
         } catch (_: Exception) {
@@ -211,10 +247,12 @@ class PlaceRepository @Inject constructor(
 ) {
     companion object {
         val CURATED_CDO_LANDMARKS = listOf(
-            Place("pl-limketkai", "Limketkai Center", "Lapasan", "mall", 124.6568, 8.4842, 8.4842, 124.6568),
-            Place("pl-sm-downtown", "SM CDO Downtown Premier", "Lapasan", "mall", 124.6535, 8.4855, 8.4855, 124.6535),
-            Place("pl-centrio", "Centrio Mall", "Poblacion", "mall", 124.6517, 8.4877, 8.4877, 124.6517),
-            Place("pl-cogon", "Cogon Market", "Cogon", "market", 124.6497, 8.4735, 8.4735, 124.6497),
+            Place("pl-limketkai", "Limketkai Center", "Lapasan", "mall", 124.65600665305024, 8.481879913395911, 8.481879913395911, 124.65600665305024),
+            Place("pl-sm-downtown", "SM CDO Downtown Premier", "Lapasan", "mall", 124.65492954347054, 8.484385998039096, 8.484385998039096, 124.65492954347054),
+            Place("pl-centrio", "Centrio Mall", "Poblacion", "mall", 124.65132166064039, 8.48569470716317, 8.48569470716317, 124.65132166064039),
+            Place("pl-cogon", "Cogon Market", "Cogon", "market", 124.650200, 8.475400, 8.475400, 124.650200),
+            Place("pl-carmen", "Carmen Public Market", "Carmen", "market", 124.63681954401368, 8.479497843594105, 8.479497843594105, 124.63681954401368),
+            Place("pl-patag", "Camp Evangelista", "Patag", "military", 124.625586, 8.487848, 8.487848, 124.625586),
             Place("pl-cathedral", "St. Augustine Metropolitan Cathedral", "Poblacion", "landmark", 124.6433, 8.4777, 8.4777, 124.6433),
             Place("pl-miami-inn", "Miami Inn Carmen", "Carmen", "landmark", 124.637633, 8.477285, 8.477285, 124.637633),
             Place("pl-madonna-hospital", "Madonna and Child Hospital", "Carmen", "hospital", 124.6352344, 8.4772152, 8.4772152, 124.6352344)

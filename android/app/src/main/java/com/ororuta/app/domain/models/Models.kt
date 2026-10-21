@@ -84,6 +84,7 @@ data class Route(
     @SerialName("last_updated_at") val lastUpdatedAt: String? = null,
     @SerialName("terminal_count") val terminalCount: Int = 0,
     @SerialName("stop_count") val stopCount: Int = 0,
+    @SerialName("is_popular") val isPopular: Boolean = false,
     val terminals: List<Terminal> = emptyList(),
     val stops: List<LoadingPoint> = emptyList(),
     val transfers: List<TransferPoint> = emptyList(),
@@ -171,6 +172,8 @@ data class TripOption(
     @SerialName("dropoff_lat") val dropoffLat: Double? = null,
     @SerialName("dropoff_lng") val dropoffLng: Double? = null,
     @SerialName("transfer_name") val transferName: String? = null,
+    @SerialName("transfer_lat") val transferLat: Double? = null,
+    @SerialName("transfer_lng") val transferLng: Double? = null,
     val segments: List<TripSegment> = emptyList(),
     val legs: List<TripLeg> = emptyList(),
     @SerialName("totalKm") val totalKm: Double = 0.0,
@@ -181,7 +184,13 @@ data class TripOption(
     @SerialName("geometry_coordinates") val geometryCoordinates: List<List<Double>> = emptyList(),
     @SerialName("walk_to_board_coordinates") val walkToBoardCoordinates: List<List<Double>> = emptyList(),
     @SerialName("jeepney_coordinates") val jeepneyCoordinates: List<List<Double>> = emptyList(),
-    @SerialName("walk_from_drop_coordinates") val walkFromDropCoordinates: List<List<Double>> = emptyList()
+    @SerialName("walk_from_drop_coordinates") val walkFromDropCoordinates: List<List<Double>> = emptyList(),
+    @SerialName("transfer_walk_coordinates") val transferWalkCoordinates: List<List<Double>> = emptyList(),
+    @SerialName("is_estimated_fare") val isEstimatedFare: Boolean = true,
+    @SerialName("match_reason") val matchReason: String? = null,
+    @SerialName("isCheapest") val isCheapest: Boolean = false,
+    @SerialName("isFastest") val isFastest: Boolean = false,
+    @SerialName("isLeastWalk") val isLeastWalk: Boolean = false
 )
 
 @Serializable
@@ -194,7 +203,10 @@ data class TripSegment(
     val color: String = "#1471B0",
     @SerialName("jeepney_type") val jeepneyType: String = "Traditional",
     @SerialName("route_status") val routeStatus: String = "Active",
-    val km: Double = 0.0
+    val km: Double = 0.0,
+    val minutes: Int = 0,
+    val fare: Double = 0.0,
+    @SerialName("discountedFare") val discountFare: Double = 0.0
 )
 
 @Serializable

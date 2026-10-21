@@ -30,20 +30,18 @@ class RouteRepository @Inject constructor(
 ) {
     /**
      * Ensures initial offline cache is pre-populated with verified CDO routes from assets
-     * if the local database is empty on first launch.
+     * and kept up-to-date with bundled route geometries.
      */
     private suspend fun ensureInitialCache() {
-        if (dao.getAllSync().size < 40) {
-            try {
-                context.assets.open("bundled_routes.json").use { stream ->
-                    val text = stream.bufferedReader().use { it.readText() }
-                    val routes = json.decodeFromString<List<Route>>(text)
-                    if (routes.isNotEmpty()) {
-                        dao.insertAll(routes.map { it.toCached() })
-                    }
+        try {
+            context.assets.open("bundled_routes.json").use { stream ->
+                val text = stream.bufferedReader().use { it.readText() }
+                val routes = json.decodeFromString<List<Route>>(text)
+                if (routes.isNotEmpty()) {
+                    dao.insertAll(routes.map { it.toCached() })
                 }
-            } catch (_: Exception) {}
-        }
+            }
+        } catch (_: Exception) {}
     }
 
     /**

@@ -530,6 +530,10 @@ class RoutesViewModel @Inject constructor(
         loadRoutes()
     }
 
+    private fun isPopularRoute(r: Route): Boolean {
+        return r.verificationStatus.equals("USER_SUPPLIED", ignoreCase = true) || r.isPopular
+    }
+
     fun loadRoutes() {
         // Cancel any in-flight request so we never have two collectors racing.
         loadJob?.cancel()
@@ -546,7 +550,12 @@ class RoutesViewModel @Inject constructor(
                             it.jeepneyType.isBlank() ||
                             it.jeepneyType.equals("Traditional", ignoreCase = true)
                         }
-                        Resource.Success(traditionalOnly, res.isOffline)
+                        val finalFiltered = if (selectedFilter == "Popular") {
+                            traditionalOnly.filter { isPopularRoute(it) }
+                        } else {
+                            traditionalOnly
+                        }
+                        Resource.Success(finalFiltered, res.isOffline)
                     }
                     else -> res
                 }
@@ -649,7 +658,10 @@ data class MapDirectionsState(
     val isGpsOrigin: Boolean = true,
     val walkToBoardPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList(),
     val jeepneyPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList(),
-    val walkFromDropPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList()
+    val walkFromDropPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList(),
+    val transferWalkPoints: List<com.google.android.gms.maps.model.LatLng> = emptyList(),
+    val transferPoint: com.google.android.gms.maps.model.LatLng? = null,
+    val transferName: String? = null
 ) {
     val selectedTrip: TripOption?
         get() = itineraries.getOrNull(selectedIndex)
@@ -712,6 +724,75 @@ class MapViewModel @Inject constructor(
     var mapDirectionsState by mutableStateOf<MapDirectionsState?>(null)
     private var mapDirectionsJob: kotlinx.coroutines.Job? = null
 
+    var nearbySheetTripsState by mutableStateOf<Resource<List<TripOption>>?>(null)
+    private var nearbySheetSearchJob: kotlinx.coroutines.Job? = null
+
+    fun searchNearbyTrips(
+        fromLat: Double,
+        fromLng: Double,
+        fromName: String = "My Location",
+        toLat: Double,
+        toLng: Double,
+        toName: String
+    ) {
+        nearbySheetSearchJob?.cancel()
+        nearbySheetTripsState = Resource.Loading
+        nearbySheetSearchJob = viewModelScope.launch {
+            val res = tripRepo.searchTrips(
+                from = fromName,
+                to = toName,
+                fromLat = fromLat,
+                fromLng = fromLng,
+                toLat = toLat,
+                toLng = toLng
+            )
+            nearbySheetTripsState = res
+        }
+    }
+
+    fun showItineraryOnMap(
+        trip: TripOption,
+        originLat: Double,
+        originLng: Double,
+        originName: String,
+        destLat: Double,
+        destLng: Double,
+        destName: String,
+        isGpsOrigin: Boolean = true
+    ) {
+        viewModelScope.launch {
+            tripRepo.cacheTripOption(trip)
+            val (wBoard, jeep, wDrop) = resolveItineraryPoints(trip, originLat, originLng, destLat, destLng)
+            val transferPts = if (trip.transferWalkCoordinates.size >= 2) {
+                trip.transferWalkCoordinates.map { com.google.android.gms.maps.model.LatLng(it[1], it[0]) }
+            } else emptyList()
+            val transferPt = if (trip.transferLat != null && trip.transferLng != null) {
+                com.google.android.gms.maps.model.LatLng(trip.transferLat, trip.transferLng)
+            } else null
+
+            mapDirectionsState = MapDirectionsState(
+                originName = originName,
+                originLat = originLat,
+                originLng = originLng,
+                destinationName = destName,
+                destinationLat = destLat,
+                destinationLng = destLng,
+                itineraries = listOf(trip),
+                selectedIndex = 0,
+                isLoading = false,
+                noRouteFound = false,
+                errorMessage = null,
+                walkToBoardPoints = wBoard,
+                jeepneyPoints = jeep,
+                walkFromDropPoints = wDrop,
+                transferWalkPoints = transferPts,
+                transferPoint = transferPt,
+                transferName = trip.transferName,
+                isGpsOrigin = isGpsOrigin
+            )
+        }
+    }
+
     fun startMapDirections(
         fromLat: Double,
         fromLng: Double,
@@ -757,6 +838,12 @@ class MapViewModel @Inject constructor(
                 validTrips.forEach { tripRepo.cacheTripOption(it) }
                 val firstTrip = validTrips.first()
                 val (wBoard, jeep, wDrop) = resolveItineraryPoints(firstTrip, fromLat, fromLng, toLat, toLng)
+                val transferPts = if (firstTrip.transferWalkCoordinates.size >= 2) {
+                    firstTrip.transferWalkCoordinates.map { com.google.android.gms.maps.model.LatLng(it[1], it[0]) }
+                } else emptyList()
+                val transferPt = if (firstTrip.transferLat != null && firstTrip.transferLng != null) {
+                    com.google.android.gms.maps.model.LatLng(firstTrip.transferLat, firstTrip.transferLng)
+                } else null
 
                 mapDirectionsState = mapDirectionsState?.copy(
                     itineraries = validTrips,
@@ -766,7 +853,10 @@ class MapViewModel @Inject constructor(
                     errorMessage = null,
                     walkToBoardPoints = wBoard,
                     jeepneyPoints = jeep,
-                    walkFromDropPoints = wDrop
+                    walkFromDropPoints = wDrop,
+                    transferWalkPoints = transferPts,
+                    transferPoint = transferPt,
+                    transferName = firstTrip.transferName
                 )
             } else {
                 // No verified jeepney route found. Check if road walking route is available and reasonable
@@ -800,11 +890,20 @@ class MapViewModel @Inject constructor(
         val trip = state.itineraries.getOrNull(index) ?: return
         viewModelScope.launch {
             val (wBoard, jeep, wDrop) = resolveItineraryPoints(trip, state.originLat, state.originLng, state.destinationLat, state.destinationLng)
+            val transferPts = if (trip.transferWalkCoordinates.size >= 2) {
+                trip.transferWalkCoordinates.map { com.google.android.gms.maps.model.LatLng(it[1], it[0]) }
+            } else emptyList()
+            val transferPt = if (trip.transferLat != null && trip.transferLng != null) {
+                com.google.android.gms.maps.model.LatLng(trip.transferLat, trip.transferLng)
+            } else null
             mapDirectionsState = state.copy(
                 selectedIndex = index,
                 walkToBoardPoints = wBoard,
                 jeepneyPoints = jeep,
-                walkFromDropPoints = wDrop
+                walkFromDropPoints = wDrop,
+                transferWalkPoints = transferPts,
+                transferPoint = transferPt,
+                transferName = trip.transferName
             )
         }
     }

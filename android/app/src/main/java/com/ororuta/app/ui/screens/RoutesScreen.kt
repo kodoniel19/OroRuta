@@ -97,8 +97,8 @@ fun RoutesScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Filter chips: All routes | With updates
-                    val filterChips = listOf("All", "Updated")
+                    // Filter chips: All routes | Popular Routes | With updates
+                    val filterChips = listOf("All", "Popular", "Updated")
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -111,11 +111,44 @@ fun RoutesScreen(
                                 onClick = { viewModel.onFilterChange(chip) },
                                 label = {
                                     Text(
-                                        text = if (chip == "All") "All routes" else "With updates",
+                                        text = when (chip) {
+                                            "All" -> "All routes"
+                                            "Popular" -> "Popular Routes"
+                                            else -> "With updates"
+                                        },
                                         fontSize = 12.sp
                                     )
                                 }
                             )
+                        }
+                    }
+
+                    if (viewModel.selectedFilter == "Popular") {
+                        Surface(
+                            color = Brand50,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = Brand600,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = "Curated collection of commonly used Cagayan de Oro routes",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Brand700
+                                )
+                            }
                         }
                     }
                     val isOffline = (state as? Resource.Success<*>)?.isOffline == true

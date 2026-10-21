@@ -105,7 +105,8 @@ private fun <T> List<T>.indexOfMinBy(selector: (T) -> Double): Int {
 
 fun parseGeometries(route: com.ororuta.app.domain.models.Route, direction: String? = null): List<LatLng> {
     val dirKey = direction?.trim()?.lowercase() ?: "all"
-    val cacheKey = "${route.id}_${dirKey}_${route.geometries.size}_${route.path.size}"
+    val geomHash = route.geometries.firstOrNull()?.geometry?.hashCode() ?: 0
+    val cacheKey = "${route.id}_${dirKey}_${route.geometries.size}_${route.path.size}_$geomHash"
     routeGeometriesCache[cacheKey]?.let { return it }
 
     val allPts = mutableListOf<LatLng>()
@@ -149,7 +150,8 @@ fun parseGeometries(route: com.ororuta.app.domain.models.Route, direction: Strin
 }
 
 fun getAllRouteCoordinates(route: com.ororuta.app.domain.models.Route): List<LatLng> {
-    val cacheKey = "${route.id}_all_coords_${route.terminals.size}_${route.stops.size}"
+    val geomHash = route.geometries.firstOrNull()?.geometry?.hashCode() ?: 0
+    val cacheKey = "${route.id}_all_coords_${route.terminals.size}_${route.stops.size}_$geomHash"
     allRouteCoordinatesCache[cacheKey]?.let { return it }
 
     val pts = parseGeometries(route).toMutableList()
@@ -571,6 +573,24 @@ fun MapScreen(
                 }
             }
         }
+        // Clear backend results when sheet is dismissed
+        if (nearbyRoutesTarget == null) {
+            viewModel.nearbySheetTripsState = null
+        }
+    }
+
+    // Trigger backend trip search when we have both origin (userLocation) and target
+    LaunchedEffect(nearbyRoutesTarget, userLocation) {
+        val target = nearbyRoutesTarget ?: return@LaunchedEffect
+        val loc = userLocation ?: return@LaunchedEffect
+        viewModel.searchNearbyTrips(
+            fromLat = loc.latitude,
+            fromLng = loc.longitude,
+            fromName = "My Location",
+            toLat = target.lat ?: loc.latitude,
+            toLng = target.lng ?: loc.longitude,
+            toName = target.title ?: "Near Me"
+        )
     }
 
     // Center on user location or prompt permissions when the location button is tapped
@@ -737,232 +757,31 @@ fun MapScreen(
 
     if (nearbyRoutesTarget != null) {
         val target = nearbyRoutesTarget!!
-        val matchedRoutesWithDetails = remember(target, dbRoutes, userLocation) {
+        // Call backend API for route matching when target or user location changes
+        LaunchedEffect(target, userLocation) {
             val uLat = userLocation?.latitude
             val uLng = userLocation?.longitude
-            val hasUserLocation = uLat != null && uLng != null && !(uLat == 0.0 && uLng == 0.0)
-
-            val targetLat = target.lat
-            val targetLng = target.lng
-            val hasTargetCoords = targetLat != null && targetLng != null && !(targetLat == 0.0 && targetLng == 0.0)
-            val targetClean = target.title.lowercase().trim()
-            val isNearMe = target.isGpsBasedNearMe
-
-            fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-                val r = 6371000.0
-                val dLat = Math.toRadians(lat2 - lat1)
-                val dLng = Math.toRadians(lng2 - lng1)
-                val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                        Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                        Math.sin(dLng / 2) * Math.sin(dLng / 2)
-                return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-            }
-
-            if (!hasUserLocation) {
-                return@remember emptyList<NearbyRouteDisplayItem>()
-            }
-
-            // Only traditional jeepneys
-            val traditionalRoutes = dbRoutes.filter { route ->
-                route.jeepneyType.equals("Traditional", ignoreCase = true) || route.jeepneyType.isBlank()
-            }
-
-            // Configurable walking limits for CDO urban transit
-            val maxWalkToBoardMeters = 1000.0 // 1.0 km max walk to boarding
-            val maxWalkFromDropMeters = 1000.0 // 1.0 km max walk to destination
-
-            // Helper to get descriptive stop/point names instead of generic corridors
-            fun getDescriptiveCdoStopName(lat: Double, lng: Double, defaultPrefix: String): String {
-                return when {
-                    lat in 8.483..8.490 && lng in 124.648..124.660 -> "$defaultPrefix along CM Recto Ave (Centrio / SM Downtown area)"
-                    lat in 8.480..8.488 && lng in 124.654..124.665 -> "$defaultPrefix along Limketkai / Lapasan corridor"
-                    lat in 8.484..8.495 && lng in 124.656..124.672 -> "$defaultPrefix near Agora Terminal / Valenzuela Ave"
-                    lat in 8.473..8.482 && lng in 124.642..124.655 -> "$defaultPrefix near Cogon Market area"
-                    lat in 8.475..8.485 && lng in 124.638..124.648 -> "$defaultPrefix near Divisoria area"
-                    lat in 8.478..8.488 && lng in 124.630..124.640 -> "$defaultPrefix near Carmen Public Market area"
-                    lat in 8.500..8.512 && lng in 124.605..124.625 -> "$defaultPrefix near Bulua Westbound Terminal corridor"
-                    lat in 8.445..8.475 && lng in 124.615..124.635 -> "$defaultPrefix along Masterson Ave corridor"
-                    lat in 8.490..8.505 && lng in 124.625..124.645 -> "$defaultPrefix along Kauswagan / Bonbon corridor"
-                    lat in 8.475..8.510 && lng in 124.730..124.770 -> "$defaultPrefix along Puerto / Bugo Highway"
-                    else -> "$defaultPrefix near CDO Transit Corridor"
-                }
-            }
-
-            // Filter routes that serve the requested destination (if target is a destination/landmark)
-            val suitableRoutes = if (isNearMe) {
-                traditionalRoutes
-            } else {
-                traditionalRoutes.filter { route ->
-                    val allPts = getAllRouteCoordinates(route)
-                    val passesDestination = if (hasTargetCoords) {
-                        allPts.any { pt ->
-                            haversine(targetLat!!, targetLng!!, pt.latitude, pt.longitude) <= maxWalkFromDropMeters
-                        } || (route.terminals.map { LatLng(it.lat, it.lng) } + route.stops.map { LatLng(it.lat, it.lng) }).any { pt ->
-                            pt.latitude != 0.0 && pt.longitude != 0.0 && haversine(targetLat!!, targetLng!!, pt.latitude, pt.longitude) <= maxWalkFromDropMeters
-                        }
-                    } else false
-
-                    if (hasTargetCoords) {
-                        // When coordinates are known, route MUST actually reach within walking distance
-                        passesDestination
-                    } else {
-                        val hasLandmarkMatch = route.landmarks.any {
-                            it.name.contains(targetClean, true) || targetClean.contains(it.name, true)
-                        }
-                        val hasStopMatch = (route.terminals.map { it.name } + route.stops.map { it.name } + route.transfers.map { it.name }).any {
-                            it.contains(targetClean, true) || targetClean.contains(it, true)
-                        }
-                        val hasEndpointMatch = route.origin.contains(targetClean, true) ||
-                                route.destination.contains(targetClean, true) ||
-                                targetClean.contains(route.origin, true) ||
-                                targetClean.contains(route.destination, true)
-                        hasLandmarkMatch || hasStopMatch || hasEndpointMatch
-                    }
-                }
-            }
-
-            // For each suitable route, find verified boarding stop closest to the USER'S CURRENT GPS LOCATION
-            data class StopCandidate(val name: String, val type: String, val lat: Double, val lng: Double)
-
-            val scoredItems = suitableRoutes.mapNotNull { route ->
-                val candidates = mutableListOf<StopCandidate>()
-
-                // Only terminals, loading points, and transfer points are verified boarding stops
-                route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
-                    candidates.add(StopCandidate(it.name, "Terminal", it.lat, it.lng))
-                }
-                route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", true) }.forEach {
-                    candidates.add(StopCandidate(it.name, "Loading Point", it.lat, it.lng))
-                }
-                route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
-                    candidates.add(StopCandidate(it.name, "Transfer Point", it.lat, it.lng))
-                }
-
-                var bestStopName: String? = null
-                var bestStopType: String? = null
-                var bestDist = Double.MAX_VALUE
-                var bestLat: Double? = null
-                var bestLng: Double? = null
-
-                for (cand in candidates) {
-                    val d = haversine(uLat!!, uLng!!, cand.lat, cand.lng)
-                    if (d < bestDist) {
-                        bestDist = d
-                        bestStopName = cand.name
-                        bestStopType = cand.type
-                        bestLat = cand.lat
-                        bestLng = cand.lng
-                    }
-                }
-
-                // If no specific stop was under walking threshold, check proximity to verified route line
-                val geoPts = parseGeometries(route)
-                if (bestDist > maxWalkToBoardMeters && geoPts.isNotEmpty()) {
-                    var minGeoDist = Double.MAX_VALUE
-                    var bestGeoPt: LatLng? = null
-                    for (pt in geoPts) {
-                        val d = haversine(uLat!!, uLng!!, pt.latitude, pt.longitude)
-                        if (d < minGeoDist) {
-                            minGeoDist = d
-                            bestGeoPt = pt
-                        }
-                    }
-                    if (minGeoDist <= maxWalkToBoardMeters) {
-                        bestDist = minGeoDist
-                        bestLat = bestGeoPt?.latitude
-                        bestLng = bestGeoPt?.longitude
-                        bestStopName = getDescriptiveCdoStopName(bestLat ?: 8.4822, bestLng ?: 124.6472, "Boarding Point")
-                        bestStopType = "Boarding Point"
-                    }
-                }
-
-                // Reject if boarding stop exceeds maximum walking distance
-                if (bestDist > maxWalkToBoardMeters || bestLat == null || bestLng == null) {
-                    return@mapNotNull null
-                }
-
-                // Calculate onboard ride distance between boarding stop and drop-off stop
-                var bestDropLat = targetLat
-                var bestDropLng = targetLng
-                var bestDropName: String? = null
-                var minDropDist = Double.MAX_VALUE
-
-                if (hasTargetCoords && targetLat != null && targetLng != null) {
-                    for (term in route.terminals) {
-                        if (term.lat != 0.0 && term.lng != 0.0) {
-                            val d = haversine(targetLat, targetLng, term.lat, term.lng)
-                            if (d < minDropDist) {
-                                minDropDist = d
-                                bestDropLat = term.lat
-                                bestDropLng = term.lng
-                                bestDropName = term.name
-                            }
-                        }
-                    }
-                    for (s in route.stops) {
-                        if (s.lat != 0.0 && s.lng != 0.0) {
-                            val d = haversine(targetLat, targetLng, s.lat, s.lng)
-                            if (d < minDropDist) {
-                                minDropDist = d
-                                bestDropLat = s.lat
-                                bestDropLng = s.lng
-                                bestDropName = s.name
-                            }
-                        }
-                    }
-                    if (minDropDist > 300.0 && geoPts.isNotEmpty()) {
-                        for (pt in geoPts) {
-                            val d = haversine(targetLat, targetLng, pt.latitude, pt.longitude)
-                            if (d < minDropDist) {
-                                minDropDist = d
-                                bestDropLat = pt.latitude
-                                bestDropLng = pt.longitude
-                                bestDropName = getDescriptiveCdoStopName(pt.latitude, pt.longitude, "Drop-off")
-                            }
-                        }
-                    }
-
-                    // Reject if destination drop-off is beyond maximum walking distance (e.g. 5.7 km problem)
-                    if (minDropDist > maxWalkFromDropMeters || bestDropLat == null || bestDropLng == null) {
-                        return@mapNotNull null
-                    }
-                }
-
-                val onboardKm = if (hasTargetCoords && bestDropLat != null && bestDropLng != null && geoPts.size >= 2) {
-                    TraditionalJeepneyFareService.calculateOnboardDistanceKm(
-                        routePoints = geoPts,
-                        boardingLat = bestLat,
-                        boardingLng = bestLng,
-                        dropoffLat = bestDropLat,
-                        dropoffLng = bestDropLng
-                    )
-                } else null
-
-                // For destination search, must have a valid onboard ride segment (bIdx < dIdx)
-                if (!isNearMe && hasTargetCoords && (onboardKm == null || onboardKm < 0.35)) {
-                    return@mapNotNull null
-                }
-
-                NearbyRouteDisplayItem(
-                    route = route,
-                    nearestStopName = bestStopName ?: getDescriptiveCdoStopName(bestLat, bestLng, "Boarding Point"),
-                    nearestStopType = bestStopType ?: "Boarding Stop",
-                    walkDistanceMeters = bestDist.toInt(),
-                    matchReason = if (!isNearMe) "Serves ${target.title}" else "Traditional Jeepney",
-                    nearestStopLat = bestLat,
-                    nearestStopLng = bestLng,
-                    destinationServed = if (!isNearMe) target.title else null,
-                    onboardDistanceKm = onboardKm,
-                    dropoffStopName = bestDropName ?: if (hasTargetCoords) getDescriptiveCdoStopName(bestDropLat ?: 8.4822, bestDropLng ?: 124.6472, "Drop-off Point") else null
+            if (uLat != null && uLng != null && !(uLat == 0.0 && uLng == 0.0)) {
+                val tLat = target.lat ?: uLat
+                val tLng = target.lng ?: uLng
+                viewModel.searchNearbyTrips(
+                    fromLat = uLat,
+                    fromLng = uLng,
+                    fromName = "My Location",
+                    toLat = tLat,
+                    toLng = tLng,
+                    toName = target.title
                 )
             }
-
-            // De-duplicate, sort by walking distance from user's current GPS location, take top 3–5
-            scoredItems
-                .distinctBy { "${it.route.id}_${it.nearestStopName}" }
-                .sortedBy { it.walkDistanceMeters ?: Int.MAX_VALUE }
-                .take(5)
         }
+
+        val nearbyTripsResource = viewModel.nearbySheetTripsState
+        val backendTrips = when (nearbyTripsResource) {
+            is Resource.Success -> nearbyTripsResource.data
+            else -> emptyList()
+        }
+        val isBackendLoading = nearbyTripsResource is Resource.Loading
+        val backendError = if (nearbyTripsResource is Resource.Error) nearbyTripsResource.message else null
 
         ModalBottomSheet(
             onDismissRequest = { nearbyRoutesTarget = null },
@@ -1166,7 +985,7 @@ fun MapScreen(
                         )
                     }
 
-                    viewModel.routesState is Resource.Loading -> {
+                    isBackendLoading -> {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1179,13 +998,13 @@ fun MapScreen(
                             ) {
                                 CircularProgressIndicator(color = Brand600, strokeWidth = 3.dp)
                                 Text(
-                                    text = "Searching traditional jeepney routes…",
+                                    text = "Searching jeepney routes…",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = InkSoft
                                 )
                                 Text(
-                                    text = "Checking routes serving ${target.title}",
+                                    text = "Finding routes to ${target.title}",
                                     fontSize = 12.sp,
                                     color = InkMuted
                                 )
@@ -1193,8 +1012,7 @@ fun MapScreen(
                         }
                     }
 
-                    viewModel.routesState is Resource.Error -> {
-                        val errMsg = (viewModel.routesState as Resource.Error).message
+                    backendError != null -> {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1226,7 +1044,7 @@ fun MapScreen(
                                     color = Ink
                                 )
                                 Text(
-                                    text = errMsg.ifBlank { "Could not connect to OroRuta servers. Please check your internet connection." },
+                                    text = backendError.ifBlank { "Could not connect to OroRuta servers. Please check your internet connection." },
                                     fontSize = 13.sp,
                                     color = InkMuted,
                                     textAlign = TextAlign.Center
@@ -1234,7 +1052,15 @@ fun MapScreen(
                                 Spacer(modifier = Modifier.height(6.dp))
                                 OroButton(
                                     text = "Retry",
-                                    onClick = { viewModel.loadRoutes() },
+                                    onClick = {
+                                        val uLat = userLocation?.latitude ?: return@OroButton
+                                        val uLng = userLocation?.longitude ?: return@OroButton
+                                        viewModel.searchNearbyTrips(
+                                            fromLat = uLat, fromLng = uLng, fromName = "My Location",
+                                            toLat = target.lat ?: uLat, toLng = target.lng ?: uLng,
+                                            toName = target.title
+                                        )
+                                    },
                                     variant = ButtonVariant.Primary,
                                     size = ButtonSize.Sm
                                 )
@@ -1242,7 +1068,7 @@ fun MapScreen(
                         }
                     }
 
-                    matchedRoutesWithDetails.isEmpty() -> {
+                    backendTrips.isEmpty() -> {
                         EmptyState(
                             icon = if (target.isGpsBasedNearMe) Icons.Default.NearMe else Icons.Default.DirectionsBus,
                             title = if (target.isGpsBasedNearMe) "No Nearby Routes Found" else "No verified jeepney route found for this destination",
@@ -1278,19 +1104,28 @@ fun MapScreen(
                     }
 
                     else -> {
+                        // Badge row for cheapest/fastest/least walk
+                        val badges = remember(backendTrips) {
+                            buildList {
+                                backendTrips.count { it.isCheapest }.let { if (it > 0) add("💰 Cheapest") }
+                                backendTrips.count { it.isFastest }.let { if (it > 0) add("⚡ Fastest") }
+                                backendTrips.count { it.isLeastWalk }.let { if (it > 0) add("🚶 Least Walk") }
+                            }
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "${matchedRoutesWithDetails.size} nearest traditional jeepney ${if (matchedRoutesWithDetails.size == 1) "route" else "routes"}",
+                                text = "${backendTrips.size} trip ${if (backendTrips.size == 1) "option" else "options"} found",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Brand600
                             )
                             Text(
-                                text = "Nearest boarding stops first",
+                                text = "Best matches first",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = InkMuted
@@ -1304,8 +1139,20 @@ fun MapScreen(
                             contentPadding = PaddingValues(bottom = 32.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            items(matchedRoutesWithDetails, key = { it.route.id }) { item ->
-                                val r = item.route
+                            items(backendTrips, key = { it.id }) { trip ->
+                                val firstSeg = trip.segments.firstOrNull()
+                                val routeCode = firstSeg?.code ?: ""
+                                val routeColor = firstSeg?.color ?: "#1471B0"
+                                val routeName = firstSeg?.routeName ?: ""
+                                val jeepneyType = firstSeg?.jeepneyType ?: "Traditional"
+
+                                // Highlight badges for this trip
+                                val tripBadges = buildList {
+                                    if (trip.isCheapest) add("💰 Cheapest")
+                                    if (trip.isFastest) add("⚡ Fastest")
+                                    if (trip.isLeastWalk) add("🚶 Least Walk")
+                                }
+
                                 Surface(
                                     color = Color.White,
                                     shape = RoundedCornerShape(14.dp),
@@ -1314,29 +1161,114 @@ fun MapScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(14.dp)) {
-                                        // Route Code, Name, Traditional Tag
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
+                                        // Trip highlight badges
+                                        if (tripBadges.isNotEmpty()) {
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                modifier = Modifier.padding(bottom = 6.dp)
+                                            ) {
+                                                tripBadges.forEach { badge ->
+                                                    Surface(
+                                                        color = Brand50,
+                                                        shape = RoundedCornerShape(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = badge,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Brand700,
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Route segments header
+                                        if (trip.segments.size == 1 && firstSeg != null) {
+                                            // Single-route trip
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    RouteBadge(code = routeCode, colorHex = routeColor, size = BadgeSize.Md)
+                                                    Column {
+                                                        Text(
+                                                            text = "Route $routeCode – $routeName",
+                                                            fontSize = 14.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Ink,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                        if (trip.direction != null) {
+                                                            Text(
+                                                                text = trip.direction,
+                                                                fontSize = 12.sp,
+                                                                color = InkSoft,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                Surface(
+                                                    color = Brand50,
+                                                    shape = RoundedCornerShape(6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = jeepneyType,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Brand700,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                                    )
+                                                }
+                                            }
+                                        } else if (trip.segments.size > 1) {
+                                            // Multi-route (transfer) trip
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                modifier = Modifier.weight(1f)
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                modifier = Modifier.fillMaxWidth()
                                             ) {
-                                                RouteBadge(code = r.code, colorHex = r.color, size = BadgeSize.Md)
-                                                Column {
+                                                trip.segments.forEachIndexed { idx, seg ->
+                                                    RouteBadge(code = seg.code, colorHex = seg.color, size = BadgeSize.Sm)
+                                                    if (idx < trip.segments.size - 1) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.ArrowForward,
+                                                            contentDescription = null,
+                                                            tint = InkMuted,
+                                                            modifier = Modifier.size(14.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.weight(1f))
+                                                Surface(
+                                                    color = Oro50,
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
                                                     Text(
-                                                        text = "Route ${r.code} – ${r.name}",
-                                                        fontSize = 14.sp,
+                                                        text = "${trip.transfers} transfer${if (trip.transfers > 1) "s" else ""}",
+                                                        fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = Ink,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
+                                                        color = Oro700,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                                     )
+                                                }
+                                            }
+                                            // Show route names
+                                            Column(modifier = Modifier.padding(top = 4.dp)) {
+                                                trip.segments.forEach { seg ->
                                                     Text(
-                                                        text = "${r.origin} ⇄ ${r.destination}",
+                                                        text = "Route ${seg.code} – ${seg.routeName}",
                                                         fontSize = 12.sp,
                                                         color = InkSoft,
                                                         maxLines = 1,
@@ -1344,30 +1276,18 @@ fun MapScreen(
                                                     )
                                                 }
                                             }
-
-                                            Surface(
-                                                color = Brand50,
-                                                shape = RoundedCornerShape(6.dp)
-                                            ) {
-                                                Text(
-                                                    text = "Traditional",
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Brand700,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                                )
-                                            }
                                         }
 
                                         Spacer(modifier = Modifier.height(10.dp))
 
-                                        // Nearby stop / loading point info
+                                        // Boarding stop info
                                         Surface(
                                             color = Canvas,
                                             shape = RoundedCornerShape(8.dp),
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
                                             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                                // Walk to boarding stop
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1380,13 +1300,13 @@ fun MapScreen(
                                                     )
                                                     Column {
                                                         Text(
-                                                            text = "${item.nearestStopType ?: "Boarding Stop"}: ${item.nearestStopName}",
+                                                            text = "Board at: ${trip.boardingName ?: "Nearest Stop"}",
                                                             fontSize = 12.sp,
                                                             fontWeight = FontWeight.SemiBold,
                                                             color = Ink
                                                         )
-                                                        if (item.walkDistanceMeters != null) {
-                                                            val distM = item.walkDistanceMeters
+                                                        if (trip.walkMeters > 0) {
+                                                            val distM = trip.walkMeters
                                                             val distLabel = when {
                                                                 distM < 1000 -> "Walk $distM m to boarding stop"
                                                                 else -> "Walk ${"%.1f".format(distM / 1000.0)} km to boarding stop"
@@ -1402,23 +1322,46 @@ fun MapScreen(
                                                     }
                                                 }
 
-                                                if (!item.destinationServed.isNullOrBlank()) {
-                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                // Dropoff info
+                                                if (!trip.dropoffName.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(6.dp))
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                     ) {
                                                         Icon(
-                                                            imageVector = Icons.Default.CheckCircle,
+                                                            imageVector = Icons.Default.Place,
                                                             contentDescription = null,
-                                                            tint = Brand600,
-                                                            modifier = Modifier.size(12.dp)
+                                                            tint = Bad600,
+                                                            modifier = Modifier.size(16.dp)
                                                         )
                                                         Text(
-                                                            text = "Serves ${item.destinationServed}",
-                                                            fontSize = 11.sp,
+                                                            text = "Alight at: ${trip.dropoffName}",
+                                                            fontSize = 12.sp,
                                                             fontWeight = FontWeight.SemiBold,
-                                                            color = Brand600
+                                                            color = Ink
+                                                        )
+                                                    }
+                                                }
+
+                                                // Transfer info
+                                                if (!trip.transferName.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.SwapHoriz,
+                                                            contentDescription = null,
+                                                            tint = Warn600,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Text(
+                                                            text = "Transfer at: ${trip.transferName}",
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = Oro700
                                                         )
                                                     }
                                                 }
@@ -1427,42 +1370,30 @@ fun MapScreen(
 
                                         Spacer(modifier = Modifier.height(8.dp))
 
-                                        // Route stats: Fare, Travel time, Distance along onboard segment
-                                        val effectiveKm = item.onboardDistanceKm ?: if (r.lengthKm > 0) r.lengthKm else 4.0
-                                        val fareRes = remember(effectiveKm, r.jeepneyType) {
-                                            TraditionalJeepneyFareService.calculateFareForDistance(
-                                                distanceKm = effectiveKm,
-                                                category = PassengerCategory.REGULAR,
-                                                jeepneyType = r.jeepneyType
-                                            )
-                                        }
-                                        val travelMins = if (item.onboardDistanceKm != null) {
-                                            Math.max(8, Math.round(item.onboardDistanceKm * 3.5).toInt())
-                                        } else {
-                                            r.travelTime
-                                        }
-
+                                        // Route stats: Fare, Travel time, Distance
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            if (fareRes.isAvailable) {
+                                            if (trip.regularFare > 0) {
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                                 ) {
                                                     Text(
-                                                        text = "₱${"%.2f".format(fareRes.regularFare)}",
+                                                        text = "₱${"%.2f".format(trip.regularFare)}",
                                                         fontSize = 13.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = Ink
                                                     )
-                                                    Text(
-                                                        text = "(₱${"%.2f".format(fareRes.discountedFare)} disc)",
-                                                        fontSize = 11.sp,
-                                                        color = InkMuted
-                                                    )
+                                                    if (trip.discountFare > 0 && trip.discountFare < trip.regularFare) {
+                                                        Text(
+                                                            text = "(₱${"%.2f".format(trip.discountFare)} disc)",
+                                                            fontSize = 11.sp,
+                                                            color = InkMuted
+                                                        )
+                                                    }
                                                 }
                                             } else {
                                                 Text(
@@ -1478,19 +1409,32 @@ fun MapScreen(
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = "~$travelMins mins",
+                                                text = "~${trip.minutes} mins",
                                                 fontSize = 12.sp,
                                                 color = InkSoft
                                             )
+                                            if (trip.totalKm > 0) {
+                                                Text(
+                                                    text = "·",
+                                                    color = InkMuted,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = "${"%.1f".format(trip.totalKm)} km",
+                                                    fontSize = 12.sp,
+                                                    color = InkMuted
+                                                )
+                                            }
+                                        }
+
+                                        // Match reason
+                                        if (!trip.matchReason.isNullOrBlank()) {
+                                            Spacer(modifier = Modifier.height(4.dp))
                                             Text(
-                                                text = "·",
+                                                text = trip.matchReason,
+                                                fontSize = 10.sp,
                                                 color = InkMuted,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                text = "${"%.1f".format(effectiveKm)} km",
-                                                fontSize = 12.sp,
-                                                color = InkMuted
+                                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                                             )
                                         }
 
@@ -1501,62 +1445,27 @@ fun MapScreen(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
-                                            // Determine route direction based on stop ordering:
-                                            // If nearest boarding stop appears before destination-related stop in
-                                            // inbound path → Inbound; otherwise Outbound.
-                                            val detectedDirection = remember(r, item, target) {
-                                                val boardLat = item.nearestStopLat ?: return@remember "Inbound"
-                                                val boardLng = item.nearestStopLng ?: return@remember "Inbound"
-                                                val inboundPts = parseGeometries(r, "Inbound")
-                                                if (inboundPts.size < 2) return@remember "Inbound"
-                                                // Find the index of the nearest boarding point in inbound path
-                                                val boardIdx = inboundPts.indexOfMinBy { pt ->
-                                                    val dLat = pt.latitude - boardLat
-                                                    val dLng = pt.longitude - boardLng
-                                                    dLat * dLat + dLng * dLng
-                                                }
-                                                // Find the index of the nearest destination point in inbound path
-                                                val destIdx = if (target.lat != null && target.lng != null) {
-                                                    val tLat = target.lat
-                                                    val tLng = target.lng
-                                                    inboundPts.indexOfMinBy { pt ->
-                                                        val dLat = pt.latitude - tLat
-                                                        val dLng = pt.longitude - tLng
-                                                        dLat * dLat + dLng * dLng
-                                                    }
-                                                } else inboundPts.size - 1
-                                                if (boardIdx <= destIdx) "Inbound" else "Outbound"
-                                            }
+                                            val tripDirection = trip.direction ?: "Inbound"
 
                                             OroButton(
                                                 text = "Show on Map",
                                                 onClick = {
-                                                    selectedRouteId = r.id
                                                     nearbyRoutesTarget = null
-                                                    viewModel.selectRouteForGuidance(r.id, detectedDirection, userLocation)
-                                                    val pts = getAllRouteCoordinates(r)
-                                                    if (pts.isNotEmpty()) {
-                                                        coroutineScope.launch {
-                                                            val builder = LatLngBounds.builder()
-                                                            userLocation?.let { builder.include(it) }
-                                                            if (item.nearestStopLat != null && item.nearestStopLng != null) {
-                                                                builder.include(LatLng(item.nearestStopLat, item.nearestStopLng))
-                                                            }
-                                                            pts.forEach { builder.include(it) }
-                                                            try {
-                                                                cameraPositionState.animate(
-                                                                    CameraUpdateFactory.newLatLngBounds(builder.build(), 120),
-                                                                    600
-                                                                )
-                                                            } catch (_: Exception) {
-                                                                val targetPt = userLocation ?: pts.first()
-                                                                cameraPositionState.animate(
-                                                                    CameraUpdateFactory.newLatLngZoom(targetPt, 15f),
-                                                                    600
-                                                                )
-                                                            }
-                                                        }
-                                                    }
+                                                    // Use the itinerary display for backend trips
+                                                    val originLat = userLocation?.latitude ?: target.lat ?: 0.0
+                                                    val originLng = userLocation?.longitude ?: target.lng ?: 0.0
+                                                    val destLat = target.lat ?: trip.dropoffLat ?: 0.0
+                                                    val destLng = target.lng ?: trip.dropoffLng ?: 0.0
+                                                    viewModel.showItineraryOnMap(
+                                                        trip = trip,
+                                                        originLat = originLat,
+                                                        originLng = originLng,
+                                                        originName = "My Location",
+                                                        destLat = destLat,
+                                                        destLng = destLng,
+                                                        destName = target.title ?: trip.dropoffName ?: "Destination",
+                                                        isGpsOrigin = target.isGpsBasedNearMe
+                                                    )
                                                 },
                                                 variant = ButtonVariant.Secondary,
                                                 size = ButtonSize.Sm,
@@ -1566,28 +1475,28 @@ fun MapScreen(
                                             OroButton(
                                                 text = "View Details",
                                                 onClick = {
-                                                    val destTitle = (if (!target.isGpsBasedNearMe) target.title else null) ?: item.destinationServed ?: r.destination
-                                                    val dLat = if (!target.isGpsBasedNearMe) target.lat else null
-                                                    val dLng = if (!target.isGpsBasedNearMe) target.lng else null
+                                                    val destTitle = (if (!target.isGpsBasedNearMe) target.title else null) ?: trip.dropoffName ?: "Destination"
+                                                    val dLat = if (!target.isGpsBasedNearMe) target.lat else trip.dropoffLat
+                                                    val dLng = if (!target.isGpsBasedNearMe) target.lng else trip.dropoffLng
+                                                    val segRouteId = firstSeg?.routeId ?: ""
                                                     val encodedDest = try { URLEncoder.encode(destTitle, "UTF-8") } catch (_: Exception) { destTitle }
-                                                    val encodedBName = try { URLEncoder.encode(item.nearestStopName, "UTF-8") } catch (_: Exception) { item.nearestStopName }
-                                                    val dropoffName = item.dropoffStopName ?: destTitle
-                                                    val encodedDName = try { URLEncoder.encode(dropoffName, "UTF-8") } catch (_: Exception) { dropoffName }
+                                                    val bName = trip.boardingName ?: ""
+                                                    val encodedBName = try { URLEncoder.encode(bName, "UTF-8") } catch (_: Exception) { bName }
+                                                    val dName = trip.dropoffName ?: destTitle
+                                                    val encodedDName = try { URLEncoder.encode(dName, "UTF-8") } catch (_: Exception) { dName }
 
                                                     val navPath = buildString {
-                                                        append("route_info/${r.id}?destination=$encodedDest&direction=$detectedDirection")
+                                                        append("route_info/$segRouteId?destination=$encodedDest&direction=$tripDirection")
                                                         if (dLat != null && dLng != null) append("&destLat=$dLat&destLng=$dLng")
-                                                        if (item.nearestStopLat != null && item.nearestStopLng != null) {
-                                                            append("&boardingName=$encodedBName&boardingLat=${item.nearestStopLat}&boardingLng=${item.nearestStopLng}")
+                                                        if (trip.boardingLat != null && trip.boardingLng != null) {
+                                                            append("&boardingName=$encodedBName&boardingLat=${trip.boardingLat}&boardingLng=${trip.boardingLng}")
                                                         }
                                                         if (dLat != null && dLng != null) {
                                                             append("&dropoffName=$encodedDName&dropoffLat=$dLat&dropoffLng=$dLng")
                                                         }
-                                                        if (item.walkDistanceMeters != null) {
-                                                            append("&walkDistanceMeters=${item.walkDistanceMeters}")
-                                                        }
-                                                        if (item.onboardDistanceKm != null) {
-                                                            append("&onboardDistanceKm=${item.onboardDistanceKm}")
+                                                        append("&walkDistanceMeters=${trip.walkMeters}")
+                                                        if (trip.totalKm > 0) {
+                                                            append("&onboardDistanceKm=${trip.totalKm}")
                                                         }
                                                     }
                                                     nearbyRoutesTarget = null
@@ -1829,8 +1738,26 @@ fun MapScreen(
                         )
                     }
 
+                    val distinctTerminals = activeRoute.terminals
+                        .filter { it.lat != 0.0 && it.lng != 0.0 }
+                        .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+
+                    val distinctLoadingStops = activeRoute.stops
+                        .filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }
+                        .filter { stop -> distinctTerminals.none { term -> term.name.equals(stop.name, ignoreCase = true) || (Math.abs(term.lat - stop.lat) < 0.0005 && Math.abs(term.lng - stop.lng) < 0.0005) } }
+                        .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+
+                    val distinctUnloadingStops = activeRoute.stops
+                        .filter { it.lat != 0.0 && it.lng != 0.0 && it.pointType.equals("unloading", ignoreCase = true) }
+                        .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+
+                    val distinctTransfers = activeRoute.transfers
+                        .filter { it.lat != 0.0 && it.lng != 0.0 }
+                        .filter { tr -> distinctTerminals.none { term -> term.name.equals(tr.name, ignoreCase = true) } }
+                        .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+
                     // C. Verified Terminals for this route (Orange)
-                    activeRoute.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { term ->
+                    distinctTerminals.forEach { term ->
                         Marker(
                             state = rememberMarkerState(key = "spec_term_${term.id}", position = LatLng(term.lat, term.lng)),
                             title = term.name,
@@ -1853,7 +1780,7 @@ fun MapScreen(
                     }
 
                     // D. Verified Loading Points for this route (Green)
-                    activeRoute.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }.forEach { stop ->
+                    distinctLoadingStops.forEach { stop ->
                         Marker(
                             state = rememberMarkerState(key = "spec_loading_${stop.id}", position = LatLng(stop.lat, stop.lng)),
                             title = stop.name,
@@ -1876,7 +1803,7 @@ fun MapScreen(
                     }
 
                     // E. Verified Unloading Points for this route (Rose/Red)
-                    activeRoute.stops.filter { it.lat != 0.0 && it.lng != 0.0 && it.pointType.equals("unloading", ignoreCase = true) }.forEach { stop ->
+                    distinctUnloadingStops.forEach { stop ->
                         Marker(
                             state = rememberMarkerState(key = "spec_unloading_${stop.id}", position = LatLng(stop.lat, stop.lng)),
                             title = stop.name,
@@ -1899,7 +1826,7 @@ fun MapScreen(
                     }
 
                     // F. Verified Transfer Points for this route (Yellow/Amber)
-                    activeRoute.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { tr ->
+                    distinctTransfers.forEach { tr ->
                         Marker(
                             state = rememberMarkerState(key = "spec_transfer_${tr.id}", position = LatLng(tr.lat, tr.lng)),
                             title = tr.name,
@@ -3210,11 +3137,7 @@ fun MapScreen(
                             route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
                                 list.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
                             }
-                            // Destination
-                            if (guidance.routePoints.isNotEmpty() && list.none { it.name.equals(route.destination, ignoreCase = true) }) {
-                                list.add(RouteStopPoint("card_dest_${route.id}", route.destination, "terminal", guidance.routePoints.last().latitude, guidance.routePoints.last().longitude, "Route Destination Point"))
-                            }
-                            list
+                            list.distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
                         }
 
                         if (verifiedStopsForCard.isNotEmpty()) {

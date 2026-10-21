@@ -16,7 +16,7 @@ async function list(req, res, next) {
         LEFT JOIN transfer_points tp ON tp.route_id = r.id
         LEFT JOIN route_landmarks rl ON rl.route_id = r.id
         LEFT JOIN landmarks lm ON lm.id = rl.landmark_id
-        WHERE r.verification_status = 'PUBLISHED' AND (
+        WHERE r.verification_status IN ('PUBLISHED', 'USER_SUPPLIED', 'VERIFIED') AND (
           r.code LIKE ? OR r.name LIKE ? OR r.origin LIKE ? OR r.destination LIKE ? OR r.description LIKE ?
           OR t.name LIKE ?
           OR lp.name LIKE ?
@@ -25,8 +25,8 @@ async function list(req, res, next) {
         )`;
       params.push(like, like, like, like, like, like, like, like, like);
     } else {
-      // The mobile app should only see published routes
-      sql = "SELECT r.* FROM routes r WHERE r.verification_status = 'PUBLISHED'";
+      // The mobile app should see published and user-supplied routes
+      sql = "SELECT r.* FROM routes r WHERE r.verification_status IN ('PUBLISHED', 'USER_SUPPLIED', 'VERIFIED')";
     }
 
     if (type) { sql += " AND r.jeepney_type = ?"; params.push(type); }

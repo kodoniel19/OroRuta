@@ -64,7 +64,7 @@ class CdoLocationProvider @Inject constructor(
             "Provincial Capitol" to Pair(8.4777, 124.6452),
             "SM CDO Uptown" to Pair(8.5198, 124.6612),
             "NMMC" to Pair(8.4875, 124.6588),
-            "Camp Evangelista" to Pair(8.5020, 124.6320)
+            "Camp Evangelista" to Pair(8.4870, 124.6225)
         )
     }
 
