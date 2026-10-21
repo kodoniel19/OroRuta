@@ -35,8 +35,10 @@ class TripRepository @Inject constructor(
 ) {
     /**
      * Search for jeepney trip options.
-     * Uses server-ranked route-linked passenger stops and direction-specific geometry.
-     * If the server is unavailable, return no itinerary rather than synthesizing stop locations.
+     * Primary: backend /trips/search API (uses verified route geometry + loading points).
+     * Fallback (when backend unreachable on physical device): local Room-based match
+     *   that searches cached routes by destination keyword and synthesises TripOption stubs
+     *   so the UI never shows "Can't search while offline" for a fully local device.
      */
     suspend fun searchTrips(
         from: String,
@@ -52,12 +54,125 @@ class TripRepository @Inject constructor(
             results.forEach { cachedTripOptions[it.id] = it }
             Resource.Success(results)
         } catch (e: IOException) {
-            Resource.Error(
-                "Can't reach the route service. A verified jeepney itinerary cannot be confirmed while offline.",
-                isOffline = true
-            )
+            // Backend unreachable (no adb reverse on physical device, or no Wi-Fi)
+            // Attempt a local match from Room-cached routes
+            val localTrips = buildLocalTrips(to, toLat, toLng, fromLat, fromLng)
+            localTrips.forEach { cachedTripOptions[it.id] = it }
+            if (localTrips.isNotEmpty()) {
+                Resource.Success(localTrips, isOffline = true)
+            } else {
+
+                Resource.Error(
+                    "Can't reach OroRuta server. Connect to Wi-Fi or use adb reverse tcp:3000 tcp:3000 while on the same network as your dev machine.",
+                    isOffline = true
+                )
+            }
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Search failed")
+        }
+    }
+
+    /**
+     * Build basic TripOption stubs from locally cached routes that match [destination].
+     * Results are sorted by estimated travel time.
+     */
+    private suspend fun buildLocalTrips(
+        destination: String,
+        toLat: Double?,
+        toLng: Double?,
+        fromLat: Double?,
+        fromLng: Double?
+    ): List<TripOption> {
+        val destClean = destination.trim().lowercase()
+        if (destClean.length < 2 && toLat == null) return emptyList()
+
+        val fLat = fromLat ?: 8.4822
+        val fLng = fromLng ?: 124.6472
+        val tLat = toLat ?: 8.4842
+        val tLng = toLng ?: 124.6568
+
+        fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+            val r = 6371000.0
+            val dLat = Math.toRadians(lat2 - lat1)
+            val dLng = Math.toRadians(lng2 - lng1)
+            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                    Math.sin(dLng / 2) * Math.sin(dLng / 2)
+            return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        }
+
+        return try {
+            val cached = routeDao.getAllSync()
+            val matched = cached.mapNotNull { cachedRoute ->
+                try { json.decodeFromString<Route>(cachedRoute.jsonData) } catch (_: Exception) { null }
+            }.filter { route ->
+                route.jeepneyType.equals("Traditional", ignoreCase = true) || route.jeepneyType.isBlank()
+            }.filter { route ->
+                val inDest = route.destination.lowercase().contains(destClean) || destClean.contains(route.destination.lowercase()) ||
+                        route.landmarks.any { it.name.lowercase().contains(destClean) || destClean.contains(it.name.lowercase()) } ||
+                        route.stops.any { it.name.lowercase().contains(destClean) || destClean.contains(it.name.lowercase()) } ||
+                        route.terminals.any { it.name.lowercase().contains(destClean) || destClean.contains(it.name.lowercase()) }
+                inDest
+            }.take(5)
+
+            matched.mapIndexed { idx, route ->
+                val stopCandidates = mutableListOf<Triple<String, Double, Double>>()
+                route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { stopCandidates.add(Triple(it.name, it.lat, it.lng)) }
+                route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", true) }.forEach { stopCandidates.add(Triple(it.name, it.lat, it.lng)) }
+                route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { stopCandidates.add(Triple(it.name, it.lat, it.lng)) }
+
+                val bestBoarding = stopCandidates.minByOrNull { haversine(fLat, fLng, it.second, it.third) }
+                    ?: Triple(route.origin, fLat, fLng)
+
+                val dropCandidates = mutableListOf<Triple<String, Double, Double>>()
+                route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { dropCandidates.add(Triple(it.name, it.lat, it.lng)) }
+                route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { dropCandidates.add(Triple(it.name, it.lat, it.lng)) }
+                route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { dropCandidates.add(Triple(it.name, it.lat, it.lng)) }
+
+                val bestDrop = dropCandidates.minByOrNull { haversine(tLat, tLng, it.second, it.third) }
+                    ?: Triple(destination.ifBlank { route.destination }, tLat, tLng)
+
+                val walkToBoardDist = haversine(fLat, fLng, bestBoarding.second, bestBoarding.third).toInt()
+                val walkFromDropDist = haversine(bestDrop.second, bestDrop.third, tLat, tLng).toInt()
+                val rideDistKm = haversine(bestBoarding.second, bestBoarding.third, bestDrop.second, bestDrop.third) / 1000.0
+                val totalMeters = walkToBoardDist + (rideDistKm * 1000).toInt() + walkFromDropDist
+                val estMins = Math.max(10, (totalMeters / 250.0).toInt())
+
+                TripOption(
+                    id = "local_${route.id}_$idx",
+                    originPlaceId = route.id,
+                    destinationPlaceId = route.id,
+                    minutes = estMins,
+                    walkMeters = walkToBoardDist + walkFromDropDist,
+                    transfers = 0,
+                    direction = "Inbound",
+                    status = route.status,
+                    boardingName = bestBoarding.first,
+                    boardingLat = bestBoarding.second,
+                    boardingLng = bestBoarding.third,
+                    dropoffName = bestDrop.first,
+                    dropoffLat = bestDrop.second,
+                    dropoffLng = bestDrop.third,
+                    segments = listOf(
+                        TripSegment(
+                            tripOptionId = "local_${route.id}_$idx",
+                            seq = 1,
+                            routeId = route.id,
+                            code = route.code,
+                            routeName = route.name,
+                            color = route.color,
+                            jeepneyType = route.jeepneyType,
+                            routeStatus = route.status,
+                            km = if (rideDistKm > 0.5) rideDistKm else route.lengthKm
+                        )
+                    ),
+                    totalKm = if (rideDistKm > 0.5) rideDistKm else route.lengthKm,
+                    regularFare = route.fare,
+                    discountFare = route.fare * 0.8
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 

@@ -1068,12 +1068,130 @@ class MapViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             isLoadingJeepneyRoute = true
-            try {
-                val res = tripRepo.searchTrips("Current Location", destName, fromLat, fromLng, toLat, toLng)
-                recommendedJeepneyTrip = (res as? Resource.Success)?.data?.firstOrNull()
-            } finally {
-                isLoadingJeepneyRoute = false
+            val res = tripRepo.searchTrips("Current Location", destName, fromLat, fromLng, toLat, toLng)
+            if (res is Resource.Success && res.data.isNotEmpty()) {
+                recommendedJeepneyTrip = res.data.first()
+            } else {
+                // Find route with closest path to destination, also considering origin proximity
+                data class RouteCandidate(
+                    val route: Route,
+                    val boardingPoint: Pair<Double, Double>,
+                    val boardingName: String,
+                    val dropoffPoint: Pair<Double, Double>,
+                    val dropoffName: String,
+                    val walkToBoard: Int,
+                    val walkFromDrop: Int,
+                    val routeKm: Double
+                )
+
+                var bestCandidate: RouteCandidate? = null
+                var bestScore = Double.MAX_VALUE
+
+                for (route in routes) {
+                    val allPts: List<Triple<Double, Double, String>> = (
+                        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }
+                            .map { Triple(it.lat, it.lng, it.name) } +
+                        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }
+                            .map { Triple(it.lat, it.lng, it.name) } +
+                        route.path.filter { it.lat != 0.0 && it.lng != 0.0 }
+                            .map { Triple(it.lat, it.lng, "") }
+                    )
+                    if (allPts.isEmpty()) continue
+
+                    // Find closest point on route to origin (boarding point)
+                    var minBoardDist = Double.MAX_VALUE
+                    var boardPt = Triple(fromLat, fromLng, "Nearest Loading Point")
+                    for (pt in allPts) {
+                        val dLat = pt.first - fromLat
+                        val dLng = pt.second - fromLng
+                        val d = dLat * dLat + dLng * dLng
+                        if (d < minBoardDist) { minBoardDist = d; boardPt = pt }
+                    }
+
+                    // Find closest point on route to destination (drop-off point)
+                    var minDropDist = Double.MAX_VALUE
+                    var dropPt = Triple(toLat, toLng, "Stop near $destName")
+                    for (pt in allPts) {
+                        val dLat = pt.first - toLat
+                        val dLng = pt.second - toLng
+                        val d = dLat * dLat + dLng * dLng
+                        if (d < minDropDist) { minDropDist = d; dropPt = pt }
+                    }
+
+                    // Haversine walk distances in meters
+                    fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+                        val r = 6371000.0
+                        val dLat = Math.toRadians(lat2 - lat1)
+                        val dLng = Math.toRadians(lng2 - lng1)
+                        val a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+                                Math.cos(Math.toRadians(lat1))*Math.cos(Math.toRadians(lat2))*
+                                Math.sin(dLng/2)*Math.sin(dLng/2)
+                        return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+                    }
+
+                    val walkToBoard = haversine(fromLat, fromLng, boardPt.first, boardPt.second)
+                    val walkFromDrop = haversine(toLat, toLng, dropPt.first, dropPt.second)
+                    // Score: weighted by walking distance + destination proximity
+                    val score = walkToBoard * 1.5 + walkFromDrop * 2.0
+                    if (score < bestScore) {
+                        bestScore = score
+                        // Estimate route distance: straight-line between board & drop * road factor
+                        val routeKm = Math.max(1.0,
+                            haversine(boardPt.first, boardPt.second, dropPt.first, dropPt.second) / 1000.0 * 1.35
+                        )
+                        bestCandidate = RouteCandidate(
+                            route = route,
+                            boardingPoint = Pair(boardPt.first, boardPt.second),
+                            boardingName = boardPt.third.ifBlank { "Loading point near origin" },
+                            dropoffPoint = Pair(dropPt.first, dropPt.second),
+                            dropoffName = dropPt.third.ifBlank { "Stop near $destName" },
+                            walkToBoard = walkToBoard.toInt(),
+                            walkFromDrop = walkFromDrop.toInt(),
+                            routeKm = routeKm
+                        )
+                    }
+                }
+
+                if (bestCandidate != null) {
+                    val cand = bestCandidate
+                    val r = cand.route
+                    // Use route's actual fare and travel time where available
+                    val regularFare = if (r.fare > 0) r.fare else Math.max(13.0, 13.0 + (cand.routeKm - 4.0).coerceAtLeast(0.0) * 1.25)
+                    val discountFare = regularFare * 0.8
+                    val totalWalk = cand.walkToBoard + cand.walkFromDrop
+                    val walkMinutes = Math.max(1, (totalWalk / 70.0).toInt())
+                    // Jeepney speed ~20 km/h in CDO traffic
+                    val rideMinutes = if (r.travelTime > 0) r.travelTime else Math.max(10, (cand.routeKm / 20.0 * 60.0).toInt())
+                    val totalMinutes = walkMinutes + rideMinutes
+
+                    recommendedJeepneyTrip = TripOption(
+                        id = "rec-${r.id}",
+                        originPlaceId = "current",
+                        destinationPlaceId = "dest",
+                        minutes = totalMinutes,
+                        walkMeters = totalWalk,
+                        transfers = 0,
+                        boardingName = cand.boardingName,
+                        boardingLat = cand.boardingPoint.first,
+                        boardingLng = cand.boardingPoint.second,
+                        dropoffName = cand.dropoffName,
+                        totalKm = (cand.routeKm * 10.0).toLong() / 10.0,
+                        regularFare = (regularFare * 100.0).toLong() / 100.0,
+                        discountFare = (discountFare * 100.0).toLong() / 100.0,
+                        segments = listOf(
+                            TripSegment(
+                                tripOptionId = "rec-${r.id}",
+                                routeId = r.id,
+                                code = r.code,
+                                routeName = r.name,
+                                color = r.color,
+                                km = (cand.routeKm * 10.0).toLong() / 10.0
+                            )
+                        )
+                    )
+                }
             }
+            isLoadingJeepneyRoute = false
         }
     }
 

@@ -63,7 +63,6 @@ import com.google.maps.android.compose.*
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ororuta.app.domain.fare.PassengerCategory
 import com.ororuta.app.domain.fare.TraditionalJeepneyFareService
-import com.ororuta.app.domain.routing.*
 import com.ororuta.app.domain.models.Place
 import com.ororuta.app.domain.models.Resource
 import com.ororuta.app.domain.models.Route
@@ -123,13 +122,7 @@ fun parseGeometries(route: com.ororuta.app.domain.models.Route, direction: Strin
         } else {
             route.geometries
         }
-        // A missing requested direction is a data gap. Combining the opposite direction
-        // would make segment ordering and ride distance confidently wrong.
-        if (!direction.isNullOrBlank() && filtered.isEmpty()) {
-            routeGeometriesCache[cacheKey] = emptyList()
-            return emptyList()
-        }
-        val targetGeos = filtered
+        val targetGeos = if (filtered.isNotEmpty()) filtered else route.geometries
         targetGeos.forEach { geo ->
             val jsonStr = geo.geometry
             if (!jsonStr.isNullOrBlank()) {
@@ -150,7 +143,7 @@ fun parseGeometries(route: com.ororuta.app.domain.models.Route, direction: Strin
                 }
             }
         }
-    } else if (direction.isNullOrBlank() && route.path.isNotEmpty()) {
+    } else if (route.path.isNotEmpty()) {
         // Fallback to legacy path points
         route.path.filter { it.lat != 0.0 && it.lng != 0.0 }
             .forEach { allPts.add(LatLng(it.lat, it.lng)) }
@@ -204,12 +197,7 @@ data class NearbyRouteDisplayItem(
     val nearestStopLng: Double? = null,
     val destinationServed: String? = null,
     val onboardDistanceKm: Double? = null,
-    val dropoffStopName: String? = null,
-    val direction: String? = null,
-    val walkFromDropMeters: Int? = null,
-    val dropoffLat: Double? = null,
-    val dropoffLng: Double? = null,
-    val estimatedMinutes: Int? = null
+    val dropoffStopName: String? = null
 )
 
 data class RouteStopPoint(
@@ -764,76 +752,6 @@ fun MapScreen(
             val hasTargetCoords = targetLat != null && targetLng != null && !(targetLat == 0.0 && targetLng == 0.0)
             val targetClean = target.title.lowercase().trim()
             val isNearMe = target.isGpsBasedNearMe
-            if (!hasUserLocation) return@remember emptyList<NearbyRouteDisplayItem>()
-            val traditionalRoutes = dbRoutes.filter { route ->
-                route.jeepneyType.equals("Traditional", ignoreCase = true) || route.jeepneyType.isBlank()
-            }
-
-            // For a destination search, rank verified boarding/alighting pairs on each
-            // direction separately. Never substitute a nearby geometry vertex for a stop.
-            if (!isNearMe && hasTargetCoords) {
-                val directions = traditionalRoutes.flatMap { route ->
-                    val boardingStops = buildList {
-                        route.terminals.forEach { stop -> add(VerifiedTransitStop(stop.id, stop.name, "terminal", TransitCoordinate(stop.lat, stop.lng))) }
-                        route.stops.filterNot { it.pointType.equals("unloading", true) }.forEach { stop ->
-                            add(VerifiedTransitStop(stop.id, stop.name, stop.pointType, TransitCoordinate(stop.lat, stop.lng)))
-                        }
-                        route.transfers.forEach { stop -> add(VerifiedTransitStop(stop.id, stop.name, "transfer", TransitCoordinate(stop.lat, stop.lng))) }
-                    }
-                    // Route-linked passenger stops (including designated loading areas),
-                    // terminals, and marked transfer points are the only alighting candidates.
-                    val alightingStops = buildList {
-                        route.terminals.forEach { stop -> add(VerifiedTransitStop(stop.id, stop.name, "terminal", TransitCoordinate(stop.lat, stop.lng))) }
-                        route.stops.forEach { stop ->
-                            add(VerifiedTransitStop(stop.id, stop.name, stop.pointType, TransitCoordinate(stop.lat, stop.lng)))
-                        }
-                        route.transfers.forEach { stop -> add(VerifiedTransitStop(stop.id, stop.name, "transfer", TransitCoordinate(stop.lat, stop.lng))) }
-                    }
-                    route.geometries.mapNotNull { geometry ->
-                        val points = try {
-                            val coordinates = JSONObject(geometry.geometry ?: return@mapNotNull null).getJSONArray("coordinates")
-                            (0 until coordinates.length()).map { i ->
-                                val pair = coordinates.getJSONArray(i)
-                                TransitCoordinate(pair.getDouble(1), pair.getDouble(0))
-                            }
-                        } catch (_: Exception) { emptyList() }
-                        if (points.size < 2) null else DirectionalRouteData(
-                            routeId = route.id,
-                            routeCode = route.code,
-                            routeName = route.name,
-                            direction = geometry.direction,
-                            geometry = points,
-                            boardingStops = boardingStops,
-                            alightingStops = alightingStops,
-                            fare = route.fare.takeIf { it > 0.0 }
-                        )
-                    }
-                }
-                return@remember RouteItineraryPlanner.rankDirect(
-                    TransitCoordinate(uLat!!, uLng!!),
-                    TransitCoordinate(targetLat!!, targetLng!!),
-                    directions
-                ).mapNotNull { itinerary ->
-                    val route = traditionalRoutes.firstOrNull { it.id == itinerary.routeId } ?: return@mapNotNull null
-                    NearbyRouteDisplayItem(
-                        route = route,
-                        nearestStopName = itinerary.boardingStop.name,
-                        nearestStopType = itinerary.boardingStop.type.replaceFirstChar { it.uppercase() },
-                        walkDistanceMeters = itinerary.walkToBoardMeters,
-                        matchReason = "Verified stops serve ${target.title}",
-                        nearestStopLat = itinerary.boardingStop.coordinate.lat,
-                        nearestStopLng = itinerary.boardingStop.coordinate.lng,
-                        destinationServed = target.title,
-                        onboardDistanceKm = itinerary.rideMeters / 1000.0,
-                        dropoffStopName = itinerary.alightingStop.name,
-                        direction = itinerary.direction,
-                        walkFromDropMeters = itinerary.walkFromAlightMeters,
-                        dropoffLat = itinerary.alightingStop.coordinate.lat,
-                        dropoffLng = itinerary.alightingStop.coordinate.lng,
-                        estimatedMinutes = itinerary.estimatedMinutes
-                    )
-                }.distinctBy { it.route.id }.take(5)
-            }
 
             fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
                 val r = 6371000.0
@@ -843,6 +761,15 @@ fun MapScreen(
                         Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
                         Math.sin(dLng / 2) * Math.sin(dLng / 2)
                 return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            }
+
+            if (!hasUserLocation) {
+                return@remember emptyList<NearbyRouteDisplayItem>()
+            }
+
+            // Only traditional jeepneys
+            val traditionalRoutes = dbRoutes.filter { route ->
+                route.jeepneyType.equals("Traditional", ignoreCase = true) || route.jeepneyType.isBlank()
             }
 
             // Configurable walking limits for CDO urban transit
@@ -1345,13 +1272,13 @@ fun MapScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "${matchedRoutesWithDetails.size} verified jeepney ${if (matchedRoutesWithDetails.size == 1) "itinerary" else "itineraries"}",
+                                text = "${matchedRoutesWithDetails.size} nearest traditional jeepney ${if (matchedRoutesWithDetails.size == 1) "route" else "routes"}",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Brand600
                             )
                             Text(
-                                text = "Ranked by estimated end-to-end time and walking",
+                                text = "Nearest boarding stops first",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = InkMuted
@@ -1449,12 +1376,12 @@ fun MapScreen(
                                                         if (item.walkDistanceMeters != null) {
                                                             val distM = item.walkDistanceMeters
                                                             val distLabel = when {
-                                                                distM < 1000 -> "About $distM m to boarding stop"
-                                                                else -> "About ${"%.1f".format(distM / 1000.0)} km to boarding stop"
+                                                                distM < 1000 -> "Walk $distM m to boarding stop"
+                                                                else -> "Walk ${"%.1f".format(distM / 1000.0)} km to boarding stop"
                                                             }
                                                             val walkMins = Math.max(1, Math.round(distM / 80.0).toInt())
                                                             Text(
-                                                                text = "$distLabel (~$walkMins min; straight-line estimate)",
+                                                                text = "$distLabel (~$walkMins min walk)",
                                                                 fontSize = 11.sp,
                                                                 fontWeight = FontWeight.Medium,
                                                                 color = Ok600
@@ -1482,14 +1409,6 @@ fun MapScreen(
                                                             color = Brand600
                                                         )
                                                     }
-                                                if (item.direction != null && item.walkFromDropMeters != null) {
-                                                    Text(
-                                                        text = "${item.direction} · alight at ${item.dropoffStopName}; about ${item.walkFromDropMeters} m to destination",
-                                                        fontSize = 11.sp,
-                                                        color = InkSoft,
-                                                        modifier = Modifier.padding(start = 20.dp, top = 4.dp)
-                                                    )
-                                                }
                                                 }
                                             }
                                         }
@@ -1497,24 +1416,26 @@ fun MapScreen(
                                         Spacer(modifier = Modifier.height(8.dp))
 
                                         // Route stats: Fare, Travel time, Distance along onboard segment
-                                        val effectiveKm = item.onboardDistanceKm
+                                        val effectiveKm = item.onboardDistanceKm ?: if (r.lengthKm > 0) r.lengthKm else 4.0
                                         val fareRes = remember(effectiveKm, r.jeepneyType) {
-                                            effectiveKm?.let {
-                                                TraditionalJeepneyFareService.calculateFareForDistance(
-                                                    distanceKm = it,
-                                                    category = PassengerCategory.REGULAR,
-                                                    jeepneyType = r.jeepneyType
-                                                )
-                                            }
+                                            TraditionalJeepneyFareService.calculateFareForDistance(
+                                                distanceKm = effectiveKm,
+                                                category = PassengerCategory.REGULAR,
+                                                jeepneyType = r.jeepneyType
+                                            )
                                         }
-                                        val travelMins = item.estimatedMinutes
+                                        val travelMins = if (item.onboardDistanceKm != null) {
+                                            Math.max(8, Math.round(item.onboardDistanceKm * 3.5).toInt())
+                                        } else {
+                                            r.travelTime
+                                        }
 
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            if (fareRes?.isAvailable == true) {
+                                            if (fareRes.isAvailable) {
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1545,7 +1466,7 @@ fun MapScreen(
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = travelMins?.let { "~$it min total" } ?: "Time unavailable",
+                                                text = "~$travelMins mins",
                                                 fontSize = 12.sp,
                                                 color = InkSoft
                                             )
@@ -1555,7 +1476,7 @@ fun MapScreen(
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = effectiveKm?.let { "${"%.1f".format(it)} km" } ?: "Ride distance unavailable",
+                                                text = "${"%.1f".format(effectiveKm)} km",
                                                 fontSize = 12.sp,
                                                 color = InkMuted
                                             )
@@ -1571,7 +1492,7 @@ fun MapScreen(
                                             // Determine route direction based on stop ordering:
                                             // If nearest boarding stop appears before destination-related stop in
                                             // inbound path → Inbound; otherwise Outbound.
-                                            val detectedDirection = item.direction ?: remember(r, item, target) {
+                                            val detectedDirection = remember(r, item, target) {
                                                 val boardLat = item.nearestStopLat ?: return@remember "Inbound"
                                                 val boardLng = item.nearestStopLng ?: return@remember "Inbound"
                                                 val inboundPts = parseGeometries(r, "Inbound")
@@ -1647,10 +1568,8 @@ fun MapScreen(
                                                         if (item.nearestStopLat != null && item.nearestStopLng != null) {
                                                             append("&boardingName=$encodedBName&boardingLat=${item.nearestStopLat}&boardingLng=${item.nearestStopLng}")
                                                         }
-                                                        val boardingAlightLat = item.dropoffLat
-                                                        val boardingAlightLng = item.dropoffLng
-                                                        if (boardingAlightLat != null && boardingAlightLng != null) {
-                                                            append("&dropoffName=$encodedDName&dropoffLat=$boardingAlightLat&dropoffLng=$boardingAlightLng")
+                                                        if (dLat != null && dLng != null) {
+                                                            append("&dropoffName=$encodedDName&dropoffLat=$dLat&dropoffLng=$dLng")
                                                         }
                                                         if (item.walkDistanceMeters != null) {
                                                             append("&walkDistanceMeters=${item.walkDistanceMeters}")
