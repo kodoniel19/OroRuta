@@ -40,7 +40,7 @@ async function list(req, res, next) {
        [rows] = await db.execute(sql, []);
     }
 
-    for (const r of rows) {
+    await Promise.all(rows.map(async (r) => {
       const [[tCount]] = await db.execute("SELECT COUNT(*) cnt FROM route_terminals WHERE route_id = ?", [r.id]);
       const [[lCount]] = await db.execute("SELECT COUNT(*) cnt FROM loading_points WHERE route_id = ?", [r.id]);
       r.terminal_count = tCount.cnt;
@@ -111,7 +111,7 @@ async function list(req, res, next) {
       r.landmarks = landmarks;
 
       r.travelTime = Math.round((r.length_km || 5) * 3.5);
-    }
+    }));
     res.json(rows);
   } catch (err) { next(err); }
 }

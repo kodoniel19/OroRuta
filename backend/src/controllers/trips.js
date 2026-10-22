@@ -25,7 +25,7 @@ const CDO_ALIASES = [
   { keywords: ["centrio", "ayala centrio", "centrio mall"], name: "Centrio Mall", area: "Poblacion", kind: "mall", lat: 8.4877, lng: 124.6517 },
   { keywords: ["limketkai", "ketkai"], name: "Limketkai Center", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6568 },
   { keywords: ["gaisano", "gaisano city"], name: "Gaisano City Mall", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6515 },
-  { keywords: ["cogon", "cogon market"], name: "Cogon Market", area: "Cogon", kind: "market", lat: 8.4735, lng: 124.6497 },
+  { keywords: ["cogon", "cogon market"], name: "Cogon Market", area: "Cogon", kind: "market", lat: 8.477160465033135, lng: 124.65120822163647 },
   { keywords: ["carmen market", "carmen public market"], name: "Carmen Market", area: "Carmen", kind: "market", lat: 8.4845, lng: 124.6335 },
   { keywords: ["agora", "agora terminal"], name: "Agora Terminal", area: "Lapasan", kind: "terminal", lat: 8.4857, lng: 124.6589 },
   { keywords: ["bulua", "bulua terminal", "wtpm", "westbound"], name: "Bulua Terminal", area: "Bulua", kind: "terminal", lat: 8.5040, lng: 124.6115 },
@@ -42,7 +42,7 @@ const CDO_ALIASES = [
 // Verified CDO transfer hubs for multi-jeepney journeys
 const CDO_TRANSFER_HUBS = [
   { id: "hub-carmen", name: "Carmen Public Market Terminal", lat: 8.4845, lng: 124.6335, area: "Carmen" },
-  { id: "hub-cogon", name: "Cogon Market Terminal", lat: 8.4735, lng: 124.6497, area: "Cogon" },
+  { id: "hub-cogon", name: "Cogon Market Terminal", lat: 8.477160465033135, lng: 124.65120822163647, area: "Cogon" },
   { id: "hub-agora", name: "Agora Eastbound Terminal", lat: 8.4857, lng: 124.6589, area: "Lapasan" },
   { id: "hub-bulua", name: "Bulua Westbound Terminal", lat: 8.5040, lng: 124.6115, area: "Bulua" },
   { id: "hub-divisoria", name: "Divisoria Plaza Interchange", lat: 8.4777, lng: 124.6452, area: "Divisoria" },

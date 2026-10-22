@@ -76,8 +76,8 @@ const CDO_STREET_ANCHORS = {
   'valenzuela ave.': [124.6600, 8.4890],
 
   // Downtown / Divisoria / Cogon Corridor
-  'cogon public market': [124.6502, 8.4754],
-  'cogon market': [124.6502, 8.4754],
+  'cogon public market': [124.65143105271864, 8.477611458628417],
+  'cogon market': [124.65143105271864, 8.477611458628417],
   'capt. vicente roa st.': [124.6500, 8.4760],
   'v. roa st.': [124.6500, 8.4760],
   'yacapin st.': [124.6480, 8.4770],
