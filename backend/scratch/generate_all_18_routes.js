@@ -93,9 +93,9 @@ const NEW_ROUTES_SPECS = [
     origin: 'Camp Evangelista (Patag)',
     destination: 'Cogon Public Market',
     color: '#D97706',
-    inboundWaypoints: [LOCS.campEvangelista, LOCS.liceo, LOCS.gaisano, LOCS.smDowntown, LOCS.limketkai, LOCS.cogon, LOCS.divisoria],
-    outboundWaypoints: [LOCS.divisoria, LOCS.cogon, LOCS.limketkai, LOCS.gaisano, LOCS.liceo, LOCS.campEvangelista],
-    description: 'Camp Evangelista (Patag) → Liceo de Cagayan Univ → Gaisano City Mall → SM CDO Downtown → Limketkai Center → Cogon Market → Divisoria.'
+    inboundWaypoints: [LOCS.campEvangelista, LOCS.carmen, LOCS.liceo, LOCS.gaisano, LOCS.smDowntown, LOCS.limketkai, LOCS.cogon, LOCS.divisoria],
+    outboundWaypoints: [LOCS.divisoria, LOCS.cogon, LOCS.limketkai, LOCS.gaisano, LOCS.smDowntown, LOCS.liceo, LOCS.carmen, LOCS.campEvangelista],
+    description: 'Camp Evangelista (Patag) → Carmen Market → Liceo de Cagayan Univ → Gaisano City Mall → SM CDO Downtown → Limketkai Center → Cogon Market → Divisoria.'
   },
   // 4. Bugo–Cogon Line
   {
