@@ -60,7 +60,7 @@ private val DEFAULT_CDO_STOPS = listOf(
     Pair("Centrio Mall / Velez-Recto", LatLng(8.4871, 124.6508)),
     Pair("Limketkai Center", LatLng(8.4842, 124.6568)),
     Pair("Gusa Highway Drop-off", LatLng(8.4925, 124.6780)),
-    Pair("Cogon Public Market", LatLng(8.4754, 124.6502)),
+    Pair("Cogon Public Market", LatLng(8.477160465033135, 124.65120822163647)),
     Pair("Puerto Highway Junction", LatLng(8.4960, 124.7410))
 )
 
@@ -79,7 +79,7 @@ private val CDO_ROUTE_C1 = listOf(
     LatLng(8.4804, 124.6369), // Carmen
     LatLng(8.4871, 124.6508), // Velez
     LatLng(8.4772, 124.6465), // Divisoria
-    LatLng(8.4754, 124.6502)  // Cogon
+    LatLng(8.477160465033135, 124.65120822163647)  // Cogon
 )
 
 private val CDO_ROUTE_B1 = listOf(

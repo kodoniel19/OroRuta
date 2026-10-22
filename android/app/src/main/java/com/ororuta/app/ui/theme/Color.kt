@@ -2,40 +2,40 @@ package com.ororuta.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// OroRuta Design System Colors
-// Clean, modern light background with deep green / dark teal and golden-yellow accents (inspired by Cagayan de Oro)
-val Canvas = Color(0xFFF6F8F7)
-val Line = Color(0xFFE2E8E5)
-val Ink = Color(0xFF101B17)
-val InkSoft = Color(0xFF334640)
-val InkMuted = Color(0xFF647771)
+// OroRuta Official Light-Mode Design System Colors
+// Primary Blue: #1477D2 | Highlight Yellow: #E6B400
+val Canvas = Color(0xFFF7F9FC)
+val Line = Color(0xFFE5E7EB)
+val Ink = Color(0xFF1F2937)
+val InkSoft = Color(0xFF374151)
+val InkMuted = Color(0xFF6B7280)
 
-// Deep Forest / Dark Teal Brand Colors
-val Brand50 = Color(0xFFEBF5F1)
-val Brand100 = Color(0xFFCEE7DE)
-val Brand500 = Color(0xFF147D64)
-val Brand600 = Color(0xFF0F6652)
-val Brand700 = Color(0xFF0B4D3D)
-val Brand900 = Color(0xFF062920)
+// Official Primary Blue Brand Colors (#1477D2)
+val Brand50 = Color(0xFFEBF4FC)
+val Brand100 = Color(0xFFC7E1FA)
+val Brand500 = Color(0xFF2B8BE3)
+val Brand600 = Color(0xFF1477D2) // Main Brand Primary Blue
+val Brand700 = Color(0xFF0F5CA4)
+val Brand900 = Color(0xFF0A3E6F)
 
-// Golden-Yellow Accents (Oro - Cagayan de Oro "City of Golden Friendship")
-val Oro50 = Color(0xFFFFFBEB)
-val Oro100 = Color(0xFFFEF3C7)
-val Oro400 = Color(0xFFFBBF24)
-val Oro500 = Color(0xFFF59E0B)
-val Oro600 = Color(0xFFD97706)
-val Oro700 = Color(0xFFB45309)
+// Official Highlight Yellow Accents (#E6B400)
+val Oro50 = Color(0xFFFFFDF5)
+val Oro100 = Color(0xFFFCF4D6)
+val Oro400 = Color(0xFFE6B400) // Highlight Yellow #E6B400
+val Oro500 = Color(0xFFE6B400)
+val Oro600 = Color(0xFFC79B00)
+val Oro700 = Color(0xFFA88300)
 
 // Semantic feedback colors
 val Ok50 = Color(0xFFECFDF5)
-val Ok600 = Color(0xFF16A34A)
+val Ok600 = Color(0xFF10B981)
 
 val Warn50 = Color(0xFFFFFBEB)
-val Warn600 = Color(0xFFD97706)
+val Warn600 = Color(0xFFF59E0B)
 
 val Bad50 = Color(0xFFFEF2F2)
 val Bad100 = Color(0xFFFEE2E2)
-val Bad600 = Color(0xFFDC2626)
+val Bad600 = Color(0xFFEF4444)
 
 // Surface / background aliases for M3
 val SurfaceBackground = Canvas
@@ -46,8 +46,8 @@ val Primary = Brand600
 val PrimaryContainer = Brand50
 val OnPrimary = Color.White
 val OnPrimaryContainer = Brand700
-val Secondary = Oro500
-val OnSecondary = Color.White
+val Secondary = Oro400
+val OnSecondary = Ink
 val Error = Bad600
 val OnError = Color.White
 val ErrorContainer = Bad50

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -53,6 +54,31 @@ val bottomTabs = listOf(
     BottomTab.Saved,
     BottomTab.More
 )
+
+private fun navigateToResults(
+    navController: NavHostController,
+    from: String,
+    to: String,
+    fromLat: Double? = null,
+    fromLng: Double? = null,
+    toLat: Double? = null,
+    toLng: Double? = null,
+    sort: String = "time"
+) {
+    val cleanFrom = from.ifBlank { "Current Location" }
+    val cleanTo = to.ifBlank { "Destination" }
+    val encodedFrom = try { URLEncoder.encode(cleanFrom, "UTF-8") } catch (_: Exception) { cleanFrom }
+    val encodedTo = try { URLEncoder.encode(cleanTo, "UTF-8") } catch (_: Exception) { cleanTo }
+    val fLatStr = fromLat?.toString() ?: ""
+    val fLngStr = fromLng?.toString() ?: ""
+    val tLatStr = toLat?.toString() ?: ""
+    val tLngStr = toLng?.toString() ?: ""
+
+    val targetRoute = "results?from=$encodedFrom&to=$encodedTo&sort=$sort&fromLat=$fLatStr&fromLng=$fLngStr&toLat=$tLatStr&toLng=$tLngStr"
+    try {
+        navController.navigate(targetRoute)
+    } catch (_: Exception) {}
+}
 
 @Composable
 fun OroRutaApp(initialRoute: String? = null) {
@@ -128,7 +154,9 @@ fun OroRutaApp(initialRoute: String? = null) {
                                             }
                                         }
                                     }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .heightIn(min = 48.dp)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalArrangement = Arrangement.Center
                             ) {
                                 Box(
                                     modifier = Modifier
@@ -261,8 +289,12 @@ fun OroRutaApp(initialRoute: String? = null) {
                 val savedVm = hiltViewModel<SavedViewModel>()
                 SavedScreen(
                     viewModel = savedVm,
-                    onNavigateResults = { from, to -> navController.navigate("results?from=$from&to=$to") },
-                    onNavigateSearchPrefilled = { _ -> navController.navigate("map") },
+                    onOpenRouteInfo = { routeId ->
+                        val target = if (routeId.startsWith("route_info/")) routeId else "route_info/$routeId"
+                        navController.navigate(target)
+                    },
+                    onNavigateResults = { from, to -> navigateToResults(navController, from, to) },
+                    onNavigateRoutes = { navController.navigate("routes") },
                     onStartNav = { optId -> navController.navigate("navigation/$optId") }
                 )
             }

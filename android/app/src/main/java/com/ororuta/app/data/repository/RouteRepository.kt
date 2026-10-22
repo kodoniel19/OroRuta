@@ -28,19 +28,42 @@ class RouteRepository @Inject constructor(
     private val networkMonitor: NetworkMonitor,
     private val json: Json
 ) {
+    @Volatile
+    private var isCacheSeeded = false
+
+    @Volatile
+    private var memoryRoutesCache: List<Route>? = null
+
     /**
      * Ensures initial offline cache is pre-populated with verified CDO routes from assets
-     * and kept up-to-date with bundled route geometries.
+     * on initial launch. Skips asset reading/parsing if cache is already populated.
      */
     private suspend fun ensureInitialCache() {
+        if (isCacheSeeded) return
         try {
+            val existing = dao.getAllSync()
+            if (existing.size >= 18) {
+                val hasOldCogon = existing.any {
+                    it.jsonData.contains("124.6437") ||
+                    it.jsonData.contains("8.4735") ||
+                    it.jsonData.contains("8.4754") ||
+                    it.jsonData.contains("8.477611") ||
+                    it.jsonData.contains("124.65143")
+                }
+                if (!hasOldCogon) {
+                    isCacheSeeded = true
+                    return
+                }
+            }
             context.assets.open("bundled_routes.json").use { stream ->
                 val text = stream.bufferedReader().use { it.readText() }
                 val routes = json.decodeFromString<List<Route>>(text)
                 if (routes.isNotEmpty()) {
                     dao.insertAll(routes.map { it.toCached() })
+                    memoryRoutesCache = routes
                 }
             }
+            isCacheSeeded = true
         } catch (_: Exception) {}
     }
 
@@ -99,52 +122,60 @@ class RouteRepository @Inject constructor(
      *   4. Only emit Resource.Error if there is NOTHING to show (no cache, no network).
      */
     fun getRoutes(q: String = "", type: String = "", hasUpdates: Boolean = false): Flow<Resource<List<Route>>> = flow {
-        emit(Resource.Loading)
+        val currentMem = memoryRoutesCache
+        if (currentMem != null && currentMem.isNotEmpty()) {
+            val cached = filterRoutes(currentMem, q, type, hasUpdates)
+            emit(Resource.Success(cached, isOffline = !networkMonitor.isOnline()))
+        } else {
+            emit(Resource.Loading)
 
-        // Step 1: Seed cache from bundled JSON if the DB is nearly empty (first launch)
-        ensureInitialCache()
+            ensureInitialCache()
 
-        // Step 2: Serve cached data immediately — this guarantees the screen is never blank
-        val initialCache = if (q.isNotBlank()) dao.search(q) else dao.getAllSync()
-        if (initialCache.isNotEmpty()) {
-            val cached = filterRoutes(initialCache.mapNotNull { safeDecode(it) }, q, type, hasUpdates)
-            emit(Resource.Success(cached, isOffline = true))
+            val initialCache = if (q.isNotBlank()) dao.search(q) else dao.getAllSync()
+            if (initialCache.isNotEmpty()) {
+                val decoded = initialCache.mapNotNull { safeDecode(it) }
+                if (decoded.isNotEmpty() && q.isBlank() && type.isBlank() && !hasUpdates) {
+                    memoryRoutesCache = decoded
+                }
+                val cached = filterRoutes(decoded, q, type, hasUpdates)
+                emit(Resource.Success(cached, isOffline = true))
+            }
         }
 
-        // Step 3: If there's no network, we're done — show the cached data (or an error if empty)
         val isDeviceOnline = networkMonitor.isOnline()
         if (!isDeviceOnline) {
-            if (initialCache.isEmpty()) {
+            if (memoryRoutesCache.isNullOrEmpty() && dao.getAllSync().isEmpty()) {
                 emit(Resource.Error("You're offline and no cached routes are available.", isOffline = true))
             }
             return@flow
         }
 
-        // Step 4: Online — attempt a background refresh against the real API
         try {
             val remote = api.getRoutes(q, type, if (hasUpdates) "true" else "")
             if (remote.isNotEmpty()) {
+                if (q.isBlank() && type.isBlank() && !hasUpdates) {
+                    memoryRoutesCache = remote
+                }
                 dao.insertAll(remote.map { it.toCached() })
                 val filtered = filterRoutes(remote, q, type, hasUpdates)
                 emit(Resource.Success(filtered, isOffline = false))
-            } else if (initialCache.isEmpty()) {
-                // Server returned empty AND we had nothing cached → show error
+            } else if (memoryRoutesCache.isNullOrEmpty() && dao.getAllSync().isEmpty()) {
                 emit(Resource.Error("No routes available.", isOffline = false))
             }
-            // If remote is empty but cache was served → keep the cached result (no new emit)
         } catch (e: Exception) {
-            // Network request failed — cache was already served in Step 2, so only emit
-            // an error if we had nothing cached to show the user.
-            if (initialCache.isEmpty()) {
+            if (memoryRoutesCache.isNullOrEmpty() && dao.getAllSync().isEmpty()) {
                 val msg = classifyError(e)
                 emit(Resource.Error(msg, isOffline = false))
             }
-            // Otherwise: cache result stays displayed; no additional action needed.
         }
     }
 
     suspend fun getRoute(id: String): Resource<Route> {
-        // 1. Check existing local Room cache first
+        val inMem = memoryRoutesCache?.firstOrNull { it.id == id || it.code.equals(id, true) }
+        if (inMem != null) {
+            return Resource.Success(inMem, isOffline = !networkMonitor.isOnline())
+        }
+
         ensureInitialCache()
         val cached = dao.getById(id)
         if (cached != null) {

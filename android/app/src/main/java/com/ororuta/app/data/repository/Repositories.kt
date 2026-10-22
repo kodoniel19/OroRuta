@@ -250,7 +250,7 @@ class PlaceRepository @Inject constructor(
             Place("pl-limketkai", "Limketkai Center", "Lapasan", "mall", 124.65600665305024, 8.481879913395911, 8.481879913395911, 124.65600665305024),
             Place("pl-sm-downtown", "SM CDO Downtown Premier", "Lapasan", "mall", 124.65492954347054, 8.484385998039096, 8.484385998039096, 124.65492954347054),
             Place("pl-centrio", "Centrio Mall", "Poblacion", "mall", 124.65132166064039, 8.48569470716317, 8.48569470716317, 124.65132166064039),
-            Place("pl-cogon", "Cogon Market", "Cogon", "market", 124.650200, 8.475400, 8.475400, 124.650200),
+            Place("pl-cogon", "Cogon Market", "Cogon", "market", 124.65120822163647, 8.477160465033135, 8.477160465033135, 124.65120822163647),
             Place("pl-carmen", "Carmen Public Market", "Carmen", "market", 124.63681954401368, 8.479497843594105, 8.479497843594105, 124.63681954401368),
             Place("pl-patag", "Camp Evangelista", "Patag", "military", 124.625586, 8.487848, 8.487848, 124.625586),
             Place("pl-cathedral", "St. Augustine Metropolitan Cathedral", "Poblacion", "landmark", 124.6433, 8.4777, 8.4777, 124.6433),
@@ -541,11 +541,9 @@ class HistoryRepository @Inject constructor(
 @Singleton
 class SavedRepository @Inject constructor(
     private val api: OroRutaApi,
-    private val tripsDao: SavedTripsDao,
-    private val destsDao: SavedDestinationsDao
+    private val tripsDao: SavedTripsDao
 ) {
     fun getSavedTrips(): Flow<List<LocalSavedTrip>> = tripsDao.getAll()
-    fun getSavedDestinations(): Flow<List<LocalSavedDestination>> = destsDao.getAll()
 
     suspend fun saveTrip(fromLabel: String, toLabel: String, routeIds: List<String>, tripOptionId: String?): Resource<String> {
         return try {
@@ -555,7 +553,6 @@ class SavedRepository @Inject constructor(
             tripsDao.insert(LocalSavedTrip(id, fromLabel, toLabel, routeIds.joinToString(","), tripOptionId))
             Resource.Success(id)
         } catch (e: Exception) {
-            // Save locally even if offline
             val id = UUID.randomUUID().toString()
             tripsDao.insert(LocalSavedTrip(id, fromLabel, toLabel, routeIds.joinToString(","), tripOptionId))
             Resource.Success(id)
@@ -565,24 +562,6 @@ class SavedRepository @Inject constructor(
     suspend fun deleteTrip(id: String) {
         try { api.deleteSavedTrip(id) } catch (_: Exception) {}
         tripsDao.delete(id)
-    }
-
-    suspend fun saveDestination(label: String, placeName: String, icon: String): Resource<String> {
-        return try {
-            val resp = api.saveDestination(mapOf("label" to label, "placeName" to placeName, "icon" to icon))
-            val id = resp["id"] ?: UUID.randomUUID().toString()
-            destsDao.insert(LocalSavedDestination(id, label, placeName, icon))
-            Resource.Success(id)
-        } catch (e: Exception) {
-            val id = UUID.randomUUID().toString()
-            destsDao.insert(LocalSavedDestination(id, label, placeName, icon))
-            Resource.Success(id)
-        }
-    }
-
-    suspend fun deleteDestination(id: String) {
-        try { api.deleteDestination(id) } catch (_: Exception) {}
-        destsDao.delete(id)
     }
 }
 

@@ -98,9 +98,9 @@ fun RouteBadge(
 ) {
     val parsedColor = remember(colorHex) {
         try {
-            Color(android.graphics.Color.parseColor(colorHex ?: "#1471B0"))
+            Color(android.graphics.Color.parseColor(colorHex ?: "#1477D2"))
         } catch (_: Exception) {
-            Brand500
+            Brand600
         }
     }
 
@@ -175,10 +175,22 @@ fun OroButton(
     fullWidth: Boolean = false,
     loading: Boolean = false
 ) {
+    // Click debouncing guard to prevent accidental double-taps
+    var lastClickTime by remember { mutableLongStateOf(0L) }
+    val debouncedOnClick = remember(onClick) {
+        {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastClickTime >= 400L) {
+                lastClickTime = currentTime
+                onClick()
+            }
+        }
+    }
+
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.95f else 1f,
+        targetValue = if (isPressed && enabled && !loading) 0.96f else 1f,
         animationSpec = spring(
             dampingRatio = 0.72f,
             stiffness = 800f
@@ -192,7 +204,7 @@ fun OroButton(
     )
 
     val height = when (size) {
-        ButtonSize.Sm -> 40.dp
+        ButtonSize.Sm -> 42.dp
         ButtonSize.Md -> 48.dp
         ButtonSize.Lg -> 54.dp
     }
@@ -209,21 +221,21 @@ fun OroButton(
     val finalContent = if (enabled) contentColor else InkMuted
 
     Surface(
-        onClick = onClick,
+        onClick = debouncedOnClick,
         enabled = enabled && !loading,
         shape = RoundedCornerShape(14.dp),
         color = finalBg,
         contentColor = finalContent,
         shadowElevation = elevation,
-        border = if (borderStroke != null && enabled) androidx.compose.foundation.BorderStroke(1.dp, borderStroke) else null,
+        border = if (borderStroke != null && enabled) BorderStroke(1.dp, borderStroke) else null,
         modifier = modifier
             .scale(scale)
-            .height(height)
+            .heightIn(min = height)
             .then(if (fullWidth) Modifier.fillMaxWidth() else Modifier),
         interactionSource = interactionSource
     ) {
         Box(
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {
             if (loading) {
@@ -252,7 +264,8 @@ fun OroButton(
                             fontWeight = FontWeight.Bold,
                             color = finalContent
                         ),
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -445,7 +458,7 @@ fun SegmentedControl(
                 shadowElevation = if (isSelected) 2.dp else 0.dp,
                 modifier = Modifier
                     .weight(1f)
-                    .height(36.dp)
+                    .height(40.dp)
                     .scale(itemScale)
             ) {
                 Box(contentAlignment = Alignment.Center) {

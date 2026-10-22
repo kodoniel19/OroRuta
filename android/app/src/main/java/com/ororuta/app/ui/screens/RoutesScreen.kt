@@ -109,6 +109,7 @@ fun RoutesScreen(
                             FilterChip(
                                 selected = viewModel.selectedFilter == chip,
                                 onClick = { viewModel.onFilterChange(chip) },
+                                modifier = Modifier.heightIn(min = 40.dp),
                                 label = {
                                     Text(
                                         text = when (chip) {
@@ -116,95 +117,11 @@ fun RoutesScreen(
                                             "Popular" -> "Popular Routes"
                                             else -> "With updates"
                                         },
-                                        fontSize = 12.sp
+                                        fontSize = 12.sp,
+                                        fontWeight = if (viewModel.selectedFilter == chip) FontWeight.Bold else FontWeight.Medium
                                     )
                                 }
                             )
-                        }
-                    }
-
-                    if (viewModel.selectedFilter == "Popular") {
-                        Surface(
-                            color = Brand50,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Star,
-                                    contentDescription = null,
-                                    tint = Brand600,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = "Curated collection of commonly used Cagayan de Oro routes",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Brand700
-                                )
-                            }
-                        }
-                    }
-                    val isOffline = (state as? Resource.Success<*>)?.isOffline == true
-                    if (isOffline) {
-                        Surface(
-                            color = Warn50,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Warn600)
-                                )
-                                Text(
-                                    text = "Offline – Showing cached routes",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Warn600
-                                )
-                            }
-                        }
-                    } else if (state is Resource.Success<*>) {
-                        Surface(
-                            color = Ok50,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Ok600)
-                                )
-                                Text(
-                                    text = "Online – Updated just now",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Ok600
-                                )
-                            }
                         }
                     }
                 }
@@ -298,7 +215,7 @@ fun RoutesScreen(
                                 )
                             }
 
-                            items(routes) { route ->
+                            items(routes, key = { it.id }) { route ->
                                 RouteDirectoryRow(route = route, onClick = { onSelectRoute(route.id) })
                             }
                         }

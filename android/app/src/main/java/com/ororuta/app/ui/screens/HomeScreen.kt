@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -409,7 +410,7 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(uiState.announcements.filter { it.status != "Expired" }) { ann ->
+                        items(uiState.announcements.filter { it.status != "Expired" }, key = { it.id }) { ann ->
                             AnnouncementCard(
                                 announcement = ann,
                                 compact = true,
@@ -452,8 +453,10 @@ fun QuickActionTile(
         color = Color.White,
         shape = RoundedCornerShape(16.dp),
         shadowElevation = elevation,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Line),
-        modifier = modifier.scale(scale)
+        border = BorderStroke(1.dp, Line),
+        modifier = modifier
+            .scale(scale)
+            .heightIn(min = 102.dp)
     ) {
         Column(
             modifier = Modifier

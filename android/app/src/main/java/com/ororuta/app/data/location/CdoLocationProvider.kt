@@ -57,7 +57,7 @@ class CdoLocationProvider @Inject constructor(
             "Centrio Mall" to Pair(8.4871, 124.6508),
             "Agora Terminal" to Pair(8.4907, 124.6610),
             "Bulua Terminal" to Pair(8.5132, 124.6190),
-            "Cogon Market" to Pair(8.4754, 124.6502),
+            "Cogon Market" to Pair(8.477160465033135, 124.65120822163647),
             "Gusa" to Pair(8.4925, 124.6780),
             "Liceo de Cagayan University" to Pair(8.4961, 124.6483),
             "Xavier University" to Pair(8.4832, 124.6503),

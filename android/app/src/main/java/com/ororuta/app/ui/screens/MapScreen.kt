@@ -268,6 +268,7 @@ fun MapScreen(
                     val allPts = getAllRouteCoordinates(route)
                     allPts.any { pt ->
                         pt.latitude != 0.0 && pt.longitude != 0.0 &&
+                        Math.abs(pt.latitude - lat) <= 0.0035 && Math.abs(pt.longitude - lng) <= 0.0035 &&
                         haversine(lat, lng, pt.latitude, pt.longitude) <= 200.0
                     }
                 } else false
@@ -371,7 +372,7 @@ fun MapScreen(
                 CdoGeoStop("l2", "Divisoria Plaza (Golden Friendship)", "loading", 8.4772, 124.6465, "R1, R2, C1", "Divisoria"),
                 CdoGeoStop("x1", "Velez-Recto Junction (Centrio / Gaisano)", "transfer", 8.4871, 124.6508, "R1, C1", "Recto"),
                 CdoGeoStop("u1", "Limketkai Center Drop-off", "unloading", 8.4842, 124.6568, "R1, R2", "Limketkai"),
-                CdoGeoStop("m1", "Cogon Public Market", "loading", 8.4754, 124.6502, "C1, R2", "Cogon"),
+                CdoGeoStop("m1", "Cogon Public Market", "loading", 8.477160465033135, 124.65120822163647, "C1, R2", "Cogon"),
                 CdoGeoStop("p1", "Puerto Highway Terminal", "terminal", 8.4960, 124.7410, "B1", "Puerto")
             )
         }
@@ -1713,10 +1714,18 @@ fun MapScreen(
                         )
 
                         // Destination Marker (Red Pin)
-                        val destPt = routePts.last()
+                        val destTerminal = activeRoute.terminals.firstOrNull {
+                            it.name.contains(activeRoute.destination, ignoreCase = true) ||
+                            activeRoute.destination.contains(it.name, ignoreCase = true)
+                        }
+                        val destPt = when {
+                            destTerminal != null && destTerminal.lat != 0.0 && destTerminal.lng != 0.0 -> LatLng(destTerminal.lat, destTerminal.lng)
+                            activeRoute.destination.contains("Cogon", ignoreCase = true) -> LatLng(8.477160465033135, 124.65120822163647)
+                            else -> routePts.last()
+                        }
                         Marker(
                             state = rememberMarkerState(
-                                key = "dest_${activeRoute.id}_$activeDirection",
+                                key = "dest_${activeRoute.id}_${activeDirection}_${destPt.latitude}_${destPt.longitude}",
                                 position = destPt
                             ),
                             title = "Destination: ${activeRoute.destination}",
@@ -1738,23 +1747,31 @@ fun MapScreen(
                         )
                     }
 
-                    val distinctTerminals = activeRoute.terminals
-                        .filter { it.lat != 0.0 && it.lng != 0.0 }
-                        .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+                    val distinctTerminals = remember(activeRoute) {
+                        activeRoute.terminals
+                            .filter { it.lat != 0.0 && it.lng != 0.0 }
+                            .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+                    }
 
-                    val distinctLoadingStops = activeRoute.stops
-                        .filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }
-                        .filter { stop -> distinctTerminals.none { term -> term.name.equals(stop.name, ignoreCase = true) || (Math.abs(term.lat - stop.lat) < 0.0005 && Math.abs(term.lng - stop.lng) < 0.0005) } }
-                        .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+                    val distinctLoadingStops = remember(activeRoute, distinctTerminals) {
+                        activeRoute.stops
+                            .filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }
+                            .filter { stop -> distinctTerminals.none { term -> term.name.equals(stop.name, ignoreCase = true) || (Math.abs(term.lat - stop.lat) < 0.0005 && Math.abs(term.lng - stop.lng) < 0.0005) } }
+                            .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+                    }
 
-                    val distinctUnloadingStops = activeRoute.stops
-                        .filter { it.lat != 0.0 && it.lng != 0.0 && it.pointType.equals("unloading", ignoreCase = true) }
-                        .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+                    val distinctUnloadingStops = remember(activeRoute) {
+                        activeRoute.stops
+                            .filter { it.lat != 0.0 && it.lng != 0.0 && it.pointType.equals("unloading", ignoreCase = true) }
+                            .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+                    }
 
-                    val distinctTransfers = activeRoute.transfers
-                        .filter { it.lat != 0.0 && it.lng != 0.0 }
-                        .filter { tr -> distinctTerminals.none { term -> term.name.equals(tr.name, ignoreCase = true) } }
-                        .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+                    val distinctTransfers = remember(activeRoute, distinctTerminals) {
+                        activeRoute.transfers
+                            .filter { it.lat != 0.0 && it.lng != 0.0 }
+                            .filter { tr -> distinctTerminals.none { term -> term.name.equals(tr.name, ignoreCase = true) } }
+                            .distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+                    }
 
                     // C. Verified Terminals for this route (Orange)
                     distinctTerminals.forEach { term ->
@@ -2032,7 +2049,7 @@ fun MapScreen(
                     // Markers
                     // 1. Origin marker
                     Marker(
-                        state = rememberMarkerState(key = "dir_origin_pt", position = LatLng(mapDir.originLat, mapDir.originLng)),
+                        state = rememberMarkerState(key = "dir_origin_${mapDir.originLat}_${mapDir.originLng}", position = LatLng(mapDir.originLat, mapDir.originLng)),
                         title = mapDir.originName,
                         snippet = "Trip Origin",
                         icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
@@ -2042,7 +2059,7 @@ fun MapScreen(
                     // 2. Boarding stop marker with label
                     if (trip.boardingLat != null && trip.boardingLng != null && (trip.boardingLat != 0.0 || trip.boardingLng != 0.0)) {
                         Marker(
-                            state = rememberMarkerState(key = "dir_board_pt", position = LatLng(trip.boardingLat, trip.boardingLng)),
+                            state = rememberMarkerState(key = "dir_board_${trip.boardingLat}_${trip.boardingLng}", position = LatLng(trip.boardingLat, trip.boardingLng)),
                             title = "Board: ${trip.boardingName ?: "Loading Point"}",
                             snippet = "Board Route ${trip.segments.firstOrNull()?.code ?: ""}",
                             icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
@@ -2053,7 +2070,7 @@ fun MapScreen(
                     // 3. Alighting stop marker with label
                     if (trip.dropoffLat != null && trip.dropoffLng != null && (trip.dropoffLat != 0.0 || trip.dropoffLng != 0.0)) {
                         Marker(
-                            state = rememberMarkerState(key = "dir_drop_pt", position = LatLng(trip.dropoffLat, trip.dropoffLng)),
+                            state = rememberMarkerState(key = "dir_drop_${trip.dropoffLat}_${trip.dropoffLng}", position = LatLng(trip.dropoffLat, trip.dropoffLng)),
                             title = "Alight: ${trip.dropoffName ?: "Drop-off Point"}",
                             snippet = "Alight here ('Lugar lang')",
                             icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
@@ -2063,7 +2080,7 @@ fun MapScreen(
 
                     // 4. Destination marker
                     Marker(
-                        state = rememberMarkerState(key = "dir_dest_pt", position = LatLng(mapDir.destinationLat, mapDir.destinationLng)),
+                        state = rememberMarkerState(key = "dir_dest_${mapDir.destinationLat}_${mapDir.destinationLng}", position = LatLng(mapDir.destinationLat, mapDir.destinationLng)),
                         title = mapDir.destinationName,
                         snippet = "Trip Destination",
                         icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
@@ -2084,13 +2101,13 @@ fun MapScreen(
                         width = 12f
                     )
                     Marker(
-                        state = rememberMarkerState(key = "directions_origin_marker", position = LatLng(guide.originLat, guide.originLng)),
+                        state = rememberMarkerState(key = "dir_guide_origin_${guide.originLat}_${guide.originLng}", position = LatLng(guide.originLat, guide.originLng)),
                         title = "Starting Point (${guide.originName})",
                         snippet = "GPS Current Location",
                         icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
                     )
                     Marker(
-                        state = rememberMarkerState(key = "directions_dest_marker", position = LatLng(guide.destinationLat, guide.destinationLng)),
+                        state = rememberMarkerState(key = "dir_guide_dest_${guide.destinationLat}_${guide.destinationLng}", position = LatLng(guide.destinationLat, guide.destinationLng)),
                         title = guide.destinationName,
                         snippet = "Selected Destination",
                         icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
@@ -3788,7 +3805,7 @@ fun MapScreen(
 
                         val hubs = listOf(
                             Triple("Carmen Public Market", 8.4831, 124.6364),
-                            Triple("Cogon Public Market", 8.4772, 124.6496),
+                            Triple("Cogon Public Market", 8.477160465033135, 124.65120822163647),
                             Triple("Divisoria Plaza", 8.4770, 124.6444),
                             Triple("Limketkai Center", 8.4837, 124.6567),
                             Triple("Agora / Eastbound Terminal", 8.4907, 124.6618),

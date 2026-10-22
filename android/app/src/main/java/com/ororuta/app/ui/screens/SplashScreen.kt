@@ -218,15 +218,6 @@ fun SplashScreen(
                     color = Oro400,
                     trackColor = Color.White.copy(alpha = 0.18f),
                 )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text(
-                    text = "No account needed · 100% Offline Ready",
-                    color = Color.White.copy(alpha = 0.65f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Normal
-                )
             }
         }
     }

@@ -75,15 +75,6 @@ data class LocalSavedTrip(
     val createdAt: Long = System.currentTimeMillis()
 )
 
-@Entity(tableName = "local_saved_destinations")
-data class LocalSavedDestination(
-    @PrimaryKey val id: String,
-    val label: String,
-    val placeName: String,
-    val icon: String,
-    val createdAt: Long = System.currentTimeMillis()
-)
-
 @Entity(tableName = "recent_place_searches")
 data class RecentSearchEntity(
     @PrimaryKey val id: String,

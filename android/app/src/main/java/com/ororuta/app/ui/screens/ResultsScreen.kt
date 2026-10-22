@@ -120,7 +120,14 @@ fun ResultsScreen(
                             FilterChip(
                                 selected = viewModel.currentSort == opt.first,
                                 onClick = { viewModel.changeSort(from, to, opt.first) },
-                                label = { Text(opt.second, fontSize = 12.sp) }
+                                modifier = Modifier.heightIn(min = 40.dp),
+                                label = {
+                                    Text(
+                                        text = opt.second,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (viewModel.currentSort == opt.first) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
                             )
                         }
                     }

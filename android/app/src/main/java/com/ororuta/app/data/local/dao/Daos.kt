@@ -129,17 +129,7 @@ interface SavedTripsDao {
     suspend fun delete(id: String)
 }
 
-@Dao
-interface SavedDestinationsDao {
-    @Query("SELECT * FROM local_saved_destinations ORDER BY createdAt DESC")
-    fun getAll(): Flow<List<LocalSavedDestination>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(item: LocalSavedDestination)
-
-    @Query("DELETE FROM local_saved_destinations WHERE id = :id")
-    suspend fun delete(id: String)
-}
 
 @Dao
 interface RecentSearchDao {

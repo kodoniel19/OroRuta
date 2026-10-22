@@ -294,7 +294,13 @@ fun RouteInfoScreen(
                                     route.landmarks.map { LatLng(it.lat, it.lng) to it.name })
                                 .filter { it.first.latitude != 0.0 && it.first.longitude != 0.0 }
                                 .firstOrNull { it.second.contains(targetDestination, ignoreCase = true) || targetDestination.contains(it.second, ignoreCase = true) }
-                            matchingStop?.first ?: routeGeomPts.lastOrNull()
+                            if (matchingStop != null) {
+                                matchingStop.first
+                            } else if (targetDestination.contains("Cogon", ignoreCase = true)) {
+                                LatLng(8.477160465033135, 124.65120822163647)
+                            } else {
+                                routeGeomPts.lastOrNull()
+                            }
                         }
                     }
 
@@ -1911,7 +1917,7 @@ private fun StepGuidanceMap(
                 )
                 Polyline(
                     points = walkToBoardCoords,
-                    color = Color(0xFF00A86B), // Vibrant Emerald
+                    color = Brand600,
                     width = 8f,
                     zIndex = 8f
                 )
@@ -1969,7 +1975,7 @@ private fun StepGuidanceMap(
             // 7. Destination Pin (Red)
             destinationCoords?.let { dCoords ->
                 Marker(
-                    state = rememberMarkerState(key = "guide_destination", position = dCoords),
+                    state = rememberMarkerState(key = "guide_dest_${dCoords.latitude}_${dCoords.longitude}", position = dCoords),
                     title = "Destination: $destinationTitle",
                     snippet = "Step 5: Final Destination",
                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),

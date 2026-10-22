@@ -9,7 +9,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ororuta.app.data.local.AppDataStore
 import com.ororuta.app.data.local.entities.LocalHistory
-import com.ororuta.app.data.local.entities.LocalSavedDestination
 import com.ororuta.app.data.local.entities.LocalSavedTrip
 import com.ororuta.app.data.local.entities.CachedRoute
 import com.ororuta.app.data.location.CdoLocationProvider
@@ -22,6 +21,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -522,22 +522,25 @@ class RoutesViewModel @Inject constructor(
 
     fun onSearchChange(q: String) {
         searchQuery = q
-        loadRoutes()
+        loadRoutes(debounceMs = 200L)
     }
 
     fun onFilterChange(filter: String) {
         selectedFilter = filter
-        loadRoutes()
+        loadRoutes(debounceMs = 0L)
     }
 
     private fun isPopularRoute(r: Route): Boolean {
         return r.verificationStatus.equals("USER_SUPPLIED", ignoreCase = true) || r.isPopular
     }
 
-    fun loadRoutes() {
+    fun loadRoutes(debounceMs: Long = 0L) {
         // Cancel any in-flight request so we never have two collectors racing.
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
+            if (debounceMs > 0L) {
+                delay(debounceMs)
+            }
             val hasUpdates = selectedFilter == "Updated"
             // Collect: no type filter sent to server — we apply it client-side below
             // to avoid missing routes whose jeepneyType field is blank in the bundled JSON.
@@ -1606,16 +1609,10 @@ class SavedViewModel @Inject constructor(
     private val savedRepo: SavedRepository
 ) : ViewModel() {
 
-    var activeTab by mutableIntStateOf(0) // 0: Routes, 1: Destinations
     val savedTrips = savedRepo.getSavedTrips().stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-    val savedDestinations = savedRepo.getSavedDestinations().stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun deleteTrip(id: String) {
         viewModelScope.launch { savedRepo.deleteTrip(id) }
-    }
-
-    fun deleteDestination(id: String) {
-        viewModelScope.launch { savedRepo.deleteDestination(id) }
     }
 }
 
