@@ -78,24 +78,24 @@ const NEW_ROUTES_SPECS = [
     id: 'r2-gaisano-agora-cogon-carmen',
     code: 'R2',
     name: 'R2 — Gaisano–Agora–Cogon–Carmen Loop Line',
-    origin: 'NMMC / Centrio',
-    destination: 'Carmen Public Market',
+    origin: 'Carmen Public Market',
+    destination: 'Plaza Divisoria / Cogon',
     color: '#147D64',
-    inboundWaypoints: [LOCS.nmmc, LOCS.smDowntown, LOCS.agora, LOCS.puregold, LOCS.limketkai, LOCS.cogon, LOCS.divisoria, LOCS.carmen],
-    outboundWaypoints: [LOCS.carmen, LOCS.divisoria, LOCS.cogon, LOCS.limketkai, LOCS.agora, LOCS.smDowntown, LOCS.nmmc],
-    description: 'NMMC → Centrio & SM CDO Downtown → Agora Bus Terminal → Puregold Lapasan → Limketkai Center → Cogon Market → Plaza Divisoria → Carmen Market.'
+    inboundWaypoints: [LOCS.carmen, LOCS.liceo, LOCS.gaisano, LOCS.centrio, LOCS.smDowntown, LOCS.agora, LOCS.puregold, LOCS.limketkai, LOCS.cogon, LOCS.divisoria],
+    outboundWaypoints: [LOCS.divisoria, LOCS.cogon, LOCS.limketkai, LOCS.puregold, LOCS.agora, LOCS.smDowntown, LOCS.centrio, LOCS.gaisano, LOCS.liceo, LOCS.carmen],
+    description: 'Carmen Market → Liceo de Cagayan Univ → Gaisano City Mall → Ayala Malls Centrio → SM CDO Downtown → Agora Bus Terminal → Puregold Lapasan → Limketkai Center → Cogon Market → Divisoria.'
   },
   // 3. C2 — Patag–Gaisano–Limketkai–Cogon Loop Line
   {
     id: 'c2-patag-gaisano-limketkai-cogon',
     code: 'C2',
     name: 'C2 — Patag–Gaisano–Limketkai–Cogon Loop Line',
-    origin: 'Camp Evangelista (Patag)',
-    destination: 'Cogon Public Market',
+    origin: 'Carmen Public Market / Patag',
+    destination: 'Plaza Divisoria / Cogon',
     color: '#D97706',
-    inboundWaypoints: [LOCS.campEvangelista, LOCS.carmen, LOCS.liceo, LOCS.gaisano, LOCS.smDowntown, LOCS.limketkai, LOCS.cogon, LOCS.divisoria],
-    outboundWaypoints: [LOCS.divisoria, LOCS.cogon, LOCS.limketkai, LOCS.gaisano, LOCS.smDowntown, LOCS.liceo, LOCS.carmen, LOCS.campEvangelista],
-    description: 'Camp Evangelista (Patag) → Carmen Market → Liceo de Cagayan Univ → Gaisano City Mall → SM CDO Downtown → Limketkai Center → Cogon Market → Divisoria.'
+    inboundWaypoints: [LOCS.carmen, LOCS.campEvangelista, LOCS.liceo, LOCS.gaisano, LOCS.smDowntown, LOCS.limketkai, LOCS.cogon, LOCS.divisoria],
+    outboundWaypoints: [LOCS.divisoria, LOCS.cogon, LOCS.limketkai, LOCS.smDowntown, LOCS.gaisano, LOCS.liceo, LOCS.campEvangelista, LOCS.carmen],
+    description: 'Carmen Market → Camp Evangelista (Patag) → Liceo de Cagayan Univ → Gaisano City Mall → SM CDO Downtown → Limketkai Center → Cogon Market → Divisoria.'
   },
   // 4. Bugo–Cogon Line
   {
