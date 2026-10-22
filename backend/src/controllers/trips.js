@@ -77,7 +77,7 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
           };
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     return {
       id: isOrigin ? "origin-coord" : "dest-coord",
@@ -145,7 +145,7 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
         return { ...matched, lat: parseFloat(matched.lat), lng: parseFloat(matched.lng) };
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 
   return null;
 }
@@ -180,16 +180,16 @@ function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, 
 
   // 3. Approximate by CDO street corridors
   const streetHints = [
-    { minLat:8.500, maxLat:8.520, minLng:124.600, maxLng:124.625, name:"Bulua Westbound Terminal corridor" },
-    { minLat:8.490, maxLat:8.505, minLng:124.625, maxLng:124.645, name:"Kauswagan / RN Pelaez corridor" },
-    { minLat:8.475, maxLat:8.490, minLng:124.625, maxLng:124.640, name:"Carmen / Vamenta Blvd area" },
-    { minLat:8.483, maxLat:8.492, minLng:124.646, maxLng:124.656, name:"CM Recto Ave (Centrio / SM Downtown area)" },
-    { minLat:8.473, maxLat:8.482, minLng:124.642, maxLng:124.655, name:"Cogon Market area" },
-    { minLat:8.475, maxLat:8.482, minLng:124.638, maxLng:124.648, name:"Divisoria area" },
-    { minLat:8.480, maxLat:8.490, minLng:124.654, maxLng:124.665, name:"Limketkai / Lapasan corridor" },
-    { minLat:8.484, maxLat:8.495, minLng:124.656, maxLng:124.672, name:"Agora Terminal / Valenzuela Ave corridor" },
-    { minLat:8.445, maxLat:8.475, minLng:124.615, maxLng:124.635, name:"Masterson Ave corridor" },
-    { minLat:8.475, maxLat:8.510, minLng:124.720, maxLng:124.770, name:"Puerto / Bugo Highway area" }
+    { minLat: 8.500, maxLat: 8.520, minLng: 124.600, maxLng: 124.625, name: "Bulua Westbound Terminal corridor" },
+    { minLat: 8.490, maxLat: 8.505, minLng: 124.625, maxLng: 124.645, name: "Kauswagan / RN Pelaez corridor" },
+    { minLat: 8.475, maxLat: 8.490, minLng: 124.625, maxLng: 124.640, name: "Carmen / Vamenta Blvd area" },
+    { minLat: 8.483, maxLat: 8.492, minLng: 124.646, maxLng: 124.656, name: "CM Recto Ave (Centrio / SM Downtown area)" },
+    { minLat: 8.473, maxLat: 8.482, minLng: 124.642, maxLng: 124.655, name: "Cogon Market area" },
+    { minLat: 8.475, maxLat: 8.482, minLng: 124.638, maxLng: 124.648, name: "Divisoria area" },
+    { minLat: 8.480, maxLat: 8.490, minLng: 124.654, maxLng: 124.665, name: "Limketkai / Lapasan corridor" },
+    { minLat: 8.484, maxLat: 8.495, minLng: 124.656, maxLng: 124.672, name: "Agora Terminal / Valenzuela Ave corridor" },
+    { minLat: 8.445, maxLat: 8.475, minLng: 124.615, maxLng: 124.635, name: "Masterson Ave corridor" },
+    { minLat: 8.475, maxLat: 8.510, minLng: 124.720, maxLng: 124.770, name: "Puerto / Bugo Highway area" }
   ];
   for (const s of streetHints) {
     if (lat >= s.minLat && lat <= s.maxLat && lng >= s.minLng && lng <= s.maxLng) {
@@ -367,8 +367,8 @@ async function findTransferJeepneyRoutes(origLat, origLng, destLat, destLng, ori
     if (!leg2Candidates.length) continue;
 
     // Sort to consider best matches
-    leg1Candidates.sort((a,b) => a.compositeScore - b.compositeScore);
-    leg2Candidates.sort((a,b) => a.compositeScore - b.compositeScore);
+    leg1Candidates.sort((a, b) => a.compositeScore - b.compositeScore);
+    leg2Candidates.sort((a, b) => a.compositeScore - b.compositeScore);
 
     const topLeg1 = leg1Candidates.slice(0, 3);
     const topLeg2 = leg2Candidates.slice(0, 3);
@@ -551,7 +551,7 @@ async function search(req, res, next) {
           if (osrmWalk1 && osrmWalk1.coordinates && osrmWalk1.coordinates.length >= 2) {
             walkToBoardCoords = osrmWalk1.coordinates;
           }
-        } catch (_) {}
+        } catch (_) { }
 
         let walkFromDropCoords = [
           [c.dropoffCoord[0], c.dropoffCoord[1]],
@@ -562,7 +562,7 @@ async function search(req, res, next) {
           if (osrmWalk2 && osrmWalk2.coordinates && osrmWalk2.coordinates.length >= 2) {
             walkFromDropCoords = osrmWalk2.coordinates;
           }
-        } catch (_) {}
+        } catch (_) { }
 
         const fullGeometryCoords = [
           ...walkToBoardCoords,
@@ -702,7 +702,7 @@ async function search(req, res, next) {
         try {
           const w1 = await getWalkingRoute([oLng, oLat], [l1.boardingCoord[0], l1.boardingCoord[1]]);
           if (w1 && w1.coordinates && w1.coordinates.length >= 2) walkToBoardCoords = w1.coordinates;
-        } catch (_) {}
+        } catch (_) { }
 
         let transferWalkCoords = [
           [l1.dropoffCoord[0], l1.dropoffCoord[1]],
@@ -711,7 +711,7 @@ async function search(req, res, next) {
         try {
           const wt = await getWalkingRoute([l1.dropoffCoord[0], l1.dropoffCoord[1]], [l2.boardingCoord[0], l2.boardingCoord[1]]);
           if (wt && wt.coordinates && wt.coordinates.length >= 2) transferWalkCoords = wt.coordinates;
-        } catch (_) {}
+        } catch (_) { }
 
         let walkFromDropCoords = [
           [l2.dropoffCoord[0], l2.dropoffCoord[1]],
@@ -720,7 +720,7 @@ async function search(req, res, next) {
         try {
           const w2 = await getWalkingRoute([l2.dropoffCoord[0], l2.dropoffCoord[1]], [dLng, dLat]);
           if (w2 && w2.coordinates && w2.coordinates.length >= 2) walkFromDropCoords = w2.coordinates;
-        } catch (_) {}
+        } catch (_) { }
 
         const fullGeometryCoords = [
           ...walkToBoardCoords,
