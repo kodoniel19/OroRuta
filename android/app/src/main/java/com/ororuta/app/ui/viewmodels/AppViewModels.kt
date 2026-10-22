@@ -1378,7 +1378,14 @@ class MapViewModel @Inject constructor(
                 )
             )
         }
-        val dropoffStop = dropoffCandidates.firstOrNull()
+        val dropoffStop = dropoffCandidates.firstOrNull() ?: RouteStopPoint(
+            id = "dest_${route.id}",
+            name = route.destination,
+            type = "terminal",
+            lat = routePoints.lastOrNull()?.latitude ?: 8.4842,
+            lng = routePoints.lastOrNull()?.longitude ?: 124.6568,
+            note = "Route Destination Point"
+        )
 
         if (userLoc == null) {
             val nearestStop = boardingCandidates.firstOrNull()
@@ -1409,9 +1416,19 @@ class MapViewModel @Inject constructor(
             return r * c
         }
 
-        val nearestStop = boardingCandidates.minByOrNull {
-            haversineMeters(userLoc.latitude, userLoc.longitude, it.lat, it.lng)
-        } ?: boardingCandidates.firstOrNull()
+        val eligibleBoardingCandidates = if (dropoffStop != null) {
+            val distToDrop = haversineMeters(userLoc.latitude, userLoc.longitude, dropoffStop.lat, dropoffStop.lng)
+            if (distToDrop > 400.0) {
+                boardingCandidates.filter {
+                    haversineMeters(it.lat, it.lng, dropoffStop.lat, dropoffStop.lng) > 300.0 &&
+                    !it.name.equals(dropoffStop.name, ignoreCase = true)
+                }
+            } else boardingCandidates
+        } else boardingCandidates
+
+        val nearestStop = (eligibleBoardingCandidates.takeIf { it.isNotEmpty() } ?: boardingCandidates)
+            .minByOrNull { haversineMeters(userLoc.latitude, userLoc.longitude, it.lat, it.lng) }
+            ?: boardingCandidates.firstOrNull()
 
         if (nearestStop == null) {
             routeGuidance = RouteGuidance(

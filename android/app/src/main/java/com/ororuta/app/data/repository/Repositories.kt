@@ -140,73 +140,91 @@ class TripRepository @Inject constructor(
                 hasStopNearTarget || hasGeomNearTarget || textMatch
             }.take(5)
 
-            matched.mapIndexed { idx, route ->
-                val stopCandidates = mutableListOf<Triple<String, Double, Double>>()
-                route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { stopCandidates.add(Triple(it.name, it.lat, it.lng)) }
-                route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", true) }.forEach { stopCandidates.add(Triple(it.name, it.lat, it.lng)) }
-                route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { stopCandidates.add(Triple(it.name, it.lat, it.lng)) }
+            val validTrips = mutableListOf<TripOption>()
 
-                val bestBoarding = stopCandidates.minByOrNull { haversine(fLat, fLng, it.second, it.third) }
-                    ?: Triple(route.origin, fLat, fLng)
+            matched.forEachIndexed { idx, route ->
+                val allStops = mutableListOf<Triple<String, Double, Double>>()
+                route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
+                route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
+                route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
 
-                val dropCandidates = mutableListOf<Triple<String, Double, Double>>()
-                route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { dropCandidates.add(Triple(it.name, it.lat, it.lng)) }
-                route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { dropCandidates.add(Triple(it.name, it.lat, it.lng)) }
-                route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { dropCandidates.add(Triple(it.name, it.lat, it.lng)) }
+                val distinctStops = allStops.distinctBy { Pair(it.first.trim().lowercase(), Pair((it.second * 10000).toLong(), (it.third * 10000).toLong())) }
 
-                val bestDrop = dropCandidates.minByOrNull { haversine(tLat, tLng, it.second, it.third) }
+                // Find best drop-off stop near destination
+                val bestDrop = distinctStops.minByOrNull { haversine(tLat, tLng, it.second, it.third) }
                     ?: Triple(destination.ifBlank { route.destination }, tLat, tLng)
+
+                // Find best boarding stop near user's GPS, excluding stops near destination
+                val eligibleBoardingStops = distinctStops.filter {
+                    haversine(it.second, it.third, bestDrop.second, bestDrop.third) > 300.0 &&
+                    !it.first.equals(bestDrop.first, ignoreCase = true)
+                }
+
+                val bestBoarding = (eligibleBoardingStops.takeIf { it.isNotEmpty() } ?: distinctStops)
+                    .minByOrNull { haversine(fLat, fLng, it.second, it.third) }
+                    ?: Triple(route.origin, fLat, fLng)
 
                 val walkToBoardDist = haversine(fLat, fLng, bestBoarding.second, bestBoarding.third).toInt()
                 val walkFromDropDist = haversine(bestDrop.second, bestDrop.third, tLat, tLng).toInt()
                 val rideDistKm = haversine(bestBoarding.second, bestBoarding.third, bestDrop.second, bestDrop.third) / 1000.0
-                val totalMeters = walkToBoardDist + (rideDistKm * 1000).toInt() + walkFromDropDist
-                val estMins = Math.max(10, (totalMeters / 250.0).toInt())
 
-                val effectiveKm = if (rideDistKm > 0.5) rideDistKm else 4.0
-                val fareCalc = com.ororuta.app.domain.fare.TraditionalJeepneyFareService.calculateFareForDistance(
-                    distanceKm = effectiveKm,
-                    category = com.ororuta.app.domain.fare.PassengerCategory.REGULAR,
-                    jeepneyType = route.jeepneyType
-                )
+                // VALIDATION GUARD: Boarding and Drop-off MUST NOT be identical, and ride distance MUST be at least 300 meters!
+                val isIdenticalStop = bestBoarding.first.equals(bestDrop.first, ignoreCase = true) ||
+                        haversine(bestBoarding.second, bestBoarding.third, bestDrop.second, bestDrop.third) < 300.0
 
-                TripOption(
-                    id = "local_${route.id}_$idx",
-                    originPlaceId = route.id,
-                    destinationPlaceId = route.id,
-                    minutes = estMins,
-                    walkMeters = walkToBoardDist + walkFromDropDist,
-                    transfers = 0,
-                    direction = "Inbound",
-                    status = route.status,
-                    boardingName = bestBoarding.first,
-                    boardingLat = bestBoarding.second,
-                    boardingLng = bestBoarding.third,
-                    dropoffName = bestDrop.first,
-                    dropoffLat = bestDrop.second,
-                    dropoffLng = bestDrop.third,
-                    segments = listOf(
-                        TripSegment(
-                            tripOptionId = "local_${route.id}_$idx",
-                            seq = 1,
-                            routeId = route.id,
-                            code = route.code,
-                            routeName = route.name,
-                            color = route.color,
-                            jeepneyType = route.jeepneyType,
-                            routeStatus = route.status,
-                            km = effectiveKm,
+                if (!isIdenticalStop) {
+                    val totalMeters = walkToBoardDist + (rideDistKm * 1000).toInt() + walkFromDropDist
+                    val estMins = Math.max(8, (totalMeters / 250.0).toInt())
+                    val effectiveKm = if (rideDistKm > 0.5) rideDistKm else 2.5
+
+                    val fareCalc = com.ororuta.app.domain.fare.TraditionalJeepneyFareService.calculateFareForDistance(
+                        distanceKm = effectiveKm,
+                        category = com.ororuta.app.domain.fare.PassengerCategory.REGULAR,
+                        jeepneyType = route.jeepneyType
+                    )
+
+                    validTrips.add(
+                        TripOption(
+                            id = "local_${route.id}_$idx",
+                            originPlaceId = route.id,
+                            destinationPlaceId = route.id,
                             minutes = estMins,
-                            fare = fareCalc.regularFare,
-                            discountFare = fareCalc.discountedFare
+                            walkMeters = walkToBoardDist + walkFromDropDist,
+                            transfers = 0,
+                            direction = "Inbound",
+                            status = route.status,
+                            boardingName = bestBoarding.first,
+                            boardingLat = bestBoarding.second,
+                            boardingLng = bestBoarding.third,
+                            dropoffName = bestDrop.first,
+                            dropoffLat = bestDrop.second,
+                            dropoffLng = bestDrop.third,
+                            segments = listOf(
+                                TripSegment(
+                                    tripOptionId = "local_${route.id}_$idx",
+                                    seq = 1,
+                                    routeId = route.id,
+                                    code = route.code,
+                                    routeName = route.name,
+                                    color = route.color,
+                                    jeepneyType = route.jeepneyType,
+                                    routeStatus = route.status,
+                                    km = effectiveKm,
+                                    minutes = estMins,
+                                    fare = fareCalc.regularFare,
+                                    discountFare = fareCalc.discountedFare
+                                )
+                            ),
+                            totalKm = effectiveKm,
+                            regularFare = fareCalc.regularFare,
+                            discountFare = fareCalc.discountedFare,
+                            isEstimatedFare = true
                         )
-                    ),
-                    totalKm = effectiveKm,
-                    regularFare = fareCalc.regularFare,
-                    discountFare = fareCalc.discountedFare,
-                    isEstimatedFare = true
-                )
+                    )
+                }
             }
+
+            validTrips.sortedBy { it.walkMeters + (it.minutes * 50) }.take(5)
         } catch (_: Exception) {
             emptyList()
         }

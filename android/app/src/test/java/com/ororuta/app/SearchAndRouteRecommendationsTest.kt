@@ -120,6 +120,50 @@ class SearchAndRouteRecommendationsTest {
     }
 
     @Test
+    fun testBoardingStopMustNotBeIdenticalToDestinationStop() {
+        // Carmen Market: 8.480290, 124.636820
+        // Liceo: 8.486151, 124.639182
+        val userCarmenLat = 8.480290
+        val userCarmenLng = 124.636820
+        val destLiceoLat = 8.486151
+        val destLiceoLng = 124.639182
+
+        fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+            val r = 6371000.0
+            val dLat = Math.toRadians(lat2 - lat1)
+            val dLng = Math.toRadians(lng2 - lng1)
+            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                    Math.sin(dLng / 2) * Math.sin(dLng / 2)
+            return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        }
+
+        val allStops = listOf(
+            Triple("Carmen Public Market", 8.479498, 124.636820),
+            Triple("Liceo de Cagayan University", 8.486151, 124.639182),
+            Triple("Gaisano City Mall", 8.486316, 124.649746)
+        )
+
+        // Pick dropoff near Liceo
+        val bestDrop = allStops.minByOrNull { haversine(destLiceoLat, destLiceoLng, it.second, it.third) }!!
+        assertEquals("Liceo de Cagayan University", bestDrop.first)
+
+        // Eligible boarding MUST exclude Liceo (which is at the destination)
+        val eligibleBoarding = allStops.filter {
+            haversine(it.second, it.third, bestDrop.second, bestDrop.third) > 300.0 &&
+            !it.first.equals(bestDrop.first, ignoreCase = true)
+        }
+
+        val bestBoarding = eligibleBoarding.minByOrNull { haversine(userCarmenLat, userCarmenLng, it.second, it.third) }!!
+        assertEquals("Carmen Public Market", bestBoarding.first)
+        assertNotEquals(bestBoarding.first, bestDrop.first)
+
+        // Boarding distance from user at Carmen is <= 100 meters (not 1.3 km!)
+        val walkDist = haversine(userCarmenLat, userCarmenLng, bestBoarding.second, bestBoarding.third)
+        assertTrue("Walk to boarding stop near Carmen must be under 100m, actual: ${walkDist}m", walkDist < 100.0)
+    }
+
+    @Test
     fun testBoardingAfterDropoffIsRejectedDirectionally() {
         val routePoints = listOf(
             LatLng(8.4600, 124.5800), // Point 0
