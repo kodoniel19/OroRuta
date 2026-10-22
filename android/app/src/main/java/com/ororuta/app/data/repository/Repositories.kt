@@ -29,16 +29,18 @@ import com.ororuta.app.BuildConfig
 
 @Singleton
 class TripRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val api: OroRutaApi,
     private val routeDao: RouteDao,
+    private val placeDao: PlaceDao,
+    private val locationProvider: com.ororuta.app.data.location.CdoLocationProvider,
     private val json: Json
 ) {
     /**
      * Search for jeepney trip options.
      * Primary: backend /trips/search API (uses verified route geometry + loading points).
-     * Fallback (when backend unreachable on physical device): local Room-based match
-     *   that searches cached routes by destination keyword and synthesises TripOption stubs
-     *   so the UI never shows "Can't search while offline" for a fully local device.
+     * Fallback (when backend unreachable or offline): local Room/asset search.
+     * Always enriches & ranks trip options using user's actual GPS location and verified stops.
      */
     suspend fun searchTrips(
         from: String,
@@ -49,47 +51,124 @@ class TripRepository @Inject constructor(
         toLng: Double? = null,
         sort: String = "time"
     ): Resource<List<TripOption>> {
-        return try {
-            val results = api.searchTrips(from, to, fromLat, fromLng, toLat, toLng, sort)
-            results.forEach { cachedTripOptions[it.id] = it }
-            Resource.Success(results)
-        } catch (e: IOException) {
-            // Backend unreachable (no adb reverse on physical device, or no Wi-Fi)
-            // Attempt a local match from Room-cached routes
-            val localTrips = buildLocalTrips(to, toLat, toLng, fromLat, fromLng)
-            localTrips.forEach { cachedTripOptions[it.id] = it }
-            if (localTrips.isNotEmpty()) {
-                Resource.Success(localTrips, isOffline = true)
-            } else {
+        val reqId = java.util.UUID.randomUUID().toString().take(8)
+        android.util.Log.d("OroRutaSearch", "[$reqId] searchTrips requested: from='$from' ($fromLat, $fromLng) -> to='$to' ($toLat, $toLng), sort=$sort")
 
-                Resource.Error(
-                    "Can't reach OroRuta server. Connect to Wi-Fi or use adb reverse tcp:3000 tcp:3000 while on the same network as your dev machine.",
-                    isOffline = true
-                )
+        var source = "BACKEND"
+        val rawTrips = try {
+            val results = api.searchTrips(from, to, fromLat, fromLng, toLat, toLng, sort)
+            if (results.isNotEmpty()) {
+                android.util.Log.d("OroRutaSearch", "[$reqId] Backend API returned ${results.size} trip candidates.")
+                results
+            } else {
+                source = "LOCAL_FALLBACK"
+                android.util.Log.d("OroRutaSearch", "[$reqId] Backend returned empty list. Calling buildLocalTrips fallback.")
+                buildLocalTrips(to, toLat, toLng, fromLat, fromLng)
             }
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Search failed")
+            source = "LOCAL_FALLBACK"
+            android.util.Log.d("OroRutaSearch", "[$reqId] Backend API failed (${e.message}). Calling buildLocalTrips fallback.")
+            buildLocalTrips(to, toLat, toLng, fromLat, fromLng)
+        }
+
+        val enriched = enrichAndRankTrips(reqId, source, rawTrips, fromLat, fromLng, toLat, toLng, to)
+        enriched.forEach { cachedTripOptions[it.id] = it }
+        android.util.Log.d("OroRutaSearch", "[$reqId] Final enriched & ranked candidates count: ${enriched.size}")
+        return if (enriched.isNotEmpty()) {
+            Resource.Success(enriched)
+        } else {
+            Resource.Error("No suitable jeepney routes found for this journey.")
         }
     }
 
-    /**
-     * Build basic TripOption stubs from locally cached routes that match [destination].
-     * Results are sorted by estimated travel time.
-     */
-    private suspend fun buildLocalTrips(
-        destination: String,
+    private suspend fun ensureRoutesLoaded(): List<Route> {
+        val existing = routeDao.getAllSync()
+        if (existing.size >= 18) {
+            val decoded = existing.mapNotNull { cached ->
+                try { json.decodeFromString<Route>(cached.jsonData) } catch (_: Exception) { null }
+            }
+            if (decoded.size >= 18) return decoded
+        }
+        return try {
+            context.assets.open("bundled_routes.json").use { stream ->
+                val text = stream.bufferedReader().use { it.readText() }
+                val routes = json.decodeFromString<List<Route>>(text)
+                if (routes.isNotEmpty()) {
+                    routeDao.insertAll(routes.map { r ->
+                        CachedRoute(
+                            id = r.id, code = r.code, name = r.name, origin = r.origin, destination = r.destination,
+                            jeepneyType = r.jeepneyType, status = r.status, color = r.color, lengthKm = r.lengthKm,
+                            offlineSizeMb = r.offlineSizeMb, lastUpdatedAt = r.lastUpdatedAt,
+                            jsonData = json.encodeToString(r)
+                        )
+                    })
+                    routes
+                } else emptyList()
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private suspend fun resolveTargetCoordinates(
+        destinationName: String,
+        passedLat: Double?,
+        passedLng: Double?
+    ): Pair<Double, Double>? {
+        if (passedLat != null && passedLng != null && passedLat != 0.0 && passedLng != 0.0) {
+            return Pair(passedLat, passedLng)
+        }
+        val cleanName = destinationName.trim()
+        if (cleanName.isBlank()) return null
+
+        val landmark = PlaceRepository.findCuratedLandmark(cleanName)
+        if (landmark != null) {
+            return Pair(landmark.lat, landmark.lng)
+        }
+
+        try {
+            val dbPlaces = placeDao.search(cleanName)
+            val matched = dbPlaces.firstOrNull { it.lat != 0.0 && it.lng != 0.0 }
+            if (matched != null) {
+                return Pair(matched.lat, matched.lng)
+            }
+        } catch (_: Exception) {}
+
+        return null
+    }
+
+    private suspend fun enrichAndRankTrips(
+        reqId: String,
+        source: String,
+        trips: List<TripOption>,
+        fromLat: Double?,
+        fromLng: Double?,
         toLat: Double?,
         toLng: Double?,
-        fromLat: Double?,
-        fromLng: Double?
+        destinationName: String
     ): List<TripOption> {
-        val destClean = destination.trim().lowercase()
-        if (destClean.length < 2 && toLat == null) return emptyList()
+        val cachedRoutes = ensureRoutesLoaded()
 
-        val fLat = fromLat ?: 8.4822
-        val fLng = fromLng ?: 124.6472
-        val tLat = toLat ?: 8.4842
-        val tLng = toLng ?: 124.6568
+        // 1. Resolve user starting location (fLat, fLng)
+        var fLat = fromLat
+        var fLng = fromLng
+        if (fLat == null || fLng == null || fLat == 0.0 || fLng == 0.0) {
+            val deviceLoc = locationProvider.getDeviceLocationOrNull()
+            if (deviceLoc != null) {
+                fLat = deviceLoc.first
+                fLng = deviceLoc.second
+            } else {
+                fLat = com.ororuta.app.data.location.CdoLocationProvider.CDO_DEFAULT_LAT
+                fLng = com.ororuta.app.data.location.CdoLocationProvider.CDO_DEFAULT_LNG
+            }
+        }
+
+        // 2. Resolve target destination coordinates (tLat, tLng)
+        val targetCoords = resolveTargetCoordinates(destinationName, toLat, toLng)
+        val tLat = targetCoords?.first
+        val tLng = targetCoords?.second
+
+        android.util.Log.d("OroRutaSearch", "[$reqId] enrichAndRankTrips [$source]: User=($fLat, $fLng) -> Target '$destinationName' (${tLat ?: "unresolved"}, ${tLng ?: "unresolved"})")
 
         fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
             val r = 6371000.0
@@ -101,133 +180,382 @@ class TripRepository @Inject constructor(
             return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         }
 
-        val cleanTokens = destClean
-            .replace(Regex("[-–—\\(\\)]"), " ")
-            .split("\\s+".toRegex())
-            .filter { it.length >= 3 && it !in setOf("main", "campus", "university", "school", "center", "mall", "market", "terminal", "hospital", "area", "park", "plaza") }
+        val candidateTrips = mutableListOf<TripOption>()
+        candidateTrips.addAll(trips)
 
-        return try {
-            val cached = routeDao.getAllSync()
-            val matched = cached.mapNotNull { cachedRoute ->
-                try { json.decodeFromString<Route>(cachedRoute.jsonData) } catch (_: Exception) { null }
-            }.filter { route ->
-                route.jeepneyType.equals("Traditional", ignoreCase = true) || route.jeepneyType.isBlank()
-            }.filter { route ->
-                val candidatePoints = mutableListOf<Pair<Double, Double>>()
-                route.terminals.forEach { if (it.lat != 0.0 && it.lng != 0.0) candidatePoints.add(Pair(it.lat, it.lng)) }
-                route.stops.forEach { if (it.lat != 0.0 && it.lng != 0.0) candidatePoints.add(Pair(it.lat, it.lng)) }
-                route.transfers.forEach { if (it.lat != 0.0 && it.lng != 0.0) candidatePoints.add(Pair(it.lat, it.lng)) }
-
-                val hasStopNearTarget = candidatePoints.any { (lat, lng) ->
-                    haversine(tLat, tLng, lat, lng) <= 1200.0
-                }
-                val hasGeomNearTarget = route.geometries.any { g ->
-                    try {
-                        val coords = org.json.JSONObject(g.geometry ?: "").getJSONArray("coordinates")
-                        (0 until coords.length()).any { i ->
-                            val pt = coords.getJSONArray(i)
-                            haversine(tLat, tLng, pt.getDouble(1), pt.getDouble(0)) <= 800.0
-                        }
-                    } catch (_: Exception) { false }
-                }
-                val textMatch = cleanTokens.isNotEmpty() && cleanTokens.any { token ->
-                    route.destination.lowercase().contains(token) ||
-                    route.name.lowercase().contains(token) ||
-                    route.landmarks.any { it.name.lowercase().contains(token) } ||
-                    route.stops.any { it.name.lowercase().contains(token) } ||
-                    route.terminals.any { it.name.lowercase().contains(token) }
-                }
-                hasStopNearTarget || hasGeomNearTarget || textMatch
-            }.take(5)
-
-            val validTrips = mutableListOf<TripOption>()
-
-            matched.forEachIndexed { idx, route ->
-                val allStops = mutableListOf<Triple<String, Double, Double>>()
-                route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
-                route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
-                route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
-
-                val distinctStops = allStops.distinctBy { Pair(it.first.trim().lowercase(), Pair((it.second * 10000).toLong(), (it.third * 10000).toLong())) }
-
-                // Find best drop-off stop near destination
-                val bestDrop = distinctStops.minByOrNull { haversine(tLat, tLng, it.second, it.third) }
-                    ?: Triple(destination.ifBlank { route.destination }, tLat, tLng)
-
-                // Find best boarding stop near user's GPS, excluding stops near destination
-                val eligibleBoardingStops = distinctStops.filter {
-                    haversine(it.second, it.third, bestDrop.second, bestDrop.third) > 300.0 &&
-                    !it.first.equals(bestDrop.first, ignoreCase = true)
-                }
-
-                val bestBoarding = (eligibleBoardingStops.takeIf { it.isNotEmpty() } ?: distinctStops)
-                    .minByOrNull { haversine(fLat, fLng, it.second, it.third) }
-                    ?: Triple(route.origin, fLat, fLng)
-
-                val walkToBoardDist = haversine(fLat, fLng, bestBoarding.second, bestBoarding.third).toInt()
-                val walkFromDropDist = haversine(bestDrop.second, bestDrop.third, tLat, tLng).toInt()
-                val rideDistKm = haversine(bestBoarding.second, bestBoarding.third, bestDrop.second, bestDrop.third) / 1000.0
-
-                // VALIDATION GUARD: Boarding and Drop-off MUST NOT be identical, and ride distance MUST be at least 300 meters!
-                val isIdenticalStop = bestBoarding.first.equals(bestDrop.first, ignoreCase = true) ||
-                        haversine(bestBoarding.second, bestBoarding.third, bestDrop.second, bestDrop.third) < 300.0
-
-                if (!isIdenticalStop) {
-                    val totalMeters = walkToBoardDist + (rideDistKm * 1000).toInt() + walkFromDropDist
-                    val estMins = Math.max(8, (totalMeters / 250.0).toInt())
-                    val effectiveKm = if (rideDistKm > 0.5) rideDistKm else 2.5
-
-                    val fareCalc = com.ororuta.app.domain.fare.TraditionalJeepneyFareService.calculateFareForDistance(
-                        distanceKm = effectiveKm,
-                        category = com.ororuta.app.domain.fare.PassengerCategory.REGULAR,
-                        jeepneyType = route.jeepneyType
-                    )
-
-                    validTrips.add(
-                        TripOption(
-                            id = "local_${route.id}_$idx",
-                            originPlaceId = route.id,
-                            destinationPlaceId = route.id,
-                            minutes = estMins,
-                            walkMeters = walkToBoardDist + walkFromDropDist,
-                            transfers = 0,
-                            direction = "Inbound",
-                            status = route.status,
-                            boardingName = bestBoarding.first,
-                            boardingLat = bestBoarding.second,
-                            boardingLng = bestBoarding.third,
-                            dropoffName = bestDrop.first,
-                            dropoffLat = bestDrop.second,
-                            dropoffLng = bestDrop.third,
-                            segments = listOf(
-                                TripSegment(
-                                    tripOptionId = "local_${route.id}_$idx",
-                                    seq = 1,
-                                    routeId = route.id,
-                                    code = route.code,
-                                    routeName = route.name,
-                                    color = route.color,
-                                    jeepneyType = route.jeepneyType,
-                                    routeStatus = route.status,
-                                    km = effectiveKm,
-                                    minutes = estMins,
-                                    fare = fareCalc.regularFare,
-                                    discountFare = fareCalc.discountedFare
-                                )
-                            ),
-                            totalKm = effectiveKm,
-                            regularFare = fareCalc.regularFare,
-                            discountFare = fareCalc.discountedFare,
-                            isEstimatedFare = true
+        // Ensure ALL cached routes in Room DB are evaluated by checking route ID (not route code!)
+        val existingRouteIds = candidateTrips.mapNotNull { it.segments.firstOrNull()?.routeId }.toSet()
+        cachedRoutes.forEach { r ->
+            if (r.id !in existingRouteIds) {
+                candidateTrips.add(
+                    TripOption(
+                        id = "eval_${r.id}",
+                        originPlaceId = r.id,
+                        destinationPlaceId = r.id,
+                        minutes = 15,
+                        walkMeters = 100,
+                        transfers = 0,
+                        direction = "Inbound",
+                        status = r.status,
+                        boardingName = r.origin,
+                        dropoffName = r.destination,
+                        segments = listOf(
+                            TripSegment(
+                                tripOptionId = "eval_${r.id}",
+                                seq = 1,
+                                routeId = r.id,
+                                code = r.code,
+                                routeName = r.name,
+                                color = r.color,
+                                jeepneyType = r.jeepneyType,
+                                routeStatus = r.status,
+                                km = 2.5,
+                                minutes = 15,
+                                fare = 13.0,
+                                discountFare = 10.40
+                            )
                         )
                     )
-                }
+                )
+            }
+        }
+
+        val cleanTokens = destinationName.trim().lowercase()
+            .replace(Regex("[-–—\\(\\)]"), " ")
+            .split("\\s+".toRegex())
+            .filter { it.length >= 3 && it !in setOf("main", "campus", "university", "school", "center", "mall", "market", "terminal", "hospital", "area", "park", "plaza", "cdo", "city") }
+
+        val enrichedScoredTrips = mutableListOf<Pair<Double, TripOption>>()
+
+        for (trip in candidateTrips) {
+            val seg = trip.segments.firstOrNull() ?: continue
+            val route = cachedRoutes.find { it.id == seg.routeId || it.code.equals(seg.code, ignoreCase = true) } ?: continue
+
+            val allStops = mutableListOf<Triple<String, Double, Double>>()
+            route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
+            route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
+            route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
+
+            // Extract geometry points
+            route.geometries.forEach { g ->
+                try {
+                    val coords = org.json.JSONObject(g.geometry ?: "").getJSONArray("coordinates")
+                    for (i in 0 until coords.length()) {
+                        val pt = coords.getJSONArray(i)
+                        allStops.add(Triple(route.name, pt.getDouble(1), pt.getDouble(0)))
+                    }
+                } catch (_: Exception) {}
             }
 
-            validTrips.sortedBy { it.walkMeters + (it.minutes * 50) }.take(5)
-        } catch (_: Exception) {
-            emptyList()
+            val distinctStops = allStops.distinctBy { Pair(it.first.trim().lowercase(), Pair((it.second * 10000).toLong(), (it.third * 10000).toLong())) }
+            if (distinctStops.isEmpty()) continue
+
+            // 1) Find best drop-off stop/point for destination (tLat, tLng)
+            val dropTargetLat = tLat ?: 8.484386
+            val dropTargetLng = tLng ?: 124.654930
+
+            val textMatchedStop = if (cleanTokens.isNotEmpty()) {
+                distinctStops.filter { s ->
+                    cleanTokens.any { t -> s.first.lowercase().contains(t) } &&
+                    haversine(dropTargetLat, dropTargetLng, s.second, s.third) <= 800.0
+                }.minByOrNull { haversine(dropTargetLat, dropTargetLng, it.second, it.third) }
+            } else null
+
+            val bestDrop = textMatchedStop ?: distinctStops.minByOrNull { haversine(dropTargetLat, dropTargetLng, it.second, it.third) }
+                ?: Triple(route.destination, dropTargetLat, dropTargetLng)
+
+            val walkFromDropDist = haversine(dropTargetLat, dropTargetLng, bestDrop.second, bestDrop.third).toInt()
+            if (walkFromDropDist > 1200) {
+                android.util.Log.d("OroRutaSearch", "[$reqId] FILTERED OUT ${route.code} (${route.id}): walkFromDropDist $walkFromDropDist > 1200m to '$destinationName'")
+                continue
+            }
+
+            // 2) Find best boarding stop on route for user location (fLat, fLng)
+            val eligibleBoardingStops = distinctStops.filter {
+                haversine(it.second, it.third, bestDrop.second, bestDrop.third) > 150.0 &&
+                !it.first.equals(bestDrop.first, ignoreCase = true)
+            }
+
+            val bestBoarding = (eligibleBoardingStops.takeIf { it.isNotEmpty() } ?: distinctStops)
+                .minByOrNull { haversine(fLat, fLng, it.second, it.third) }
+                ?: Triple(route.origin, fLat, fLng)
+
+            val walkToBoardDist = haversine(fLat, fLng, bestBoarding.second, bestBoarding.third).toInt()
+            val isIdenticalStop = bestBoarding.first.equals(bestDrop.first, ignoreCase = true) ||
+                    haversine(bestBoarding.second, bestBoarding.third, bestDrop.second, bestDrop.third) < 150.0
+
+            if (isIdenticalStop || walkToBoardDist > 3000) {
+                android.util.Log.d("OroRutaSearch", "[$reqId] FILTERED OUT ${route.code} (${route.id}): identical stop or walkToBoardDist $walkToBoardDist > 3000m")
+                continue
+            }
+
+            val rideDistKm = haversine(bestBoarding.second, bestBoarding.third, bestDrop.second, bestDrop.third) / 1000.0
+            val effectiveKm = if (rideDistKm > 0.5) rideDistKm else 2.5
+            val rideMins = Math.max(5, Math.round(effectiveKm / 20.0 * 60).toInt())
+            val totalMeters = walkToBoardDist + (effectiveKm * 1000).toInt() + walkFromDropDist
+            val estMins = Math.max(8, Math.round(walkToBoardDist / 80.0).toInt() + rideMins + Math.round(walkFromDropDist / 80.0).toInt())
+
+            val fareCalc = com.ororuta.app.domain.fare.TraditionalJeepneyFareService.calculateFareForDistance(
+                distanceKm = effectiveKm,
+                category = com.ororuta.app.domain.fare.PassengerCategory.REGULAR,
+                jeepneyType = route.jeepneyType
+            )
+
+            // Multi-criteria ranking penalty score:
+            // Priority 1: Destination accessibility (walkFromDropDist * 3.5)
+            // Priority 2: Boarding accessibility (walkToBoardDist * 1.5)
+            // Priority 3: Total journey walk (totalMeters * 1.0)
+            // Priority 4: Travel time (estMins * 15.0)
+            // Priority 5: Fare (fare * 2.0)
+            val score = (walkFromDropDist * 3.5) + (walkToBoardDist * 1.5) + (totalMeters * 1.0) + (estMins * 15.0) + (fareCalc.regularFare * 2.0)
+
+            fun resolveStopLabel(rawName: String, lat: Double, lng: Double): String {
+                if (!rawName.contains("/")) return rawName.trim()
+                val parts = rawName.split("/").map { it.trim() }
+                val bestPart = parts.minByOrNull { part ->
+                    when {
+                        part.contains("Carmen", ignoreCase = true) && haversine(fLat, fLng, 8.4795, 124.6368) < 2000.0 -> 0.0
+                        part.contains("Patag", ignoreCase = true) && haversine(fLat, fLng, 8.4878, 124.6255) < 2000.0 -> 0.0
+                        else -> 100.0
+                    }
+                }
+                return bestPart ?: parts.first()
+            }
+
+            val cleanBoarding = resolveStopLabel(bestBoarding.first, bestBoarding.second, bestBoarding.third)
+            val cleanDropoff = resolveStopLabel(bestDrop.first, bestDrop.second, bestDrop.third)
+            val routeCode = route.code.ifBlank { "R2" }
+
+            val enriched = trip.copy(
+                direction = trip.direction?.ifBlank { "Inbound" } ?: "Inbound",
+                boardingName = cleanBoarding,
+                boardingLat = bestBoarding.second,
+                boardingLng = bestBoarding.third,
+                dropoffName = cleanDropoff,
+                dropoffLat = bestDrop.second,
+                dropoffLng = bestDrop.third,
+                walkMeters = walkToBoardDist + walkFromDropDist,
+                totalKm = effectiveKm,
+                minutes = estMins,
+                regularFare = fareCalc.regularFare,
+                discountFare = fareCalc.discountedFare,
+                segments = listOf(
+                    TripSegment(
+                        tripOptionId = trip.id,
+                        seq = 1,
+                        routeId = route.id,
+                        code = routeCode,
+                        routeName = route.name,
+                        color = route.color,
+                        jeepneyType = route.jeepneyType,
+                        routeStatus = route.status,
+                        km = effectiveKm,
+                        minutes = estMins,
+                        fare = fareCalc.regularFare,
+                        discountFare = fareCalc.discountedFare
+                    )
+                )
+            )
+
+            android.util.Log.d("OroRutaSearch", "[$reqId] ENRICHED ACCEPTED [${route.code}] ${route.id}: Board='$cleanBoarding' (${walkToBoardDist}m), Drop='$cleanDropoff' (${walkFromDropDist}m), TotalWalk=${walkToBoardDist + walkFromDropDist}m, Ride=${effectiveKm}km, Mins=${estMins}, Score=${score}")
+
+            enrichedScoredTrips.add(Pair(score, enriched))
         }
+
+        // Evaluate 2-leg transfer options if direct trips are < 3
+        if (enrichedScoredTrips.size < 3 && targetCoords != null) {
+            val (destLat, destLng) = targetCoords
+            val transferTrips = buildTransferTrips(cachedRoutes, fLat, fLng, destLat, destLng, destinationName, haversine = ::haversine)
+            enrichedScoredTrips.addAll(transferTrips)
+        }
+
+        // Deduplicate candidates by routeId & boarding/dropoff names
+        val distinctTrips = enrichedScoredTrips
+            .distinctBy { Pair(it.second.segments.firstOrNull()?.routeId ?: it.second.id, Pair(it.second.boardingName, it.second.dropoffName)) }
+            .sortedBy { it.first }
+
+        if (distinctTrips.isEmpty()) return emptyList()
+
+        val minTime = distinctTrips.minOf { it.second.minutes }
+        val minWalk = distinctTrips.minOf { it.second.walkMeters }
+        val minFare = distinctTrips.minOf { it.second.regularFare }
+
+        val finalBadged = distinctTrips.take(5).mapIndexed { rank, pair ->
+            val trip = pair.second
+            val isFastest = (trip.minutes == minTime)
+            val isLeastWalk = (trip.walkMeters == minWalk)
+            val isCheapest = (trip.regularFare == minFare)
+            val matchReason = when {
+                rank == 0 -> "Best overall trip"
+                isLeastWalk -> "Shortest walk to boarding stop"
+                isFastest -> "Fastest overall journey"
+                trip.transfers > 0 -> "1 Transfer required"
+                else -> "Direct route"
+            }
+            trip.copy(
+                isFastest = isFastest,
+                isLeastWalk = isLeastWalk,
+                isCheapest = isCheapest,
+                matchReason = matchReason
+            )
+        }
+
+        finalBadged.forEachIndexed { rank, t ->
+            val primary = t.segments.firstOrNull()
+            android.util.Log.d("OroRutaSearch", "[$reqId] RANK #${rank + 1}: [${primary?.code}] ${primary?.routeName} (${t.direction}) | Board: '${t.boardingName}' -> Drop: '${t.dropoffName}' | Walk: ${t.walkMeters}m, Mins: ${t.minutes}, Reason: '${t.matchReason}'")
+        }
+
+        return finalBadged
+    }
+
+    private fun extractRouteStops(r: Route): List<Triple<String, Double, Double>> {
+        val list = mutableListOf<Triple<String, Double, Double>>()
+        r.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { list.add(Triple(it.name, it.lat, it.lng)) }
+        r.stops.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { list.add(Triple(it.name, it.lat, it.lng)) }
+        r.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { list.add(Triple(it.name, it.lat, it.lng)) }
+        return list
+    }
+
+    private fun buildTransferTrips(
+        routes: List<Route>,
+        userLat: Double,
+        userLng: Double,
+        destLat: Double,
+        destLng: Double,
+        destName: String,
+        haversine: (Double, Double, Double, Double) -> Double
+    ): List<Pair<Double, TripOption>> {
+        val transferHubs = listOf(
+            Triple("Carmen Public Market", 8.479498, 124.636820),
+            Triple("Cogon Public Market", 8.477160, 124.651208),
+            Triple("Agora Bus Terminal", 8.489716, 124.657532),
+            Triple("Plaza Divisoria", 8.477992, 124.643762),
+            Triple("Limketkai Center", 8.481880, 124.656007)
+        )
+
+        val transferOptions = mutableListOf<Pair<Double, TripOption>>()
+
+        for (hub in transferHubs) {
+            val (hubName, hubLat, hubLng) = hub
+
+            val leg1Routes = routes.filter { r ->
+                val stops = extractRouteStops(r)
+                val nearUser = stops.any { haversine(userLat, userLng, it.second, it.third) <= 1500.0 }
+                val nearHub = stops.any { haversine(hubLat, hubLng, it.second, it.third) <= 500.0 }
+                nearUser && nearHub
+            }
+
+            val leg2Routes = routes.filter { r ->
+                val stops = extractRouteStops(r)
+                val nearHub = stops.any { haversine(hubLat, hubLng, it.second, it.third) <= 500.0 }
+                val nearDest = stops.any { haversine(destLat, destLng, it.second, it.third) <= 1000.0 }
+                nearHub && nearDest
+            }
+
+            for (r1 in leg1Routes) {
+                for (r2 in leg2Routes) {
+                    if (r1.id == r2.id) continue
+
+                    val r1Stops = extractRouteStops(r1)
+                    val r2Stops = extractRouteStops(r2)
+
+                    val board1 = r1Stops.minByOrNull { haversine(userLat, userLng, it.second, it.third) } ?: continue
+                    val drop1 = r1Stops.minByOrNull { haversine(hubLat, hubLng, it.second, it.third) } ?: continue
+
+                    val board2 = r2Stops.minByOrNull { haversine(hubLat, hubLng, it.second, it.third) } ?: continue
+                    val drop2 = r2Stops.minByOrNull { haversine(destLat, destLng, it.second, it.third) } ?: continue
+
+                    val walk1 = haversine(userLat, userLng, board1.second, board1.third).toInt()
+                    val walk2 = haversine(destLat, destLng, drop2.second, drop2.third).toInt()
+                    if (walk1 > 2500 || walk2 > 1200) continue
+
+                    val dist1 = Math.max(1.0, haversine(board1.second, board1.third, drop1.second, drop1.third) / 1000.0)
+                    val dist2 = Math.max(1.0, haversine(board2.second, board2.third, drop2.second, drop2.third) / 1000.0)
+
+                    val fare1 = com.ororuta.app.domain.fare.TraditionalJeepneyFareService.calculateFareForDistance(dist1, com.ororuta.app.domain.fare.PassengerCategory.REGULAR, r1.jeepneyType)
+                    val fare2 = com.ororuta.app.domain.fare.TraditionalJeepneyFareService.calculateFareForDistance(dist2, com.ororuta.app.domain.fare.PassengerCategory.REGULAR, r2.jeepneyType)
+
+                    val totalFare = fare1.regularFare + fare2.regularFare
+                    val totalMins = Math.max(18, ((walk1 + walk2) / 80.0 + (dist1 + dist2) / 20.0 * 60 + 5).toInt())
+                    val score = (walk2 * 3.5) + (walk1 * 1.5) + ((walk1 + walk2) * 1.0) + (totalMins * 15.0) + 500.0 + (totalFare * 2.0)
+
+                    val option = TripOption(
+                        id = "transfer_${r1.id}_${r2.id}",
+                        originPlaceId = r1.id,
+                        destinationPlaceId = r2.id,
+                        minutes = totalMins,
+                        walkMeters = walk1 + walk2,
+                        transfers = 1,
+                        direction = "Transfer via $hubName",
+                        boardingName = board1.first,
+                        boardingLat = board1.second,
+                        boardingLng = board1.third,
+                        dropoffName = drop2.first,
+                        dropoffLat = drop2.second,
+                        dropoffLng = drop2.third,
+                        transferName = hubName,
+                        transferLat = hubLat,
+                        transferLng = hubLng,
+                        segments = listOf(
+                            TripSegment(
+                                tripOptionId = "transfer_${r1.id}_${r2.id}",
+                                seq = 1,
+                                routeId = r1.id,
+                                code = r1.code,
+                                routeName = r1.name,
+                                color = r1.color,
+                                jeepneyType = r1.jeepneyType,
+                                km = dist1,
+                                minutes = (dist1 / 20.0 * 60).toInt(),
+                                fare = fare1.regularFare,
+                                discountFare = fare1.discountedFare
+                            ),
+                            TripSegment(
+                                tripOptionId = "transfer_${r1.id}_${r2.id}",
+                                seq = 2,
+                                routeId = r2.id,
+                                code = r2.code,
+                                routeName = r2.name,
+                                color = r2.color,
+                                jeepneyType = r2.jeepneyType,
+                                km = dist2,
+                                minutes = (dist2 / 20.0 * 60).toInt(),
+                                fare = fare2.regularFare,
+                                discountFare = fare2.discountedFare
+                            )
+                        ),
+                        totalKm = dist1 + dist2,
+                        regularFare = totalFare,
+                        discountFare = fare1.discountedFare + fare2.discountedFare,
+                        matchReason = "1 Transfer required"
+                    )
+                    transferOptions.add(Pair(score, option))
+                }
+            }
+        }
+        return transferOptions
+    }
+
+    /**
+     * Build basic TripOption stubs from locally cached routes that match [destination].
+     */
+    private suspend fun buildLocalTrips(
+        destination: String,
+        toLat: Double?,
+        toLng: Double?,
+        fromLat: Double?,
+        fromLng: Double?
+    ): List<TripOption> {
+        return enrichAndRankTrips(
+            reqId = "local_build",
+            source = "LOCAL_FALLBACK",
+            trips = emptyList(),
+            fromLat = fromLat,
+            fromLng = fromLng,
+            toLat = toLat,
+            toLng = toLng,
+            destinationName = destination
+        )
     }
 
     private val cachedTripOptions = java.util.concurrent.ConcurrentHashMap<String, TripOption>()
@@ -281,10 +609,44 @@ class PlaceRepository @Inject constructor(
             "pl-sm-downtown" to listOf("sm downtown", "sm cdo downtown", "sm premier", "sm downtown premier", "smdt", "sm cd downtown", "sm cdo", "sm premier cdo"),
             "pl-centrio" to listOf("centrio", "ayala centrio", "centrio mall", "ayala mall"),
             "pl-cogon" to listOf("cogon", "cogon market", "cogon public market", "palengke cogon"),
+            "pl-carmen" to listOf("carmen", "carmen market", "carmen public market", "palengke carmen"),
+            "pl-patag" to listOf("patag", "camp evangelista", "evangelista"),
             "pl-cathedral" to listOf("cathedral", "st augustine", "san agustin", "st. augustine cathedral", "san agustin church"),
             "pl-miami-inn" to listOf("miami inn", "miami inn carmen", "vamenta miami", "miami carmen"),
             "pl-madonna-hospital" to listOf("madonna", "madonna hospital", "madonna & child", "madonna and child", "madonna & child hospital", "madonna and child hospital")
         )
+
+        fun findCuratedLandmark(q: String): Place? {
+            val cleanQ = q.trim().lowercase()
+            if (cleanQ.isBlank()) return null
+
+            for ((id, aliases) in LANDMARK_ALIASES) {
+                if (aliases.any { alias ->
+                        alias.equals(cleanQ, ignoreCase = true) ||
+                        cleanQ.contains(alias) ||
+                        alias.contains(cleanQ) ||
+                        (cleanQ.length >= 4 && alias.take(4) == cleanQ.take(4))
+                    }) {
+                    val place = CURATED_CDO_LANDMARKS.find { it.id == id }
+                    if (place != null) return place
+                }
+            }
+
+            val tokens = cleanQ.replace(Regex("[-–—\\(\\)]"), " ")
+                .split("\\s+".toRegex())
+                .filter { it.length >= 2 && it !in setOf("cdo", "city", "near", "at", "the", "in", "to", "for", "st", "st.") }
+
+            if (tokens.isEmpty()) return null
+
+            return CURATED_CDO_LANDMARKS.maxByOrNull { lm ->
+                val text = "${lm.name.lowercase()} ${(lm.area ?: "").lowercase()}"
+                val matchCount = tokens.count { t -> text.contains(t) }
+                if (matchCount > 0) matchCount * 10 + (if (lm.name.lowercase().contains(cleanQ)) 5 else 0) else -1
+            }?.takeIf { lm ->
+                val text = "${lm.name.lowercase()} ${(lm.area ?: "").lowercase()}"
+                tokens.any { t -> text.contains(t) }
+            }
+        }
     }
 
     /**

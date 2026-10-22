@@ -296,8 +296,8 @@ async function findDirectJeepneyRoutes(origLat, origLng, destLat, destLng, origi
       const boardingName = findStopLabel(boardingCoord[1], boardingCoord[0], "Loading point", originName, allTerminals, allLoadingPoints);
       const dropoffName = findStopLabel(dropoffCoord[1], dropoffCoord[0], "Drop-off stop", destName, allTerminals, allLoadingPoints);
 
-      const dropoffPenalty = walkFromDropM > 250 ? Math.pow((walkFromDropM - 250) / 60, 1.3) * 3 : 0;
-      const compositeScore = (totalWalkM / 75) * 1.5 + totalMinutes + (regularFare * 0.35) + dropoffPenalty;
+      const dropoffPenalty = walkFromDropM > 200 ? Math.pow((walkFromDropM - 200) / 30, 1.4) * 8 : 0;
+      const compositeScore = (walkFromDropM / 30) * 3.5 + (walkToBoardM / 75) * 1.5 + totalMinutes + (regularFare * 0.35) + dropoffPenalty;
 
       candidates.push({
         type: "direct",
@@ -475,12 +475,19 @@ async function search(req, res, next) {
       ? directCandidates.filter(c => c.walkFromDropM <= 650)
       : directCandidates;
 
-    // Deduplicate direct candidates by route code, keeping the best composite score
+    // Deduplicate direct candidates by route code, prioritizing verified/USER_SUPPLIED routes
     const bestDirectByCode = new Map();
     for (const c of viableDirect) {
       const key = c.route.code;
-      if (!bestDirectByCode.has(key) || c.compositeScore < bestDirectByCode.get(key).compositeScore) {
+      const existing = bestDirectByCode.get(key);
+      if (!existing) {
         bestDirectByCode.set(key, c);
+      } else {
+        const cIsVerified = c.route.verification_status === 'USER_SUPPLIED' || c.route.verification_status === 'VERIFIED';
+        const exIsVerified = existing.route.verification_status === 'USER_SUPPLIED' || existing.route.verification_status === 'VERIFIED';
+        if ((cIsVerified && !exIsVerified) || (cIsVerified === exIsVerified && c.compositeScore < existing.compositeScore)) {
+          bestDirectByCode.set(key, c);
+        }
       }
     }
 

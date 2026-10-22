@@ -68,6 +68,9 @@ async function run() {
   // 5. Carmen to Liceo (Carmen Market 8.4845, 124.6335 -> Liceo 8.4975, 124.6407)
   await testSearch('Carmen to Liceo', 'Carmen Public Market', 'Liceo de Cagayan University', 8.4845, 124.6335, 8.4975, 124.6407);
 
+  // 6. Carmen to SM CDO Downtown
+  await testSearch('Carmen to SM CDO Downtown', 'Carmen Public Market', 'SM CDO Downtown Premier', 8.4845, 124.6335, 8.4855, 124.6535);
+
   process.exit(0);
 }
 

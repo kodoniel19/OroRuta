@@ -3035,7 +3035,7 @@ fun MapScreen(
                                 },
                                 label = {
                                     Text(
-                                        "Inbound (${route.origin.take(15)} →)",
+                                        "Inbound (${route.origin.take(12)} → ${route.destination.take(12)})",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium
                                     )
@@ -3059,7 +3059,7 @@ fun MapScreen(
                                 },
                                 label = {
                                     Text(
-                                        "Outbound (→ ${route.destination.take(15)})",
+                                        "Outbound (${route.destination.take(12)} → ${route.origin.take(12)})",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium
                                     )
@@ -3137,9 +3137,11 @@ fun MapScreen(
                         // Verified Route Stops Row
                         val verifiedStopsForCard = remember(route, guidance.direction) {
                             val list = mutableListOf<RouteStopPoint>()
+                            val isOutbound = guidance.direction.equals("Outbound", ignoreCase = true)
+                            val startName = if (isOutbound) route.destination else route.origin
                             // Origin
                             if (guidance.routePoints.isNotEmpty()) {
-                                list.add(RouteStopPoint("card_orig_${route.id}", route.origin, "terminal", guidance.routePoints.first().latitude, guidance.routePoints.first().longitude, "Route Origin Point"))
+                                list.add(RouteStopPoint("card_orig_${route.id}", startName, "terminal", guidance.routePoints.first().latitude, guidance.routePoints.first().longitude, "Route Origin Point"))
                             }
                             // Terminals
                             route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {

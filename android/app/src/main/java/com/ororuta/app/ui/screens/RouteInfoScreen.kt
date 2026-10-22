@@ -285,8 +285,9 @@ fun RouteInfoScreen(
                     }
 
                     // 1. Determine destination and coordinates
-                    val targetDestination = initialDestination?.ifBlank { null } ?: route.destination
-                    val targetDestCoords = remember(initialDestLat, initialDestLng, route) {
+                    val targetDestination = initialDestination?.ifBlank { null }
+                        ?: if (selectedDirection.equals("Outbound", ignoreCase = true)) route.origin else route.destination
+                    val targetDestCoords = remember(initialDestLat, initialDestLng, route, targetDestination) {
                         if (initialDestLat != null && initialDestLng != null && initialDestLat != 0.0 && initialDestLng != 0.0) {
                             LatLng(initialDestLat, initialDestLng)
                         } else {
@@ -306,40 +307,7 @@ fun RouteInfoScreen(
                         }
                     }
 
-                    // 2. Candidate verified boarding stops (Terminals, Loading Points, Transfer Points; not pure unloading)
-                    val candidateBoardingStops = remember(route) {
-                        val list = mutableListOf<RouteStopPoint>()
-                        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
-                            list.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
-                        }
-                        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }.forEach {
-                            list.add(RouteStopPoint(it.id, it.name, it.pointType.ifBlank { "loading" }, it.lat, it.lng, it.note))
-                        }
-                        route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
-                            list.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
-                        }
-                        list
-                    }
-
-                    // Nearest verified boarding stop from user's current GPS location or passed initial boarding point
-                    val nearestBoardingStop = remember(initialBoardingLat, initialBoardingLng, initialBoardingName, candidateBoardingStops, userLocation, routeGeomPts) {
-                        if (initialBoardingLat != null && initialBoardingLng != null && initialBoardingLat != 0.0 && initialBoardingLng != 0.0) {
-                            RouteStopPoint("initial_board", initialBoardingName ?: "Boarding Stop", "loading", initialBoardingLat, initialBoardingLng, "Selected Boarding Point")
-                        } else if (userLocation != null && candidateBoardingStops.isNotEmpty()) {
-                            candidateBoardingStops.minByOrNull {
-                                computeDistanceMeters(userLocation!!.latitude, userLocation!!.longitude, it.lat, it.lng)
-                            }
-                        } else {
-                            candidateBoardingStops.firstOrNull()
-                        } ?: if (routeGeomPts.isNotEmpty()) {
-                            val p = routeGeomPts.first()
-                            RouteStopPoint("start", getDescriptiveCdoStopName(p.latitude, p.longitude, "Boarding Point"), "loading", p.latitude, p.longitude, "Route Corridor Boarding")
-                        } else {
-                            RouteStopPoint("default", route.origin, "terminal", 8.4822, 124.6472, "CDO Corridor")
-                        }
-                    }
-
-                    // 3. Candidate verified drop-off stops including closest verified route corridor points
+                    // 2. Candidate verified drop-off stops
                     val candidateDropoffStops = remember(route, targetDestCoords, routeGeomPts) {
                         val list = mutableListOf<RouteStopPoint>()
                         route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
@@ -373,8 +341,19 @@ fun RouteInfoScreen(
 
                     // Suitable drop-off stop closest to the destination or passed initial drop-off point
                     val dropoffStop = remember(initialDropoffLat, initialDropoffLng, initialDropoffName, candidateDropoffStops, targetDestCoords, routeGeomPts) {
+                        val dCoords = targetDestCoords
                         if (initialDropoffLat != null && initialDropoffLng != null && initialDropoffLat != 0.0 && initialDropoffLng != 0.0) {
-                            RouteStopPoint("initial_drop", initialDropoffName ?: targetDestination, "unloading", initialDropoffLat, initialDropoffLng, "Selected Drop-off Point")
+                            val passDistToDest = if (dCoords != null) computeDistanceMeters(dCoords.latitude, dCoords.longitude, initialDropoffLat, initialDropoffLng) else 0.0
+                            val bestCandidate = if (dCoords != null && candidateDropoffStops.isNotEmpty()) {
+                                candidateDropoffStops.minByOrNull { computeDistanceMeters(it.lat, it.lng, dCoords.latitude, dCoords.longitude) }
+                            } else null
+                            val candDistToDest = if (dCoords != null && bestCandidate != null) computeDistanceMeters(bestCandidate.lat, bestCandidate.lng, dCoords.latitude, dCoords.longitude) else Double.MAX_VALUE
+
+                            if (dCoords != null && passDistToDest > 1000.0 && candDistToDest < 300.0 && bestCandidate != null) {
+                                bestCandidate
+                            } else {
+                                RouteStopPoint("initial_drop", initialDropoffName ?: targetDestination, "unloading", initialDropoffLat, initialDropoffLng, "Selected Drop-off Point")
+                            }
                         } else if (targetDestCoords != null && candidateDropoffStops.isNotEmpty()) {
                             candidateDropoffStops.minByOrNull {
                                 computeDistanceMeters(it.lat, it.lng, targetDestCoords.latitude, targetDestCoords.longitude)
@@ -386,6 +365,57 @@ fun RouteInfoScreen(
                             RouteStopPoint("end", getDescriptiveCdoStopName(p.latitude, p.longitude, "Alighting Point"), "unloading", p.latitude, p.longitude, "Route Corridor Drop-off")
                         } else {
                             RouteStopPoint("dest_default", route.destination, "terminal", 8.4822, 124.6472, "CDO Destination")
+                        }
+                    }
+
+                    // 3. Candidate verified boarding stops (Terminals, Loading Points, Transfer Points; not pure unloading)
+                    val candidateBoardingStops = remember(route, dropoffStop) {
+                        val list = mutableListOf<RouteStopPoint>()
+                        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
+                            list.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
+                        }
+                        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }.forEach {
+                            list.add(RouteStopPoint(it.id, it.name, it.pointType.ifBlank { "loading" }, it.lat, it.lng, it.note))
+                        }
+                        route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
+                            list.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
+                        }
+                        val distinct = list.distinctBy { Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong())) }
+                        if (dropoffStop != null) {
+                            val filtered = distinct.filter {
+                                !it.name.equals(dropoffStop.name, ignoreCase = true) &&
+                                computeDistanceMeters(it.lat, it.lng, dropoffStop.lat, dropoffStop.lng) > 150.0
+                            }
+                            filtered.ifEmpty { distinct }
+                        } else distinct
+                    }
+
+                    // Nearest verified boarding stop from user's current GPS location or passed initial boarding point
+                    val nearestBoardingStop = remember(initialBoardingLat, initialBoardingLng, initialBoardingName, candidateBoardingStops, userLocation, routeGeomPts) {
+                        val uLoc = userLocation
+                        if (initialBoardingLat != null && initialBoardingLng != null && initialBoardingLat != 0.0 && initialBoardingLng != 0.0) {
+                            val passDistToUser = if (uLoc != null) computeDistanceMeters(uLoc.latitude, uLoc.longitude, initialBoardingLat, initialBoardingLng) else 0.0
+                            val bestCandidate = if (uLoc != null && candidateBoardingStops.isNotEmpty()) {
+                                candidateBoardingStops.minByOrNull { computeDistanceMeters(uLoc.latitude, uLoc.longitude, it.lat, it.lng) }
+                            } else null
+                            val candDistToUser = if (uLoc != null && bestCandidate != null) computeDistanceMeters(uLoc.latitude, uLoc.longitude, bestCandidate.lat, bestCandidate.lng) else Double.MAX_VALUE
+
+                            if (uLoc != null && passDistToUser > 1000.0 && candDistToUser < 300.0 && bestCandidate != null) {
+                                bestCandidate
+                            } else {
+                                RouteStopPoint("initial_board", initialBoardingName ?: "Boarding Stop", "loading", initialBoardingLat, initialBoardingLng, "Selected Boarding Point")
+                            }
+                        } else if (uLoc != null && candidateBoardingStops.isNotEmpty()) {
+                            candidateBoardingStops.minByOrNull {
+                                computeDistanceMeters(uLoc.latitude, uLoc.longitude, it.lat, it.lng)
+                            }
+                        } else {
+                            candidateBoardingStops.firstOrNull()
+                        } ?: if (routeGeomPts.isNotEmpty()) {
+                            val p = routeGeomPts.first()
+                            RouteStopPoint("start", getDescriptiveCdoStopName(p.latitude, p.longitude, "Boarding Point"), "loading", p.latitude, p.longitude, "Route Corridor Boarding")
+                        } else {
+                            RouteStopPoint("default", route.origin, "terminal", 8.4822, 124.6472, "CDO Corridor")
                         }
                     }
 

@@ -1301,7 +1301,34 @@ class MapViewModel @Inject constructor(
                     else -> null
                 }
             if (route != null) {
-                recalculateGuidance(route, direction, userLoc)
+                var bestDirection = direction
+                if (userLoc != null && direction.equals("Inbound", ignoreCase = true)) {
+                    fun distSq(lat: Double, lng: Double): Double {
+                        val dLat = lat - userLoc.latitude
+                        val dLng = lng - userLoc.longitude
+                        return dLat * dLat + dLng * dLng
+                    }
+                    val allStops = route.terminals.map { RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note) } +
+                            route.stops.filter { !it.pointType.equals("unloading", ignoreCase = true) }
+                                .map { RouteStopPoint(it.id, it.name, "loading", it.lat, it.lng, it.note) }
+
+                    val inboundStop = allStops
+                        .filter { it.name.contains(route.origin, ignoreCase = true) }
+                        .minByOrNull { distSq(it.lat, it.lng) }
+
+                    val outboundStop = allStops
+                        .filter { it.name.contains(route.destination, ignoreCase = true) }
+                        .minByOrNull { distSq(it.lat, it.lng) }
+
+                    if (inboundStop != null && outboundStop != null) {
+                        val dIn = distSq(inboundStop.lat, inboundStop.lng)
+                        val dOut = distSq(outboundStop.lat, outboundStop.lng)
+                        if (dOut < dIn && dOut < 0.0001) { // Within ~1 km of Outbound origin stop
+                            bestDirection = "Outbound"
+                        }
+                    }
+                }
+                recalculateGuidance(route, bestDirection, userLoc)
             }
             isCalculatingGuidance = false
         }
@@ -1332,24 +1359,82 @@ class MapViewModel @Inject constructor(
         userLoc: com.google.android.gms.maps.model.LatLng?
     ) {
         val routePoints = com.ororuta.app.ui.screens.parseGeometries(route, direction)
+        val isOutbound = direction.equals("Outbound", ignoreCase = true)
+        val targetDestName = if (isOutbound) route.origin else route.destination
+        val targetOriginName = if (isOutbound) route.destination else route.origin
+
+        fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+            val r = 6371000.0
+            val dLat = Math.toRadians(lat2 - lat1)
+            val dLon = Math.toRadians(lon2 - lon1)
+            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2)
+            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            return r * c
+        }
+
+        // Gather verified drop-off points for targetDestName
+        val dropoffCandidates = mutableListOf<RouteStopPoint>()
+        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }
+            .filter { it.name.contains(targetDestName, ignoreCase = true) || targetDestName.contains(it.name, ignoreCase = true) }
+            .forEach { dropoffCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note)) }
+
+        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && it.pointType.equals("unloading", ignoreCase = true) }
+            .forEach { dropoffCandidates.add(RouteStopPoint(it.id, it.name, "unloading", it.lat, it.lng, it.note)) }
+
+        if (dropoffCandidates.isEmpty()) {
+            route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.reversed().forEach {
+                dropoffCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
+            }
+        }
+
+        if (dropoffCandidates.isEmpty() && routePoints.isNotEmpty()) {
+            dropoffCandidates.add(
+                RouteStopPoint(
+                    id = "dest_${route.id}",
+                    name = targetDestName,
+                    type = "terminal",
+                    lat = routePoints.last().latitude,
+                    lng = routePoints.last().longitude,
+                    note = "Route Destination Point"
+                )
+            )
+        }
+
+        val dropoffStop = dropoffCandidates.firstOrNull() ?: RouteStopPoint(
+            id = "dest_${route.id}",
+            name = targetDestName,
+            type = "terminal",
+            lat = routePoints.lastOrNull()?.latitude ?: 8.4842,
+            lng = routePoints.lastOrNull()?.longitude ?: 124.6568,
+            note = "Route Destination Point"
+        )
 
         // Gather all verified boarding points: Terminals, Loading Points, Transfers
         val boardingCandidates = mutableListOf<RouteStopPoint>()
-        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
-            boardingCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
-        }
-        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }.forEach {
-            boardingCandidates.add(RouteStopPoint(it.id, it.name, "loading", it.lat, it.lng, it.note))
-        }
-        route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
-            boardingCandidates.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
-        }
+        // 1) Primary origin terminal matching targetOriginName
+        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }
+            .filter { it.name.contains(targetOriginName, ignoreCase = true) || targetOriginName.contains(it.name, ignoreCase = true) }
+            .forEach { boardingCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note)) }
+
+        // 2) Other terminals
+        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }
+            .forEach { boardingCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note)) }
+
+        // 3) Loading points
+        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }
+            .forEach { boardingCandidates.add(RouteStopPoint(it.id, it.name, it.pointType.ifBlank { "loading" }, it.lat, it.lng, it.note)) }
+
+        // 4) Transfers
+        route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }
+            .forEach { boardingCandidates.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note)) }
 
         if (boardingCandidates.isEmpty() && routePoints.isNotEmpty()) {
             boardingCandidates.add(
                 RouteStopPoint(
                     id = "origin_${route.id}",
-                    name = route.origin,
+                    name = targetOriginName,
                     type = "terminal",
                     lat = routePoints.first().latitude,
                     lng = routePoints.first().longitude,
@@ -1358,37 +1443,12 @@ class MapViewModel @Inject constructor(
             )
         }
 
-        // Gather verified drop-off points
-        val dropoffCandidates = mutableListOf<RouteStopPoint>()
-        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.reversed().forEach {
-            dropoffCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
+        val distinctBoarding = boardingCandidates.distinctBy {
+            Pair(it.name.trim().lowercase(), Pair((it.lat * 10000).toLong(), (it.lng * 10000).toLong()))
         }
-        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && it.pointType.equals("unloading", ignoreCase = true) }.forEach {
-            dropoffCandidates.add(RouteStopPoint(it.id, it.name, "unloading", it.lat, it.lng, it.note))
-        }
-        if (dropoffCandidates.isEmpty() && routePoints.isNotEmpty()) {
-            dropoffCandidates.add(
-                RouteStopPoint(
-                    id = "dest_${route.id}",
-                    name = route.destination,
-                    type = "terminal",
-                    lat = routePoints.last().latitude,
-                    lng = routePoints.last().longitude,
-                    note = "Route Destination Point"
-                )
-            )
-        }
-        val dropoffStop = dropoffCandidates.firstOrNull() ?: RouteStopPoint(
-            id = "dest_${route.id}",
-            name = route.destination,
-            type = "terminal",
-            lat = routePoints.lastOrNull()?.latitude ?: 8.4842,
-            lng = routePoints.lastOrNull()?.longitude ?: 124.6568,
-            note = "Route Destination Point"
-        )
 
         if (userLoc == null) {
-            val nearestStop = boardingCandidates.firstOrNull()
+            val nearestStop = distinctBoarding.firstOrNull()
             routeGuidance = RouteGuidance(
                 route = route,
                 direction = direction,
@@ -1405,30 +1465,15 @@ class MapViewModel @Inject constructor(
             return
         }
 
-        fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-            val r = 6371000.0
-            val dLat = Math.toRadians(lat2 - lat1)
-            val dLon = Math.toRadians(lon2 - lon1)
-            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                    Math.sin(dLon / 2) * Math.sin(dLon / 2)
-            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-            return r * c
+        val eligibleBoardingCandidates = distinctBoarding.filter { candidate ->
+            !candidate.name.equals(dropoffStop.name, ignoreCase = true) &&
+            haversineMeters(candidate.lat, candidate.lng, dropoffStop.lat, dropoffStop.lng) > 150.0
         }
 
-        val eligibleBoardingCandidates = if (dropoffStop != null) {
-            val distToDrop = haversineMeters(userLoc.latitude, userLoc.longitude, dropoffStop.lat, dropoffStop.lng)
-            if (distToDrop > 400.0) {
-                boardingCandidates.filter {
-                    haversineMeters(it.lat, it.lng, dropoffStop.lat, dropoffStop.lng) > 300.0 &&
-                    !it.name.equals(dropoffStop.name, ignoreCase = true)
-                }
-            } else boardingCandidates
-        } else boardingCandidates
+        val candidatesToSearch = eligibleBoardingCandidates.ifEmpty { distinctBoarding }
 
-        val nearestStop = (eligibleBoardingCandidates.takeIf { it.isNotEmpty() } ?: boardingCandidates)
-            .minByOrNull { haversineMeters(userLoc.latitude, userLoc.longitude, it.lat, it.lng) }
-            ?: boardingCandidates.firstOrNull()
+        val nearestStop = candidatesToSearch.minByOrNull { haversineMeters(userLoc.latitude, userLoc.longitude, it.lat, it.lng) }
+            ?: distinctBoarding.firstOrNull()
 
         if (nearestStop == null) {
             routeGuidance = RouteGuidance(
@@ -1441,7 +1486,7 @@ class MapViewModel @Inject constructor(
                 walkingPathToBoarding = emptyList(),
                 walkingTimeMinutes = 0,
                 dropoffStop = dropoffStop,
-                guidanceMessage = "Ride Traditional Jeepney Route ${route.code} (${direction}) heading towards ${route.destination}.",
+                guidanceMessage = "Ride Traditional Jeepney Route ${route.code} (${direction}) heading towards ${targetDestName}.",
                 routePoints = routePoints
             )
             return
@@ -1461,7 +1506,7 @@ class MapViewModel @Inject constructor(
                 walkingPathToBoarding = emptyList(),
                 walkingTimeMinutes = 0,
                 dropoffStop = dropoffStop,
-                guidanceMessage = "You are at ${nearestStop.name}. Board Traditional Jeepney Route ${route.code} (${direction}) here heading towards ${route.destination}.",
+                guidanceMessage = "You are at ${nearestStop.name}. Board Traditional Jeepney Route ${route.code} (${direction}) here heading towards ${targetDestName}.",
                 routePoints = routePoints
             )
         } else {
@@ -1481,6 +1526,7 @@ class MapViewModel @Inject constructor(
                 walkPath = listOf(userLoc, com.google.android.gms.maps.model.LatLng(nearestStop.lat, nearestStop.lng))
             }
 
+            val distLabel = if (walkDist < 1000) "${walkDist} m" else "${"%.1f".format(walkDist / 1000.0)} km"
             routeGuidance = RouteGuidance(
                 route = route,
                 direction = direction,
@@ -1491,7 +1537,7 @@ class MapViewModel @Inject constructor(
                 walkingPathToBoarding = walkPath,
                 walkingTimeMinutes = walkMins,
                 dropoffStop = dropoffStop,
-                guidanceMessage = "Walk $walkDist m (~$walkMins min) to ${nearestStop.name} to board Traditional Jeepney Route ${route.code} (${direction}).",
+                guidanceMessage = "Walk $distLabel (~$walkMins min) to ${nearestStop.name} to board Traditional Jeepney Route ${route.code} (${direction}).",
                 routePoints = routePoints
             )
         }
