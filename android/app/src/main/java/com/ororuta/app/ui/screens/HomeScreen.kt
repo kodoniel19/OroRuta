@@ -230,7 +230,157 @@ fun HomeScreen(
                 .offset(y = contentOffsetY.value.dp)
                 .alpha(contentAlpha.value)
         ) {
-            Spacer(modifier = Modifier.height(20.dp))
+            // PROMINENT ROUTE SEARCH CARD
+            var homeFromText by remember { mutableStateOf("Current Location") }
+            var homeToText by remember { mutableStateOf("") }
+
+            Surface(
+                color = Color.White,
+                shape = RoundedCornerShape(20.dp),
+                shadowElevation = 4.dp,
+                border = BorderStroke(1.dp, Line),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset(y = (-14).dp)
+                    .padding(horizontal = 16.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Brand50),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = Brand600,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Text(
+                            text = "Find Jeepney Route",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Ink
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Destination input field
+                    OutlinedTextField(
+                        value = homeToText,
+                        onValueChange = { homeToText = it },
+                        placeholder = { Text("Where do you want to go?", fontSize = 14.sp) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Place,
+                                contentDescription = null,
+                                tint = Bad600
+                            )
+                        },
+                        trailingIcon = {
+                            if (homeToText.isNotBlank()) {
+                                IconButton(onClick = { homeToText = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Clear",
+                                        tint = InkMuted
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Brand600,
+                            unfocusedBorderColor = Line,
+                            focusedContainerColor = Canvas,
+                            unfocusedContainerColor = Canvas
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Quick CDO Landmark Shortcut Chips
+                    Text(
+                        text = "Popular CDO Landmarks:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = InkMuted
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    val quickLandmarks = listOf(
+                        "Limketkai Center",
+                        "Carmen Market",
+                        "Cogon Market",
+                        "Bulua Terminal",
+                        "Agora Terminal",
+                        "Centrio Mall"
+                    )
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(quickLandmarks) { landmark ->
+                            Surface(
+                                onClick = {
+                                    homeToText = landmark
+                                    onNavigateResults(homeFromText, landmark)
+                                },
+                                shape = RoundedCornerShape(20.dp),
+                                color = Brand50,
+                                border = BorderStroke(1.dp, Brand100)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.NorthWest,
+                                        contentDescription = null,
+                                        tint = Brand600,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = landmark,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Brand700
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Search Submit Button
+                    OroButton(
+                        text = "Search Routes",
+                        onClick = {
+                            val targetTo = if (homeToText.isNotBlank()) homeToText else "Limketkai Center"
+                            onNavigateResults(homeFromText, targetTo)
+                        },
+                        variant = ButtonVariant.Primary,
+                        size = ButtonSize.Lg,
+                        icon = Icons.Default.DirectionsBus,
+                        fullWidth = true
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // 2. QUICK ACTIONS: Elevated, tactile 3-column row
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
