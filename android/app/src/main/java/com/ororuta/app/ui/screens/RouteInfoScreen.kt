@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.Dash
+import com.google.android.gms.maps.model.Gap
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.*
@@ -1804,10 +1806,41 @@ private fun StepGuidanceMap(
         }
     }
 
+    // Slice the exact ride segment from boarding stop to dropoff stop
+    val rideSegmentPts = remember(pts, boardingStop, dropoffStop) {
+        if (pts.size >= 2 && boardingStop != null && dropoffStop != null) {
+            val bLoc = LatLng(boardingStop.lat, boardingStop.lng)
+            val dLoc = LatLng(dropoffStop.lat, dropoffStop.lng)
+
+            fun distM(p1: LatLng, p2: LatLng): Double {
+                val r = 6371000.0
+                val dLat = Math.toRadians(p2.latitude - p1.latitude)
+                val dLng = Math.toRadians(p2.longitude - p1.longitude)
+                val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                        Math.cos(Math.toRadians(p1.latitude)) * Math.cos(Math.toRadians(p2.latitude)) *
+                        Math.sin(dLng / 2) * Math.sin(dLng / 2)
+                return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            }
+
+            var bIdx = pts.indices.minByOrNull { distM(pts[it], bLoc) } ?: 0
+            var dIdx = pts.indices.minByOrNull { distM(pts[it], dLoc) } ?: (pts.size - 1)
+
+            if (bIdx < dIdx) {
+                val sub = mutableListOf<LatLng>()
+                sub.add(bLoc)
+                sub.addAll(pts.subList(bIdx, dIdx + 1))
+                sub.add(dLoc)
+                sub
+            } else {
+                listOf(bLoc, dLoc)
+            }
+        } else pts
+    }
+
     val cameraPositionState = rememberCameraPositionState()
 
     // Smoothly focus map camera based on active step
-    LaunchedEffect(currentStep, userLocation, boardingStop, dropoffStop, destinationCoords, pts, isDestinationReachable) {
+    LaunchedEffect(currentStep, userLocation, boardingStop, dropoffStop, destinationCoords, pts, rideSegmentPts, isDestinationReachable) {
         try {
             when (currentStep) {
                 1 -> {
@@ -1830,8 +1863,14 @@ private fun StepGuidanceMap(
                     }
                 }
                 3 -> {
-                    // Focus on full jeepney route
-                    if (pts.size >= 2) {
+                    // Focus on active ride segment
+                    if (rideSegmentPts.size >= 2) {
+                        val builder = LatLngBounds.builder()
+                        rideSegmentPts.forEach { builder.include(it) }
+                        boardingStop?.let { builder.include(LatLng(it.lat, it.lng)) }
+                        dropoffStop?.let { builder.include(LatLng(it.lat, it.lng)) }
+                        cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(builder.build(), 60), 500)
+                    } else if (pts.size >= 2) {
                         val builder = LatLngBounds.builder()
                         pts.forEach { builder.include(it) }
                         cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(builder.build(), 60), 500)
@@ -1891,55 +1930,67 @@ private fun StepGuidanceMap(
                 rotationGesturesEnabled = false
             )
         ) {
-            // 1. Verified Jeepney Route Polyline (White casing + Route Color)
+            // 1. Background Route Network (Thin, translucent line for context)
             if (pts.size >= 2) {
                 Polyline(
                     points = pts,
-                    color = Color.White,
-                    width = 18f,
-                    zIndex = 4f
-                )
-                Polyline(
-                    points = pts,
-                    color = routeColor,
-                    width = 12f,
-                    zIndex = 5f
+                    color = routeColor.copy(alpha = 0.30f),
+                    width = 6f,
+                    zIndex = 3f
                 )
             }
 
-            // 2. Walking Path to Boarding Stop (Emerald Polyline)
+            // 2. Active Ride Segment (Thick, high-contrast, prominent line)
+            if (rideSegmentPts.size >= 2) {
+                Polyline(
+                    points = rideSegmentPts,
+                    color = Color.White,
+                    width = 18f,
+                    zIndex = 6f
+                )
+                Polyline(
+                    points = rideSegmentPts,
+                    color = routeColor,
+                    width = 12f,
+                    zIndex = 7f
+                )
+            }
+
+            // 3. Walking Path to Boarding Stop (Dashed Blue Polyline)
             if (walkToBoardCoords.size >= 2) {
                 Polyline(
                     points = walkToBoardCoords,
                     color = Color.White,
                     width = 14f,
-                    zIndex = 7f
+                    zIndex = 8f
                 )
                 Polyline(
                     points = walkToBoardCoords,
-                    color = Brand600,
+                    color = Color(0xFF1565C0),
                     width = 8f,
-                    zIndex = 8f
+                    pattern = listOf(Dash(20f), Gap(12f)),
+                    zIndex = 9f
                 )
             }
 
-            // 3. Walking Path from Drop-off to Destination (Indigo Polyline)
+            // 4. Walking Path from Drop-off to Destination (Dashed Indigo Polyline)
             if (walkFromDropCoords.size >= 2) {
                 Polyline(
                     points = walkFromDropCoords,
                     color = Color.White,
                     width = 14f,
-                    zIndex = 7f
+                    zIndex = 8f
                 )
                 Polyline(
                     points = walkFromDropCoords,
                     color = Color(0xFF6366F1), // Vibrant Indigo
                     width = 8f,
-                    zIndex = 8f
+                    pattern = listOf(Dash(20f), Gap(12f)),
+                    zIndex = 9f
                 )
             }
 
-            // 4. User Current Location Pin
+            // 5. User Current Location Pin
             userLocation?.let { uLoc ->
                 Marker(
                     state = rememberMarkerState(key = "guide_user_loc", position = uLoc),
@@ -1950,29 +2001,37 @@ private fun StepGuidanceMap(
                 )
             }
 
-            // 5. Boarding Stop Pin (Green)
+            // 6. Boarding Stop Pin (Green) with Info Window
             boardingStop?.let { bStop ->
+                val markerState = rememberMarkerState(key = "guide_boarding_${bStop.id}", position = LatLng(bStop.lat, bStop.lng))
+                LaunchedEffect(currentStep, bStop) {
+                    if (currentStep == 1 || currentStep == 2) markerState.showInfoWindow()
+                }
                 Marker(
-                    state = rememberMarkerState(key = "guide_boarding_${bStop.id}", position = LatLng(bStop.lat, bStop.lng)),
-                    title = "Boarding Stop: ${bStop.name}",
+                    state = markerState,
+                    title = "🟢 BOARD HERE: ${bStop.name}",
                     snippet = "Step 1: Board Jeepney ${route.code} Here",
                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
-                    zIndex = 11f
+                    zIndex = 12f
                 )
             }
 
-            // 6. Drop-off Stop Pin (Orange)
+            // 7. Drop-off Stop Pin (Rose/Red) with Info Window
             dropoffStop?.let { dStop ->
+                val markerState = rememberMarkerState(key = "guide_dropoff_${dStop.id}", position = LatLng(dStop.lat, dStop.lng))
+                LaunchedEffect(currentStep, dStop) {
+                    if (currentStep == 4) markerState.showInfoWindow()
+                }
                 Marker(
-                    state = rememberMarkerState(key = "guide_dropoff_${dStop.id}", position = LatLng(dStop.lat, dStop.lng)),
-                    title = "Drop-off Stop: ${dStop.name}",
+                    state = markerState,
+                    title = "🔴 ALIGHT HERE: ${dStop.name}",
                     snippet = "Step 4: Alight Jeepney Here",
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
-                    zIndex = 11f
+                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ROSE),
+                    zIndex = 12f
                 )
             }
 
-            // 7. Destination Pin (Red)
+            // 8. Destination Pin (Red)
             destinationCoords?.let { dCoords ->
                 Marker(
                     state = rememberMarkerState(key = "guide_dest_${dCoords.latitude}_${dCoords.longitude}", position = dCoords),
@@ -1981,6 +2040,35 @@ private fun StepGuidanceMap(
                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
                     zIndex = 12f
                 )
+            }
+        }
+
+        // Map Legend Overlay
+        Surface(
+            color = Color.White.copy(alpha = 0.92f),
+            shape = RoundedCornerShape(8.dp),
+            shadowElevation = 3.dp,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF10B981)))
+                    Text("Board", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Ink)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFF43F5E)))
+                    Text("Alight", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Ink)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.width(12.dp).height(3.dp).background(routeColor))
+                    Text("Ride Segment", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Ink)
+                }
             }
         }
 
