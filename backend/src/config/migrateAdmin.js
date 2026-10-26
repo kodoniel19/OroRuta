@@ -38,7 +38,7 @@ async function migrate() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS transit_locations (
       id VARCHAR(36) PRIMARY KEY,
-      kind ENUM('terminal', 'loading', 'unloading', 'transfer') NOT NULL,
+      kind VARCHAR(32) NOT NULL,
       name VARCHAR(120) NOT NULL,
       address VARCHAR(200) NOT NULL DEFAULT '',
       barangay VARCHAR(100) NOT NULL DEFAULT '',

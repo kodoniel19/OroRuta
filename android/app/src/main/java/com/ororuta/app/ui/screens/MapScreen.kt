@@ -105,46 +105,107 @@ private fun <T> List<T>.indexOfMinBy(selector: (T) -> Double): Int {
 
 fun parseGeometries(route: com.ororuta.app.domain.models.Route, direction: String? = null): List<LatLng> {
     val dirKey = direction?.trim()?.lowercase() ?: "all"
-    val geomHash = route.geometries.firstOrNull()?.geometry?.hashCode() ?: 0
+    val geomHash = route.geometries.fold(0) { acc, g -> acc * 31 + (g.geometry.hashCode()) }
     val cacheKey = "${route.id}_${dirKey}_${route.geometries.size}_${route.path.size}_$geomHash"
     routeGeometriesCache[cacheKey]?.let { return it }
 
     val allPts = mutableListOf<LatLng>()
-    
+
     // Check if new geometries are available
     if (route.geometries.isNotEmpty()) {
-        val filtered = if (!direction.isNullOrBlank()) {
-            route.geometries.filter { it.direction.equals(direction, ignoreCase = true) }
+        val targetGeos = if (!direction.isNullOrBlank()) {
+            val exact = route.geometries.filter { it.direction.equals(direction, ignoreCase = true) }
+            if (exact.isNotEmpty()) {
+                exact
+            } else {
+                val partial = route.geometries.filter {
+                    it.direction.contains(direction, ignoreCase = true) || direction.contains(it.direction, ignoreCase = true)
+                }
+                if (partial.isNotEmpty()) partial else listOf(route.geometries.first())
+            }
         } else {
-            route.geometries
+            // When direction is not specified, prefer Inbound or the first geometry so we don't concatenate two opposite directions together
+            val inb = route.geometries.filter { it.direction.equals("Inbound", ignoreCase = true) }
+            if (inb.isNotEmpty()) inb else listOf(route.geometries.first())
         }
-        val targetGeos = if (filtered.isNotEmpty()) filtered else route.geometries
+        fun extractCoords(coordsArr: org.json.JSONArray) {
+            for (i in 0 until coordsArr.length()) {
+                val item = coordsArr.opt(i)
+                if (item is org.json.JSONArray) {
+                    if (item.length() >= 2 && item.opt(0) is Number && item.opt(1) is Number) {
+                        val lng = item.getDouble(0)
+                        val lat = item.getDouble(1)
+                        if (lat.isFinite() && lng.isFinite() && (lat != 0.0 || lng != 0.0)) {
+                            allPts.add(LatLng(lat, lng))
+                        }
+                    } else {
+                        // MultiLineString or nested array
+                        extractCoords(item)
+                    }
+                }
+            }
+        }
+
         targetGeos.forEach { geo ->
             val jsonStr = geo.geometry
             if (!jsonStr.isNullOrBlank()) {
                 try {
                     val root = JSONObject(jsonStr)
-                    if (root.has("coordinates")) {
-                        val coords = root.getJSONArray("coordinates")
-                        for (i in 0 until coords.length()) {
-                            val c = coords.getJSONArray(i)
-                            // GeoJSON format is [longitude, latitude]
-                            if (c.length() >= 2) {
-                                allPts.add(LatLng(c.getDouble(1), c.getDouble(0)))
+                    when (root.optString("type")) {
+                        "Feature" -> {
+                            val geom = root.optJSONObject("geometry")
+                            geom?.optJSONArray("coordinates")?.let { extractCoords(it) }
+                        }
+                        "FeatureCollection" -> {
+                            val features = root.optJSONArray("features")
+                            if (features != null) {
+                                for (i in 0 until features.length()) {
+                                    val f = features.optJSONObject(i)
+                                    val geom = f?.optJSONObject("geometry")
+                                    geom?.optJSONArray("coordinates")?.let { extractCoords(it) }
+                                }
+                            }
+                        }
+                        else -> {
+                            if (root.has("coordinates")) {
+                                root.optJSONArray("coordinates")?.let { extractCoords(it) }
+                            } else if (root.has("geometry")) {
+                                root.optJSONObject("geometry")?.optJSONArray("coordinates")?.let { extractCoords(it) }
                             }
                         }
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // ignore malformed geometry
                 }
             }
         }
     } else if (route.path.isNotEmpty()) {
         // Fallback to legacy path points
-        route.path.filter { it.lat != 0.0 && it.lng != 0.0 }
-            .forEach { allPts.add(LatLng(it.lat, it.lng)) }
+        val pts = route.path.filter { it.lat != 0.0 && it.lng != 0.0 }
+            .map { LatLng(it.lat, it.lng) }
+        if (direction.equals("Outbound", ignoreCase = true)) {
+            allPts.addAll(pts.reversed())
+        } else {
+            allPts.addAll(pts)
+        }
+    } else if (route.stops.isNotEmpty()) {
+        val stopPts = route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }
+            .map { LatLng(it.lat, it.lng) }
+        if (direction.equals("Outbound", ignoreCase = true)) {
+            allPts.addAll(stopPts.reversed())
+        } else {
+            allPts.addAll(stopPts)
+        }
+    } else if (route.terminals.isNotEmpty()) {
+        val termPts = route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }
+            .map { LatLng(it.lat, it.lng) }
+        if (direction.equals("Outbound", ignoreCase = true)) {
+            allPts.addAll(termPts.reversed())
+        } else {
+            allPts.addAll(termPts)
+        }
     }
-    
+
     routeGeometriesCache[cacheKey] = allPts
     return allPts
 }
@@ -1690,57 +1751,59 @@ fun MapScreen(
 
                         // Origin Marker (Azure Pin)
                         val originPt = routePts.first()
+                        val originTitle = if (activeDirection.equals("Outbound", ignoreCase = true)) {
+                            "Departure: ${activeRoute.destination}"
+                        } else {
+                            "Origin: ${activeRoute.origin}"
+                        }
                         Marker(
                             state = rememberMarkerState(
                                 key = "origin_${activeRoute.id}_$activeDirection",
                                 position = originPt
                             ),
-                            title = "Origin: ${activeRoute.origin}",
+                            title = originTitle,
                             snippet = "Start of $activeDirection Route",
                             icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
                             zIndex = 10f,
                             onClick = {
                                 selectedMarker = MapMarker(
                                     id = "origin_${activeRoute.id}",
-                                    name = "Origin: ${activeRoute.origin}",
+                                    name = originTitle,
                                     kind = "terminal",
                                     note = "Route start terminal/point",
                                     lat = originPt.latitude,
                                     lng = originPt.longitude,
-                                    area = activeRoute.origin
+                                    area = if (activeDirection.equals("Outbound", ignoreCase = true)) activeRoute.destination else activeRoute.origin
                                 )
                                 true
                             }
                         )
 
                         // Destination Marker (Red Pin)
-                        val destTerminal = activeRoute.terminals.firstOrNull {
-                            it.name.contains(activeRoute.destination, ignoreCase = true) ||
-                            activeRoute.destination.contains(it.name, ignoreCase = true)
-                        }
-                        val destPt = when {
-                            destTerminal != null && destTerminal.lat != 0.0 && destTerminal.lng != 0.0 -> LatLng(destTerminal.lat, destTerminal.lng)
-                            activeRoute.destination.contains("Cogon", ignoreCase = true) -> LatLng(8.477160465033135, 124.65120822163647)
-                            else -> routePts.last()
+                        val destPt = routePts.last()
+                        val destTitle = if (activeDirection.equals("Outbound", ignoreCase = true)) {
+                            "Arrival: ${activeRoute.origin}"
+                        } else {
+                            "Destination: ${activeRoute.destination}"
                         }
                         Marker(
                             state = rememberMarkerState(
                                 key = "dest_${activeRoute.id}_${activeDirection}_${destPt.latitude}_${destPt.longitude}",
                                 position = destPt
                             ),
-                            title = "Destination: ${activeRoute.destination}",
+                            title = destTitle,
                             snippet = "End of $activeDirection Route",
                             icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
                             zIndex = 10f,
                             onClick = {
                                 selectedMarker = MapMarker(
                                     id = "dest_${activeRoute.id}",
-                                    name = "Destination: ${activeRoute.destination}",
+                                    name = destTitle,
                                     kind = "terminal",
                                     note = "Route destination terminal/point",
                                     lat = destPt.latitude,
                                     lng = destPt.longitude,
-                                    area = activeRoute.destination
+                                    area = if (activeDirection.equals("Outbound", ignoreCase = true)) activeRoute.origin else activeRoute.destination
                                 )
                                 true
                             }
@@ -3035,7 +3098,7 @@ fun MapScreen(
                                 },
                                 label = {
                                     Text(
-                                        "Inbound (${route.origin.take(15)} →)",
+                                        "Inbound (→ ${route.destination.take(15)})",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium
                                     )
@@ -3059,7 +3122,7 @@ fun MapScreen(
                                 },
                                 label = {
                                     Text(
-                                        "Outbound (→ ${route.destination.take(15)})",
+                                        "Outbound (→ ${route.origin.take(15)})",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium
                                     )

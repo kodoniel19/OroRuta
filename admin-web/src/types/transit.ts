@@ -37,9 +37,12 @@ export interface JeepneyRoute {
   path: LatLng[];
   /** Same geometry as an ordered list of coordinates, stored with routes drawn in the admin. */
   coordinates?: RouteCoordinate[];
+  stops?: any[];
+  terminals?: any[];
+  geometries?: any[];
 }
 
-export type LocationKind = 'terminal' | 'loading' | 'unloading' | 'transfer';
+export type LocationKind = 'terminal' | 'loading' | 'unloading' | 'transfer' | 'landmark' | 'verified_stop';
 export type LocationStatus = 'Active' | 'Inactive' | 'Under Review';
 
 export interface TransitLocation {

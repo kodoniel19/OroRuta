@@ -76,6 +76,11 @@ class TripRepository @Inject constructor(
      * Build basic TripOption stubs from locally cached routes that match [destination].
      * Results are sorted by estimated travel time.
      */
+    /**
+     * Build accurate TripOption recommendations from locally cached routes.
+     * Uses route geometries and verified stops to ensure correct direction of travel,
+     * accurate boarding and drop-off points, and ranks by overall convenience.
+     */
     private suspend fun buildLocalTrips(
         destination: String,
         toLat: Double?,
@@ -108,28 +113,34 @@ class TripRepository @Inject constructor(
 
         return try {
             val cached = routeDao.getAllSync()
-            val matched = cached.mapNotNull { cachedRoute ->
+            val allRoutes = cached.mapNotNull { cachedRoute ->
                 try { json.decodeFromString<Route>(cachedRoute.jsonData) } catch (_: Exception) { null }
             }.filter { route ->
                 route.jeepneyType.equals("Traditional", ignoreCase = true) || route.jeepneyType.isBlank()
-            }.filter { route ->
-                val candidatePoints = mutableListOf<Pair<Double, Double>>()
-                route.terminals.forEach { if (it.lat != 0.0 && it.lng != 0.0) candidatePoints.add(Pair(it.lat, it.lng)) }
-                route.stops.forEach { if (it.lat != 0.0 && it.lng != 0.0) candidatePoints.add(Pair(it.lat, it.lng)) }
-                route.transfers.forEach { if (it.lat != 0.0 && it.lng != 0.0) candidatePoints.add(Pair(it.lat, it.lng)) }
+            }
 
-                val hasStopNearTarget = candidatePoints.any { (lat, lng) ->
-                    haversine(tLat, tLng, lat, lng) <= 1200.0
-                }
-                val hasGeomNearTarget = route.geometries.any { g ->
-                    try {
-                        val coords = org.json.JSONObject(g.geometry ?: "").getJSONArray("coordinates")
-                        (0 until coords.length()).any { i ->
-                            val pt = coords.getJSONArray(i)
-                            haversine(tLat, tLng, pt.getDouble(1), pt.getDouble(0)) <= 800.0
-                        }
-                    } catch (_: Exception) { false }
-                }
+            data class LocalCandidate(
+                val route: Route,
+                val direction: String,
+                val boardingName: String,
+                val boardingLat: Double,
+                val boardingLng: Double,
+                val dropoffName: String,
+                val dropoffLat: Double,
+                val dropoffLng: Double,
+                val rideKm: Double,
+                val walkToBoardM: Int,
+                val walkFromDropM: Int,
+                val totalMinutes: Int,
+                val compositeScore: Double,
+                val regularFare: Double,
+                val discountFare: Double,
+                val rideCoords: List<List<Double>>
+            )
+
+            val candidateList = mutableListOf<LocalCandidate>()
+
+            for (route in allRoutes) {
                 val textMatch = cleanTokens.isNotEmpty() && cleanTokens.any { token ->
                     route.destination.lowercase().contains(token) ||
                     route.name.lowercase().contains(token) ||
@@ -137,94 +148,223 @@ class TripRepository @Inject constructor(
                     route.stops.any { it.name.lowercase().contains(token) } ||
                     route.terminals.any { it.name.lowercase().contains(token) }
                 }
-                hasStopNearTarget || hasGeomNearTarget || textMatch
-            }.take(5)
 
-            val validTrips = mutableListOf<TripOption>()
+                var routeMatched = false
+                for (g in route.geometries) {
+                    val dir = g.direction ?: "Inbound"
+                    val coords = mutableListOf<Pair<Double, Double>>() // (lat, lng)
+                    try {
+                        val geoObj = org.json.JSONObject(g.geometry ?: "")
+                        val coordArray = geoObj.getJSONArray("coordinates")
+                        for (i in 0 until coordArray.length()) {
+                            val pt = coordArray.getJSONArray(i)
+                            coords.add(Pair(pt.getDouble(1), pt.getDouble(0)))
+                        }
+                    } catch (_: Exception) {}
 
-            matched.forEachIndexed { idx, route ->
-                val allStops = mutableListOf<Triple<String, Double, Double>>()
-                route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
-                route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
-                route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach { allStops.add(Triple(it.name, it.lat, it.lng)) }
+                    if (coords.size < 4) continue
 
-                val distinctStops = allStops.distinctBy { Pair(it.first.trim().lowercase(), Pair((it.second * 10000).toLong(), (it.third * 10000).toLong())) }
+                    // Find candidate boarding indices (within 850m of origin)
+                    val origIndices = mutableListOf<Pair<Int, Double>>()
+                    for (i in coords.indices) {
+                        val d = haversine(fLat, fLng, coords[i].first, coords[i].second)
+                        if (d <= 850.0) origIndices.add(Pair(i, d))
+                    }
+                    if (origIndices.isEmpty()) continue
 
-                // Find best drop-off stop near destination
-                val bestDrop = distinctStops.minByOrNull { haversine(tLat, tLng, it.second, it.third) }
-                    ?: Triple(destination.ifBlank { route.destination }, tLat, tLng)
+                    // Find candidate drop-off indices (within 750m of destination)
+                    val destIndices = mutableListOf<Pair<Int, Double>>()
+                    for (i in coords.indices) {
+                        val d = haversine(tLat, tLng, coords[i].first, coords[i].second)
+                        if (d <= 750.0) destIndices.add(Pair(i, d))
+                    }
+                    if (destIndices.isEmpty()) continue
 
-                // Find best boarding stop near user's GPS, excluding stops near destination
-                val eligibleBoardingStops = distinctStops.filter {
-                    haversine(it.second, it.third, bestDrop.second, bestDrop.third) > 300.0 &&
-                    !it.first.equals(bestDrop.first, ignoreCase = true)
+                    // Find best valid pair where boardIdx < dropIdx
+                    var bestPair: Triple<Int, Int, Double>? = null
+                    var minPairCost = Double.MAX_VALUE
+
+                    for (o in origIndices) {
+                        for (d in destIndices) {
+                            if (o.first >= d.first || (d.first - o.first) < 3) continue
+                            val cost = (o.second * 1.2) + (d.second * 2.2)
+                            if (cost < minPairCost) {
+                                minPairCost = cost
+                                bestPair = Triple(o.first, d.first, cost)
+                            }
+                        }
+                    }
+
+                    if (bestPair != null) {
+                        val bIdx = bestPair.first
+                        val dIdx = bestPair.second
+                        val walkBoard = haversine(fLat, fLng, coords[bIdx].first, coords[bIdx].second).toInt()
+                        val walkDrop = haversine(tLat, tLng, coords[dIdx].first, coords[dIdx].second).toInt()
+
+                        var polyMeters = 0.0
+                        for (k in bIdx until dIdx) {
+                            polyMeters += haversine(coords[k].first, coords[k].second, coords[k + 1].first, coords[k + 1].second)
+                        }
+                        if (polyMeters < 300.0) continue
+
+                        val rideKm = Math.max(0.5, Math.round((polyMeters / 1000.0) * 10.0) / 10.0)
+                        val walkMinutesToBoard = Math.max(1, (walkBoard / 75.0).toInt())
+                        val walkMinutesFromDrop = Math.max(1, (walkDrop / 75.0).toInt())
+                        val rideMinutes = Math.max(3, (rideKm / 18.0 * 60.0).toInt())
+                        val totalMinutes = walkMinutesToBoard + walkMinutesFromDrop + rideMinutes
+
+                        val fareCalc = com.ororuta.app.domain.fare.TraditionalJeepneyFareService.calculateFareForDistance(
+                            distanceKm = rideKm,
+                            category = com.ororuta.app.domain.fare.PassengerCategory.REGULAR,
+                            jeepneyType = route.jeepneyType
+                        )
+
+                        val dropPenalty = if (walkDrop > 200) Math.pow((walkDrop - 200.0) / 45.0, 1.35) * 3.5 else 0.0
+                        val boardPenalty = if (walkBoard > 350) Math.pow((walkBoard - 350.0) / 60.0, 1.2) * 2.0 else 0.0
+                        val directBonus = if (textMatch) 10.0 else 0.0
+                        val compositeScore = (walkMinutesToBoard * 1.8) + (walkMinutesFromDrop * 2.5) + (rideMinutes * 1.0) + (fareCalc.regularFare * 0.2) + dropPenalty + boardPenalty - directBonus
+
+                        val bStop = route.stops.filter { !it.name.contains("Miami", ignoreCase = true) }.minByOrNull { haversine(coords[bIdx].first, coords[bIdx].second, it.lat, it.lng) }
+                        val dStop = route.stops.filter { !it.name.contains("Miami", ignoreCase = true) }.minByOrNull { haversine(coords[dIdx].first, coords[dIdx].second, it.lat, it.lng) }
+                        val boardName = bStop?.name?.takeIf { haversine(coords[bIdx].first, coords[bIdx].second, bStop.lat, bStop.lng) <= 120 }
+                            ?: "Loading point on ${route.name.take(24)}"
+                        val dropName = dStop?.name?.takeIf { haversine(coords[dIdx].first, coords[dIdx].second, dStop.lat, dStop.lng) <= 120 }
+                            ?: (if (destination.isNotBlank()) "Stop near $destination" else "Drop-off stop")
+
+                        val rideCoordsSlice = (bIdx..dIdx).map { listOf(coords[it].second, coords[it].first) }
+
+                        candidateList.add(
+                            LocalCandidate(
+                                route = route,
+                                direction = dir,
+                                boardingName = boardName,
+                                boardingLat = coords[bIdx].first,
+                                boardingLng = coords[bIdx].second,
+                                dropoffName = dropName,
+                                dropoffLat = coords[dIdx].first,
+                                dropoffLng = coords[dIdx].second,
+                                rideKm = rideKm,
+                                walkToBoardM = walkBoard,
+                                walkFromDropM = walkDrop,
+                                totalMinutes = totalMinutes,
+                                compositeScore = compositeScore,
+                                regularFare = fareCalc.regularFare,
+                                discountFare = fareCalc.discountedFare,
+                                rideCoords = rideCoordsSlice
+                            )
+                        )
+                        routeMatched = true
+                    }
                 }
 
-                val bestBoarding = (eligibleBoardingStops.takeIf { it.isNotEmpty() } ?: distinctStops)
-                    .minByOrNull { haversine(fLat, fLng, it.second, it.third) }
-                    ?: Triple(route.origin, fLat, fLng)
+                if (!routeMatched && textMatch) {
+                    val allStops = route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 && !it.name.contains("Miami", ignoreCase = true) }.map { Triple(it.name, it.lat, it.lng) } +
+                                   route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.name.contains("Miami", ignoreCase = true) }.map { Triple(it.name, it.lat, it.lng) }
+                    val dStop = allStops.minByOrNull { haversine(tLat, tLng, it.second, it.third) }
+                    val eligibleBoarding = allStops.filter {
+                        dStop != null && haversine(it.second, it.third, dStop.second, dStop.third) > 300.0 &&
+                        !it.first.equals(dStop.first, ignoreCase = true)
+                    }
+                    val bStop = eligibleBoarding.minByOrNull { haversine(fLat, fLng, it.second, it.third) }
 
-                val walkToBoardDist = haversine(fLat, fLng, bestBoarding.second, bestBoarding.third).toInt()
-                val walkFromDropDist = haversine(bestDrop.second, bestDrop.third, tLat, tLng).toInt()
-                val rideDistKm = haversine(bestBoarding.second, bestBoarding.third, bestDrop.second, bestDrop.third) / 1000.0
-
-                // VALIDATION GUARD: Boarding and Drop-off MUST NOT be identical, and ride distance MUST be at least 300 meters!
-                val isIdenticalStop = bestBoarding.first.equals(bestDrop.first, ignoreCase = true) ||
-                        haversine(bestBoarding.second, bestBoarding.third, bestDrop.second, bestDrop.third) < 300.0
-
-                if (!isIdenticalStop) {
-                    val totalMeters = walkToBoardDist + (rideDistKm * 1000).toInt() + walkFromDropDist
-                    val estMins = Math.max(8, (totalMeters / 250.0).toInt())
-                    val effectiveKm = if (rideDistKm > 0.5) rideDistKm else 2.5
-
-                    val fareCalc = com.ororuta.app.domain.fare.TraditionalJeepneyFareService.calculateFareForDistance(
-                        distanceKm = effectiveKm,
-                        category = com.ororuta.app.domain.fare.PassengerCategory.REGULAR,
-                        jeepneyType = route.jeepneyType
-                    )
-
-                    validTrips.add(
-                        TripOption(
-                            id = "local_${route.id}_$idx",
-                            originPlaceId = route.id,
-                            destinationPlaceId = route.id,
-                            minutes = estMins,
-                            walkMeters = walkToBoardDist + walkFromDropDist,
-                            transfers = 0,
-                            direction = "Inbound",
-                            status = route.status,
-                            boardingName = bestBoarding.first,
-                            boardingLat = bestBoarding.second,
-                            boardingLng = bestBoarding.third,
-                            dropoffName = bestDrop.first,
-                            dropoffLat = bestDrop.second,
-                            dropoffLng = bestDrop.third,
-                            segments = listOf(
-                                TripSegment(
-                                    tripOptionId = "local_${route.id}_$idx",
-                                    seq = 1,
-                                    routeId = route.id,
-                                    code = route.code,
-                                    routeName = route.name,
-                                    color = route.color,
-                                    jeepneyType = route.jeepneyType,
-                                    routeStatus = route.status,
-                                    km = effectiveKm,
-                                    minutes = estMins,
-                                    fare = fareCalc.regularFare,
-                                    discountFare = fareCalc.discountedFare
+                    if (bStop != null && dStop != null) {
+                        val walkBoard = haversine(fLat, fLng, bStop.second, bStop.third).toInt()
+                        val walkDrop = haversine(tLat, tLng, dStop.second, dStop.third).toInt()
+                        if (walkBoard <= 850 && walkDrop <= 750) {
+                            val straightKm = haversine(bStop.second, bStop.third, dStop.second, dStop.third) / 1000.0 * 1.3
+                            val rideKm = Math.max(1.0, Math.round(straightKm * 10.0) / 10.0)
+                            val walkMinutes = Math.max(1, ((walkBoard + walkDrop) / 75.0).toInt())
+                            val rideMinutes = Math.max(3, (rideKm / 18.0 * 60.0).toInt())
+                            val fareCalc = com.ororuta.app.domain.fare.TraditionalJeepneyFareService.calculateFareForDistance(
+                                distanceKm = rideKm,
+                                category = com.ororuta.app.domain.fare.PassengerCategory.REGULAR,
+                                jeepneyType = route.jeepneyType
+                            )
+                            val compScore = (walkMinutes * 2.0) + rideMinutes + (fareCalc.regularFare * 0.2)
+                            candidateList.add(
+                                LocalCandidate(
+                                    route = route,
+                                    direction = "Inbound",
+                                    boardingName = bStop.first,
+                                    boardingLat = bStop.second,
+                                    boardingLng = bStop.third,
+                                    dropoffName = dStop.first,
+                                    dropoffLat = dStop.second,
+                                    dropoffLng = dStop.third,
+                                    rideKm = rideKm,
+                                    walkToBoardM = walkBoard,
+                                    walkFromDropM = walkDrop,
+                                    totalMinutes = walkMinutes + rideMinutes,
+                                    compositeScore = compScore,
+                                    regularFare = fareCalc.regularFare,
+                                    discountFare = fareCalc.discountedFare,
+                                    rideCoords = listOf(listOf(bStop.third, bStop.second), listOf(dStop.third, dStop.second))
                                 )
-                            ),
-                            totalKm = effectiveKm,
-                            regularFare = fareCalc.regularFare,
-                            discountFare = fareCalc.discountedFare,
-                            isEstimatedFare = true
-                        )
-                    )
+                            )
+                        }
+                    }
                 }
             }
 
-            validTrips.sortedBy { it.walkMeters + (it.minutes * 50) }.take(5)
+            // Deduplicate by route code, keeping lowest compositeScore
+            val bestByCode = mutableMapOf<String, LocalCandidate>()
+            for (c in candidateList) {
+                val key = c.route.code
+                if (!bestByCode.containsKey(key) || c.compositeScore < bestByCode[key]!!.compositeScore) {
+                    bestByCode[key] = c
+                }
+            }
+
+            // Filter out options with excessive dropoff walk (> 500m) if close option (<= 300m) exists
+            val hasCloseOption = bestByCode.values.any { it.walkFromDropM <= 300 }
+            val viableCandidates = if (hasCloseOption) {
+                bestByCode.values.filter { it.walkFromDropM <= 500 }
+            } else {
+                bestByCode.values.toList()
+            }
+
+            // Sort by convenience: compositeScore ranks the most convenient and accurate route first!
+            val sorted = viableCandidates.sortedBy { it.compositeScore }.take(5)
+
+            sorted.mapIndexed { idx, cand ->
+                TripOption(
+                    id = "local_${cand.route.id}_$idx",
+                    originPlaceId = cand.route.id,
+                    destinationPlaceId = cand.route.id,
+                    minutes = cand.totalMinutes,
+                    walkMeters = cand.walkToBoardM + cand.walkFromDropM,
+                    transfers = 0,
+                    direction = cand.direction,
+                    status = cand.route.status,
+                    boardingName = cand.boardingName,
+                    boardingLat = cand.boardingLat,
+                    boardingLng = cand.boardingLng,
+                    dropoffName = cand.dropoffName,
+                    dropoffLat = cand.dropoffLat,
+                    dropoffLng = cand.dropoffLng,
+                    jeepneyCoordinates = cand.rideCoords,
+                    segments = listOf(
+                        TripSegment(
+                            tripOptionId = "local_${cand.route.id}_$idx",
+                            seq = 1,
+                            routeId = cand.route.id,
+                            code = cand.route.code,
+                            routeName = cand.route.name,
+                            color = cand.route.color,
+                            jeepneyType = cand.route.jeepneyType,
+                            routeStatus = cand.route.status,
+                            km = cand.rideKm,
+                            minutes = cand.totalMinutes,
+                            fare = cand.regularFare,
+                            discountFare = cand.discountFare
+                        )
+                    ),
+                    totalKm = cand.rideKm,
+                    regularFare = cand.regularFare,
+                    discountFare = cand.discountFare,
+                    isEstimatedFare = true
+                )
+            }
         } catch (_: Exception) {
             emptyList()
         }
@@ -273,7 +413,16 @@ class PlaceRepository @Inject constructor(
             Place("pl-patag", "Camp Evangelista", "Patag", "military", 124.625586, 8.487848, 8.487848, 124.625586),
             Place("pl-cathedral", "St. Augustine Metropolitan Cathedral", "Poblacion", "landmark", 124.6433, 8.4777, 8.4777, 124.6433),
             Place("pl-miami-inn", "Miami Inn Carmen", "Carmen", "landmark", 124.637633, 8.477285, 8.477285, 124.637633),
-            Place("pl-madonna-hospital", "Madonna and Child Hospital", "Carmen", "hospital", 124.6352344, 8.4772152, 8.4772152, 124.6352344)
+            Place("pl-madonna-hospital", "Madonna and Child Hospital", "Carmen", "hospital", 124.6352344, 8.4772152, 8.4772152, 124.6352344),
+            Place("pl-agora", "Agora Terminal", "Lapasan", "terminal", 124.6589, 8.4857, 8.4857, 124.6589),
+            Place("pl-bulua", "Bulua Terminal", "Bulua", "terminal", 124.6115, 8.5040, 8.5040, 124.6115),
+            Place("pl-liceo", "Liceo de Cagayan University", "Kauswagan", "school", 124.6407, 8.4965, 8.4965, 124.6407),
+            Place("pl-xavier", "Xavier University", "Poblacion", "school", 124.6489, 8.4784, 8.4784, 124.6489),
+            Place("pl-ustp", "USTP Lapasan", "Lapasan", "school", 124.6572, 8.4852, 8.4852, 124.6572),
+            Place("pl-nmmc", "NMMC", "Poblacion", "hospital", 124.6468, 8.4875, 8.4875, 124.6468),
+            Place("pl-polymedic", "Cagayan de Oro Polymedic Plaza", "Kauswagan", "hospital", 124.6305, 8.4940, 8.4940, 124.6305),
+            Place("pl-sm-uptown", "SM CDO Uptown", "Upper Carmen", "mall", 124.6225, 8.4578, 8.4578, 124.6225),
+            Place("pl-gaisano", "Gaisano City Mall", "Lapasan", "mall", 124.6515, 8.4842, 8.4842, 124.6515)
         )
 
         private val LANDMARK_ALIASES = mapOf(
@@ -283,7 +432,16 @@ class PlaceRepository @Inject constructor(
             "pl-cogon" to listOf("cogon", "cogon market", "cogon public market", "palengke cogon"),
             "pl-cathedral" to listOf("cathedral", "st augustine", "san agustin", "st. augustine cathedral", "san agustin church"),
             "pl-miami-inn" to listOf("miami inn", "miami inn carmen", "vamenta miami", "miami carmen"),
-            "pl-madonna-hospital" to listOf("madonna", "madonna hospital", "madonna & child", "madonna and child", "madonna & child hospital", "madonna and child hospital")
+            "pl-madonna-hospital" to listOf("madonna", "madonna hospital", "madonna & child", "madonna and child", "madonna & child hospital", "madonna and child hospital"),
+            "pl-agora" to listOf("agora", "agora terminal", "agora market", "eastbound terminal"),
+            "pl-bulua" to listOf("bulua", "bulua terminal", "wtpm", "westbound", "westbound terminal"),
+            "pl-liceo" to listOf("liceo", "liceo university", "liceo main", "liceo de cagayan", "ldcu"),
+            "pl-xavier" to listOf("xavier", "xu", "ateneo", "ateneo de cagayan", "xavier university"),
+            "pl-ustp" to listOf("ustp", "must", "ustp lapasan"),
+            "pl-nmmc" to listOf("nmmc", "provincial hospital", "northern mindanao medical center"),
+            "pl-polymedic" to listOf("polymedic", "polymedic plaza", "polymedic kauswagan"),
+            "pl-sm-uptown" to listOf("sm uptown", "sm cdo uptown", "uptown sm"),
+            "pl-gaisano" to listOf("gaisano", "gaisano city", "gaisano mall")
         )
     }
 

@@ -14,11 +14,11 @@ import { RouteChip } from '../components/ui/RouteChip';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { RouteFormModal } from '../components/routes/RouteFormModal';
 import { RouteDetailDrawer } from '../components/routes/RouteDetailDrawer';
-import { RouteDrawModal } from '../components/routes/RouteDrawModal';
+import { RouteDrawModal, type RoutePinItem } from '../components/routes/RouteDrawModal';
 import { useData } from '../contexts/DataContext';
 import { useSimulatedLoad } from '../hooks/useSimulatedLoad';
 import { api } from '../services/api';
-import type { Direction, JeepneyRoute, LatLng, RecordStatus } from '../types/transit';
+import type { Direction, JeepneyRoute, LatLng, RecordStatus, TransitLocation } from '../types/transit';
 import { formatRelative, nowIso, peso } from '../utils/format';
 import { toCoordinates } from '../utils/geo';
 import { cn } from '../utils/cn';
@@ -27,7 +27,7 @@ type StatusFilter = 'All' | RecordStatus;
 const DIRECTIONS: Array<Direction | 'All'> = ['All', 'Northbound', 'Southbound', 'Eastbound', 'Westbound', 'Loop'];
 
 export function JeepneyRoutes() {
-  const { routes, setRoutes, locations, logActivity } = useData();
+  const { routes, setRoutes, locations, setLocations, logActivity } = useData();
   const loading = useSimulatedLoad();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('All');
@@ -108,13 +108,57 @@ export function JeepneyRoutes() {
     setMapOpen(true);
   };
 
-  const handleMapSave = (path: LatLng[]) => {
+  const handleMapSave = async (path: LatLng[], pins?: RoutePinItem[]) => {
     if (!mapRoute) return;
     const updated = { ...mapRoute, path, coordinates: toCoordinates(path), lastUpdated: nowIso() };
     setRoutes((prev) => prev.map((r) => (r.id === mapRoute.id ? updated : r)));
-    api.routes.update(mapRoute.id, { path, coordinates: toCoordinates(path) }).catch((e) => console.error('Map save error:', e));
-    logActivity({ routeId: mapRoute.id, action: 'Rerouted', detail: `Path updated via map editor (${path.length} points)` });
-    toast.success(`${mapRoute.id} path saved`);
+    await api.routes.update(mapRoute.id, { path, coordinates: toCoordinates(path) }).catch((e) => console.error('Map save error:', e));
+
+    // Save newly placed landmark pins for this route
+    if (pins && pins.length > 0) {
+      for (const pin of pins) {
+        if (pin.isNew) {
+          try {
+            const res = await api.locations.create({
+              name: pin.name,
+              kind: pin.kind,
+              address: pin.address || '',
+              barangay: '',
+              lat: pin.point[0],
+              lng: pin.point[1],
+              routeIds: [mapRoute.id, mapRoute.code || ''].filter(Boolean),
+              status: 'Active',
+              notes: `Placed along route ${mapRoute.code || mapRoute.id}`,
+            });
+            if (res && (res as any).id) {
+              const createdLoc: TransitLocation = {
+                id: (res as any).id,
+                name: pin.name,
+                kind: pin.kind,
+                address: pin.address || '',
+                barangay: '',
+                lat: pin.point[0],
+                lng: pin.point[1],
+                routeIds: [mapRoute.id, mapRoute.code || ''].filter(Boolean),
+                status: 'Active',
+                notes: `Placed along route ${mapRoute.code || mapRoute.id}`,
+                lastUpdated: nowIso(),
+              };
+              setLocations((prev) => [...prev, createdLoc]);
+            }
+          } catch (err) {
+            console.error('Error saving pin:', err);
+          }
+        }
+      }
+    }
+
+    logActivity({
+      routeId: mapRoute.id,
+      action: 'Rerouted',
+      detail: `Route geometry (${path.length} pts) and ${pins?.length ?? 0} landmark pins updated via map editor`,
+    });
+    toast.success(`${mapRoute.code || mapRoute.id} route geometry and pins saved`);
     setMapOpen(false);
   };
 
@@ -226,6 +270,11 @@ export function JeepneyRoutes() {
           mode="edit"
           route={mapRoute}
           path={mapPath}
+          initialPins={locations.filter((l) =>
+            mapRoute
+              ? l.routeIds.includes(mapRoute.id) || (mapRoute.code ? l.routeIds.includes(mapRoute.code) : false)
+              : false
+          )}
           onPathChange={setMapPath}
           onBack={() => setMapOpen(false)}
           onClose={() => setMapOpen(false)}

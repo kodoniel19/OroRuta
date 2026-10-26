@@ -113,6 +113,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ status }),
       }),
+    snapToRoad: (waypoints: [number, number][]) =>
+      request<{ ok: boolean; path: [number, number][]; distanceMeters: number; durationSeconds: number }>('/admin/routes/snap-to-road', {
+        method: 'POST',
+        body: JSON.stringify({ waypoints }),
+      }),
   },
 
   // Transit Locations (Terminals, Loading, Unloading, Transfer)

@@ -18,31 +18,36 @@ function calculatePolylineMeters(coords) {
 }
 
 // Common CDO known aliases for instant resolution
+// Common CDO known aliases for instant resolution
 const CDO_ALIASES = [
-  { keywords: ["sm downtown", "sm premier", "sm cdo downtown", "downtown premier"], name: "SM CDO Downtown Premier", area: "Lapasan", kind: "mall", lat: 8.4855, lng: 124.6535 },
+  { keywords: ["sm downtown", "sm premier", "sm cdo downtown", "downtown premier", "smdt"], name: "SM CDO Downtown Premier", area: "Lapasan", kind: "mall", lat: 8.4855, lng: 124.6535 },
   { keywords: ["miami inn", "miami inn carmen", "miami", "vamenta miami"], name: "Miami Inn Carmen", area: "Carmen", kind: "landmark", lat: 8.477285, lng: 124.637633 },
   { keywords: ["gumamela", "gumamela ext", "gumamela extension"], name: "Gumamela Extension, Carmen", area: "Carmen", kind: "landmark", lat: 8.4908, lng: 124.6338 },
   { keywords: ["centrio", "ayala centrio", "centrio mall"], name: "Centrio Mall", area: "Poblacion", kind: "mall", lat: 8.4877, lng: 124.6517 },
-  { keywords: ["limketkai", "ketkai"], name: "Limketkai Center", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6568 },
+  { keywords: ["limketkai", "ketkai", "limkdtkai"], name: "Limketkai Center", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6568 },
   { keywords: ["gaisano", "gaisano city"], name: "Gaisano City Mall", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6515 },
-  { keywords: ["cogon", "cogon market"], name: "Cogon Market", area: "Cogon", kind: "market", lat: 8.477160465033135, lng: 124.65120822163647 },
-  { keywords: ["carmen market", "carmen public market"], name: "Carmen Market", area: "Carmen", kind: "market", lat: 8.4845, lng: 124.6335 },
-  { keywords: ["agora", "agora terminal"], name: "Agora Terminal", area: "Lapasan", kind: "terminal", lat: 8.4857, lng: 124.6589 },
+  { keywords: ["cogon", "cogon market", "cogon public market"], name: "Cogon Market", area: "Cogon", kind: "market", lat: 8.477160, lng: 124.651208 },
+  { keywords: ["carmen market", "carmen public market", "carmen"], name: "Carmen Public Market", area: "Carmen", kind: "market", lat: 8.479498, lng: 124.636820 },
+  { keywords: ["agora", "agora terminal", "agora market"], name: "Agora Terminal", area: "Lapasan", kind: "terminal", lat: 8.4857, lng: 124.6589 },
   { keywords: ["bulua", "bulua terminal", "wtpm", "westbound"], name: "Bulua Terminal", area: "Bulua", kind: "terminal", lat: 8.5040, lng: 124.6115 },
   { keywords: ["liceo", "liceo main", "liceo de cagayan", "liceo university"], name: "Liceo de Cagayan University", area: "Kauswagan", kind: "school", lat: 8.4965, lng: 124.6407 },
   { keywords: ["xavier", "xu", "ateneo de cagayan"], name: "Xavier University", area: "Poblacion", kind: "school", lat: 8.4784, lng: 124.6489 },
   { keywords: ["ustp", "must"], name: "USTP Lapasan", area: "Lapasan", kind: "school", lat: 8.4852, lng: 124.6572 },
   { keywords: ["nmmc", "provincial hospital"], name: "NMMC", area: "Poblacion", kind: "hospital", lat: 8.4875, lng: 124.6468 },
+  { keywords: ["camp evangelista", "patag camp", "4id"], name: "Camp Evangelista", area: "Patag", kind: "landmark", lat: 8.487848, lng: 124.625586 },
   { keywords: ["polymedic", "polymedic plaza"], name: "Cagayan de Oro Polymedic Plaza", area: "Kauswagan", kind: "hospital", lat: 8.4940, lng: 124.6305 },
   { keywords: ["savemore kauswagan", "savemore market"], name: "Savemore Market Kauswagan", area: "Kauswagan", kind: "market", lat: 8.4960, lng: 124.6340 },
   { keywords: ["capitol university", "cu"], name: "Capitol University", area: "Lapasan", kind: "school", lat: 8.4870, lng: 124.6550 },
-  { keywords: ["sm uptown", "sm cdo uptown"], name: "SM CDO Uptown", area: "Upper Carmen", kind: "mall", lat: 8.4578, lng: 124.6225 }
+  { keywords: ["sm uptown", "sm cdo uptown"], name: "SM CDO Uptown", area: "Upper Carmen", kind: "mall", lat: 8.4578, lng: 124.6225 },
+  { keywords: ["cathedral", "st augustine", "san agustin"], name: "St. Augustine Metropolitan Cathedral", area: "Poblacion", kind: "landmark", lat: 8.4777, lng: 124.6433 },
+  { keywords: ["city hall", "cdo city hall"], name: "Cagayan de Oro City Hall", area: "Poblacion", kind: "government", lat: 8.4772, lng: 124.6424 },
+  { keywords: ["madonna", "madonna hospital", "madonna and child"], name: "Madonna and Child Hospital", area: "Carmen", kind: "hospital", lat: 8.477215, lng: 124.635234 }
 ];
 
 // Verified CDO transfer hubs for multi-jeepney journeys
 const CDO_TRANSFER_HUBS = [
-  { id: "hub-carmen", name: "Carmen Public Market Terminal", lat: 8.4845, lng: 124.6335, area: "Carmen" },
-  { id: "hub-cogon", name: "Cogon Market Terminal", lat: 8.477160465033135, lng: 124.65120822163647, area: "Cogon" },
+  { id: "hub-carmen", name: "Carmen Public Market Terminal", lat: 8.479498, lng: 124.636820, area: "Carmen" },
+  { id: "hub-cogon", name: "Cogon Market Terminal", lat: 8.477160, lng: 124.651208, area: "Cogon" },
   { id: "hub-agora", name: "Agora Eastbound Terminal", lat: 8.4857, lng: 124.6589, area: "Lapasan" },
   { id: "hub-bulua", name: "Bulua Westbound Terminal", lat: 8.5040, lng: 124.6115, area: "Bulua" },
   { id: "hub-divisoria", name: "Divisoria Plaza Interchange", lat: 8.4777, lng: 124.6452, area: "Divisoria" },
@@ -154,19 +159,19 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
  * Identify a friendly boarding or dropoff stop name near coordinates.
  */
 function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, loadingPointsList = []) {
-  // 1. Check verified loading points (< 220m)
+  // 1. Check verified loading points (strict <= 120m)
   if (loadingPointsList && loadingPointsList.length > 0) {
     let closest = null, closestDist = Infinity;
     for (const lp of loadingPointsList) {
-      if (lp.lat && lp.lng) {
+      if (lp.lat && lp.lng && !lp.name.toLowerCase().includes("miami")) {
         const d = haversineMeters(lat, lng, parseFloat(lp.lat), parseFloat(lp.lng));
         if (d < closestDist) { closestDist = d; closest = lp; }
       }
     }
-    if (closest && closestDist < 220) return closest.name;
+    if (closest && closestDist <= 120) return closest.name;
   }
 
-  // 2. Check terminals (< 280m)
+  // 2. Check terminals (strict <= 150m)
   if (terminalList && terminalList.length > 0) {
     let closest = null, closestDist = Infinity;
     for (const t of terminalList) {
@@ -175,7 +180,7 @@ function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, 
         if (d < closestDist) { closestDist = d; closest = t; }
       }
     }
-    if (closest && closestDist < 280) return closest.name;
+    if (closest && closestDist <= 150) return closest.name;
   }
 
   // 3. Approximate by CDO street corridors
@@ -204,6 +209,11 @@ function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, 
  * Geometric jeepney route finder.
  * Finds all genuine traditional routes from the database that pass near origin and destination,
  * ensuring correct direction of travel and valid walking distances.
+ */
+/**
+ * Geometric jeepney route finder.
+ * Finds all genuine traditional routes from the database that pass near origin and destination,
+ * ensuring correct direction of travel, optimal boarding/dropoff points, and valid walking distances.
  */
 async function findDirectJeepneyRoutes(origLat, origLng, destLat, destLng, originName, destName, allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints, maxWalkOrig = 850, maxWalkDest = 750) {
   const directDistM = haversineMeters(origLat, origLng, destLat, destLng);
@@ -237,49 +247,67 @@ async function findDirectJeepneyRoutes(origLat, origLng, destLat, destLng, origi
 
       const coords = geom.coordinates; // [[lng, lat], ...]
 
-      // 1. Find closest coordinate to Origin
-      let minOrigDist = Infinity, origIdx = -1;
+      // 1. Collect all candidate boarding indices within maxWalkOrig
+      const origCandidates = [];
       for (let i = 0; i < coords.length; i++) {
         const d = haversineMeters(origLat, origLng, coords[i][1], coords[i][0]);
-        if (d < minOrigDist) { minOrigDist = d; origIdx = i; }
+        if (d <= maxWalkOrig) {
+          origCandidates.push({ idx: i, dist: d });
+        }
       }
+      if (origCandidates.length === 0) continue;
 
-      // 2. Find closest coordinate to Destination
-      let minDestDist = Infinity, destIdx = -1;
+      // 2. Collect all candidate dropoff indices within maxWalkDest
+      const destCandidates = [];
       for (let i = 0; i < coords.length; i++) {
         const d = haversineMeters(destLat, destLng, coords[i][1], coords[i][0]);
-        if (d < minDestDist) { minDestDist = d; destIdx = i; }
+        if (d <= maxWalkDest) {
+          destCandidates.push({ idx: i, dist: d });
+        }
+      }
+      if (destCandidates.length === 0) continue;
+
+      // 3. Find the best valid pair where boarding is BEFORE dropoff
+      let bestPair = null;
+      let minPairCost = Infinity;
+
+      for (const o of origCandidates) {
+        for (const d of destCandidates) {
+          // Direction check: Must board BEFORE dropoff with minimum progression along route
+          if (o.idx >= d.idx || (d.idx - o.idx) < 3) continue;
+
+          // Estimate ride distance between these coordinates
+          const rideCoords = coords.slice(o.idx, d.idx + 1);
+          const rideDistMeters = calculatePolylineMeters(rideCoords);
+
+          // Must be a meaningful transit ride (at least 300 meters)
+          if (rideDistMeters < 300) continue;
+
+          // Reject extreme detours for very short direct trips
+          if (directDistM < 1600 && rideDistMeters > directDistM * 2.8) continue;
+
+          // Score this pair: strongly prioritize shortest walking distance (especially dropoff walk)
+          const pairCost = (o.dist * 1.2) + (d.dist * 2.2) + (rideDistMeters / 400.0);
+          if (pairCost < minPairCost) {
+            minPairCost = pairCost;
+            bestPair = {
+              origIdx: o.idx,
+              destIdx: d.idx,
+              rideCoords,
+              rideDistMeters,
+              walkToBoardM: Math.round(o.dist),
+              walkFromDropM: Math.round(d.dist)
+            };
+          }
+        }
       }
 
-      // Proximity check: Boarding and Drop-off must be within walking distance
-      if (minOrigDist > maxWalkOrig || minDestDist > maxWalkDest) {
-        continue;
-      }
+      if (!bestPair) continue;
 
-      // Direction check: Must board BEFORE drop-off along the route direction!
-      if (origIdx >= destIdx || (destIdx - origIdx) < 4) {
-        continue;
-      }
-
-      // Extract coordinates along the route between boarding and drop-off
-      const rideCoords = coords.slice(origIdx, destIdx + 1);
-      const rideDistMeters = calculatePolylineMeters(rideCoords);
-
-      // Must be a meaningful transit ride (at least 350 meters)
-      if (rideDistMeters < 350) {
-        continue;
-      }
-
-      // Reject massive detours for short trips
-      if (directDistM < 1600 && rideDistMeters > directDistM * 2.5) {
-        continue;
-      }
-
-      const rideKm = Math.round((rideDistMeters / 1000) * 10) / 10 || 0.4;
-      const walkToBoardM = Math.round(minOrigDist);
-      const walkFromDropM = Math.round(minDestDist);
+      const { origIdx, destIdx, rideCoords, rideDistMeters, walkToBoardM, walkFromDropM } = bestPair;
       const totalWalkM = walkToBoardM + walkFromDropM;
 
+      const rideKm = Math.round((rideDistMeters / 1000) * 10) / 10 || 0.4;
       const walkMinutesToBoard = Math.max(1, Math.round(walkToBoardM / 75));
       const walkMinutesFromDrop = Math.max(1, Math.round(walkFromDropM / 75));
       const walkMinutes = walkMinutesToBoard + walkMinutesFromDrop;
@@ -293,11 +321,35 @@ async function findDirectJeepneyRoutes(origLat, origLng, destLat, destLng, origi
       const boardingCoord = [rideCoords[0][0], rideCoords[0][1]]; // [lng, lat]
       const dropoffCoord = [rideCoords[rideCoords.length - 1][0], rideCoords[rideCoords.length - 1][1]];
 
-      const boardingName = findStopLabel(boardingCoord[1], boardingCoord[0], "Loading point", originName, allTerminals, allLoadingPoints);
-      const dropoffName = findStopLabel(dropoffCoord[1], dropoffCoord[0], "Drop-off stop", destName, allTerminals, allLoadingPoints);
+      const routeLps = (allLoadingPoints || []).filter(lp => lp.route_id === r.id);
+      const boardingName = findStopLabel(boardingCoord[1], boardingCoord[0], "Loading point", originName, allTerminals, routeLps);
+      const dropoffName = findStopLabel(dropoffCoord[1], dropoffCoord[0], "Drop-off stop", destName, allTerminals, routeLps);
 
-      const dropoffPenalty = walkFromDropM > 250 ? Math.pow((walkFromDropM - 250) / 60, 1.3) * 3 : 0;
-      const compositeScore = (totalWalkM / 75) * 1.5 + totalMinutes + (regularFare * 0.35) + dropoffPenalty;
+      // Direct service bonus: check if route explicitly serves destination by name
+      const cleanDest = (destName || "").toLowerCase();
+      let directServiceBonus = 0;
+      if (cleanDest && cleanDest.length > 2) {
+        const rName = (r.name || "").toLowerCase();
+        const rDest = (r.destination || "").toLowerCase();
+        const rOrig = (r.origin || "").toLowerCase();
+        const rDesc = (r.description || "").toLowerCase();
+        if (rDest.includes(cleanDest) || rName.includes(cleanDest) || rOrig.includes(cleanDest) || rDesc.includes(cleanDest)) {
+          directServiceBonus = 12.0; // Significant boost for officially serving the destination
+        } else {
+          const tokens = cleanDest.split(/\s+/).filter(t => t.length > 3 && !["market", "terminal", "mall", "hospital", "line"].includes(t));
+          if (tokens.some(t => rDest.includes(t) || rName.includes(t))) {
+            directServiceBonus = 8.0;
+          }
+        }
+      }
+
+      // Dropoff penalty: steep disutility when dropoff walk exceeds 200m
+      const dropoffPenalty = walkFromDropM > 200 ? Math.pow((walkFromDropM - 200) / 45, 1.35) * 3.5 : 0;
+      // Boarding penalty for walking > 350m to board
+      const boardingPenalty = walkToBoardM > 350 ? Math.pow((walkToBoardM - 350) / 60, 1.2) * 2.0 : 0;
+
+      // Composite convenience score: Generalized Travel Cost (lower is better)
+      const compositeScore = (walkMinutesToBoard * 1.8) + (walkMinutesFromDrop * 2.5) + (rideMinutes * 1.0) + (regularFare * 0.2) + dropoffPenalty + boardingPenalty - directServiceBonus;
 
       candidates.push({
         type: "direct",
@@ -393,8 +445,9 @@ async function findTransferJeepneyRoutes(origLat, origLng, destLat, destLng, ori
         const regularFare = fare1.regularFare + fare2.regularFare;
         const discountFare = fare1.discountedFare + fare2.discountedFare;
 
-        const dropoffPenalty = l2.walkFromDropM > 250 ? Math.pow((l2.walkFromDropM - 250) / 60, 1.3) * 3 : 0;
-        const compositeScore = (totalWalkM / 75) * 1.5 + totalMinutes + (regularFare * 0.35) + 8.0 + dropoffPenalty;
+        const dropoffPenalty = l2.walkFromDropM > 200 ? Math.pow((l2.walkFromDropM - 200) / 45, 1.35) * 3.5 : 0;
+        // Transfer penalty: reflects changing vehicles, extra wait, and road crossing
+        const compositeScore = (l1.walkMinutesToBoard * 1.8) + (l2.walkMinutesFromDrop * 2.5) + (l1.rideMinutes + l2.rideMinutes) + (regularFare * 0.2) + 16.0 + dropoffPenalty;
 
         transferCandidates.push({
           type: "transfer",
@@ -468,11 +521,11 @@ async function search(req, res, next) {
       allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints
     );
 
-    // Filter direct candidates: If some direct candidates drop passenger very close (<= 300m),
-    // exclude candidates that leave passenger with > 650m walk from drop-off.
+    // Filter direct candidates: If some direct candidates drop passenger close (<= 300m),
+    // exclude candidates that leave passenger with > 500m walk from drop-off.
     const hasCloseDirect = directCandidates.some(c => c.walkFromDropM <= 300);
     const viableDirect = hasCloseDirect
-      ? directCandidates.filter(c => c.walkFromDropM <= 650)
+      ? directCandidates.filter(c => c.walkFromDropM <= 500)
       : directCandidates;
 
     // Deduplicate direct candidates by route code, keeping the best composite score
@@ -500,21 +553,22 @@ async function search(req, res, next) {
       return res.json([]);
     }
 
-    // Sort according to requested criterion
+    // Sort according to requested criterion:
+    // When ranking recommendations, compositeScore represents overall journey convenience,
+    // prioritizing nearest boarding point, shortest walking distance, correct jeepney route,
+    // proximity to destination, and minimal transfers.
     combined.sort((a, b) => {
-      if (sort === "time") {
-        return a.totalMinutes - b.totalMinutes || a.walkFromDropM - b.walkFromDropM || a.compositeScore - b.compositeScore;
-      }
       if (sort === "fare") {
-        return a.regularFare - b.regularFare || a.totalMinutes - b.totalMinutes || a.compositeScore - b.compositeScore;
+        return a.regularFare - b.regularFare || a.compositeScore - b.compositeScore;
       }
       if (sort === "walk") {
-        return a.totalWalkM - b.totalWalkM || a.totalMinutes - b.totalMinutes || a.compositeScore - b.compositeScore;
+        return a.totalWalkM - b.totalWalkM || a.compositeScore - b.compositeScore;
       }
       if (sort === "transfers") {
-        return a.transfers - b.transfers || a.totalMinutes - b.totalMinutes || a.compositeScore - b.compositeScore;
+        return a.transfers - b.transfers || a.compositeScore - b.compositeScore;
       }
-      return a.compositeScore - b.compositeScore || a.totalMinutes - b.totalMinutes;
+      // Default and "time" / "convenience":
+      return a.compositeScore - b.compositeScore || a.totalMinutes - b.totalMinutes || a.walkFromDropM - b.walkFromDropM;
     });
 
     // Build rich TripOption objects for top candidates

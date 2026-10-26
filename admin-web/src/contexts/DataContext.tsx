@@ -75,6 +75,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           name: r.name,
           origin: r.origin,
           destination: r.destination,
+          direction: r.direction ?? 'Inbound',
           majorRoads: r.majorRoads ?? r.roads?.map((rd: any) => rd.name) ?? [],
           description: r.description ?? '',
           inboundDistanceKm: parseFloat(r.inbound_distance_km ?? r.inboundDistanceKm ?? 0),
@@ -93,6 +94,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               ? r.path.map((p: any) => (Array.isArray(p) ? p : [Number(p.lat), Number(p.lng)]))
               : []
           ),
+          geometries: r.geometries ?? [],
+          stops: r.stops ?? [],
+          terminals: r.terminals ?? [],
         } as JeepneyRoute)));
       }
       if (lData.status === 'fulfilled' && Array.isArray(lData.value) && lData.value.length > 0) {

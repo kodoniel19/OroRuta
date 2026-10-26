@@ -55,7 +55,7 @@ async function routeAll() {
     console.log(`\nRouting [${r.code}] ${r.name}...`);
 
     for (const g of r.geometries || []) {
-      const stops = [...r.terminals, ...r.stops].filter(s => s.lat && s.lng);
+      const stops = (r.stops && r.stops.length >= 2 ? r.stops : r.terminals).filter(s => s.lat && s.lng);
       if (stops.length < 2) continue;
 
       const waypoints = stops.map(s => ({ lat: s.lat, lng: s.lng }));
@@ -67,11 +67,23 @@ async function routeAll() {
       if (res && res.coordinates.length > 2) {
         g.geometry = JSON.stringify({ type: 'LineString', coordinates: res.coordinates });
         g.geometry_status = 'road_routed';
-        r.path = res.coordinates.map((c, i) => ({ route_id: r.id, seq: i, lat: c[1], lng: c[0], map_x: 0, map_y: 0 }));
-        r.length_km = Math.round(res.distanceMeters / 100) / 10;
-        r.inbound_distance_km = r.length_km;
-        r.outbound_distance_km = r.length_km;
-        console.log(`  [OK] Direction: ${g.direction} -> Road-snapped ${res.coordinates.length} points (${r.length_km} km)`);
+        const distKm = Math.round(res.distanceMeters / 100) / 10;
+        if (g.direction === 'Inbound') {
+          r.inbound_distance_km = distKm;
+          r.length_km = distKm;
+          // Set inbound path as default path
+          r.path = res.coordinates.map((c, i) => ({ route_id: r.id, seq: i, lat: c[1], lng: c[0], map_x: 0, map_y: 0 }));
+        } else if (g.direction === 'Outbound') {
+          r.outbound_distance_km = distKm;
+        }
+        if (r.directions) {
+          const matchedDir = r.directions.find(d => d.direction.toLowerCase() === g.direction.toLowerCase());
+          if (matchedDir) {
+            matchedDir.distance_km = distKm;
+          }
+        }
+        r.last_updated_at = new Date().toISOString();
+        console.log(`  [OK] Direction: ${g.direction} -> Road-snapped ${res.coordinates.length} points (${distKm} km)`);
         routedCount++;
       } else {
         console.log(`  [WARN] Fallback used for ${g.direction}`);

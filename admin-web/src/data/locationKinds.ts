@@ -36,5 +36,21 @@ export const locationKinds: Record<
     prefix: 'X',
     path: '/transfer-points',
   },
+  landmark: {
+    title: 'Landmarks',
+    singular: 'landmark',
+    description: 'Key landmarks and points of interest along the route.',
+    color: '#6366F1',
+    prefix: 'M',
+    path: '/landmarks',
+  },
+  verified_stop: {
+    title: 'Verified Stops',
+    singular: 'verified stop',
+    description: 'Official verified jeepney stops and boarding areas.',
+    color: '#0B6E4F',
+    prefix: 'S',
+    path: '/verified-stops',
+  },
 };
 

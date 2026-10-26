@@ -94,6 +94,7 @@ router.get("/admin/routes/:id/directions", requireAdmin, admin.getRouteDirection
 router.post("/admin/routes/:id/directions", requireAdmin, admin.saveRouteDirections);
 router.post("/admin/routes/:id/generate-geometry", requireAdmin, admin.generateGeometry);
 router.post("/admin/routes/:id/verify", requireAdmin, admin.verifyRoute);
+router.post("/admin/routes/snap-to-road", requireAdmin, admin.snapToRoad);
 
 // Admin Locations CRUD
 router.get("/admin/locations", requireAdmin, admin.getLocations);

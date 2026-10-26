@@ -1,0 +1,411 @@
+{
+  "totalMaps": 50,
+  "processed": 50,
+  "matched": 50,
+  "updated": 50,
+  "totalCoords": 46238,
+  "totalStops": 0,
+  "failures": [],
+  "details": [
+    {
+      "label": "Baikingon - Carmen Public Market",
+      "routeId": "5e26a5b7-ab6e-470e-96f9-a109990ffbe0",
+      "routeName": "Baikingon (R-BAI)",
+      "inDistance": 12.81,
+      "outDistance": 13.59,
+      "coordsCount": 1559
+    },
+    {
+      "label": "Balulang (R1) Centro – Carmen Public Market",
+      "routeId": "70d79bf1-bb70-4eec-9673-43b92cd1f420",
+      "routeName": "Balulang R1 Centro (R-BAL)",
+      "inDistance": 6.95,
+      "outDistance": 5.09,
+      "coordsCount": 594
+    },
+    {
+      "label": "Balulang (R2) Villa Verde – Cogon Public Market",
+      "routeId": "198cf03a-e7fa-4163-8bfd-48978a076e67",
+      "routeName": "Balulang (R2) Villa Verde",
+      "inDistance": 7.72,
+      "outDistance": 7.89,
+      "coordsCount": 1020
+    },
+    {
+      "label": "Balulang (R3) Xavier Heights – Cogon Public Market",
+      "routeId": "a4aaa660-ff0d-48a2-9b3d-ef11221be3cf",
+      "routeName": "Balulang (R3) Xavier Heights",
+      "inDistance": 7.99,
+      "outDistance": 8.19,
+      "coordsCount": 735
+    },
+    {
+      "label": "Bayabas (R1) – Cogon Public Market",
+      "routeId": "d0402f5d-da95-4132-913e-fef5733feed2",
+      "routeName": "Bayabas (R1)",
+      "inDistance": 6.51,
+      "outDistance": 6.04,
+      "coordsCount": 393
+    },
+    {
+      "label": "Bayabas (R2) – Carmen Public Market",
+      "routeId": "262139a4-3be7-44fc-ac8a-b5f44ed01b03",
+      "routeName": "Bayabas (R2)",
+      "inDistance": 8.3,
+      "outDistance": 6.18,
+      "coordsCount": 538
+    },
+    {
+      "label": "Bayabas (R3) – Carmen Public Market",
+      "routeId": "401b4d1b-e91b-4c6d-b1c9-034aa1c87b6d",
+      "routeName": "Bayabas (R3)",
+      "inDistance": 8.14,
+      "outDistance": 4.71,
+      "coordsCount": 444
+    },
+    {
+      "label": "Bayabas (R4) – Carmen Public Market",
+      "routeId": "27375732-79e9-4c12-8658-afeb4e07faad",
+      "routeName": "Bayabas (R4)",
+      "inDistance": 10.6,
+      "outDistance": 7.37,
+      "coordsCount": 533
+    },
+    {
+      "label": "Bayabas (R5) – Agora Market City and Terminal",
+      "routeId": "a38aba4f-1cfe-404a-862c-7603ad1a67e9",
+      "routeName": "Bayabas (R5)",
+      "inDistance": 9.16,
+      "outDistance": 4.5,
+      "coordsCount": 509
+    },
+    {
+      "label": "Bonbon (R1) - Cogon Public Market",
+      "routeId": "bonbon-cogon-loop-line",
+      "routeName": "Bonbon–Cogon Loop Line",
+      "inDistance": 6.1,
+      "outDistance": 5.54,
+      "coordsCount": 396
+    },
+    {
+      "label": "Bonbon (R2) – Carmen Public Market",
+      "routeId": "3bcdc4d3-4790-4a3e-a1bf-ad48b2241ee0",
+      "routeName": "Bonbon (R2)",
+      "inDistance": 8.41,
+      "outDistance": 4.9,
+      "coordsCount": 647
+    },
+    {
+      "label": "Bonbon (R3) – Agora Market City and Terminal",
+      "routeId": "2e8ed762-ee8d-4694-b3ae-2c529cb926f3",
+      "routeName": "Bonbon (R3)",
+      "inDistance": 9.18,
+      "outDistance": 4.48,
+      "coordsCount": 509
+    },
+    {
+      "label": "Bonbon (R4) – Carmen Public Market",
+      "routeId": "c2978310-a016-4889-b5d2-454f8919135e",
+      "routeName": "Bonbon (R4)",
+      "inDistance": 12.86,
+      "outDistance": 12.46,
+      "coordsCount": 855
+    },
+    {
+      "label": "Bulua (R1) – Agora Market City and Terminal",
+      "routeId": "785b6016-46e6-4dbb-9e9d-147d2ba36ef7",
+      "routeName": "Bulua (R1)",
+      "inDistance": 10.86,
+      "outDistance": 6.47,
+      "coordsCount": 434
+    },
+    {
+      "label": "Bulua (R2) – Agora Market City and Terminal",
+      "routeId": "09cfc7ea-4f4a-477e-89a4-13666ddf29a1",
+      "routeName": "Bulua (R2)",
+      "inDistance": 8.91,
+      "outDistance": 8.31,
+      "coordsCount": 538
+    },
+    {
+      "label": "Bulua (R3) – Carmen Public Market",
+      "routeId": "de9f41f7-b13e-4b48-9e43-8380dd04da26",
+      "routeName": "Bulua (R3)",
+      "inDistance": 8.24,
+      "outDistance": 5.25,
+      "coordsCount": 398
+    },
+    {
+      "label": "Bulua (R4) – Cogon Public Market",
+      "routeId": "31241d2e-0166-4c9d-9e9a-3e89b9d8a8a9",
+      "routeName": "Bulua (R4)",
+      "inDistance": 7.76,
+      "outDistance": 7.38,
+      "coordsCount": 440
+    },
+    {
+      "label": "Bulua (R5) – Divisoria Park",
+      "routeId": "ab2932ac-f720-4ddf-b8da-d1ce269bf890",
+      "routeName": "Bulua (R5)",
+      "inDistance": 10.14,
+      "outDistance": 5.98,
+      "coordsCount": 396
+    },
+    {
+      "label": "Bulua (R6) – Carmen Public Market",
+      "routeId": "92f61e2e-6336-4010-9109-7789dd23a8eb",
+      "routeName": "Bulua (R6)",
+      "inDistance": 12.84,
+      "outDistance": 13.75,
+      "coordsCount": 1215
+    },
+    {
+      "label": "Bulua (R7) Terry Hills Subdivision",
+      "routeId": "ffa2c813-c332-4387-a01a-895aeab6dcbc",
+      "routeName": "Bulua (R7)",
+      "inDistance": 5.62,
+      "outDistance": 5.55,
+      "coordsCount": 303
+    },
+    {
+      "label": "Canitoan (R1) – Cogon Public Market",
+      "routeId": "f71ecc15-efb2-4c29-bf3e-3a7808a81e8b",
+      "routeName": "Canitoan (R1)",
+      "inDistance": 8.74,
+      "outDistance": 8.51,
+      "coordsCount": 891
+    },
+    {
+      "label": "Canitoan (R2) Calaanan (Relocation) – Cogon Public Market",
+      "routeId": "8234f496-03d7-4652-b359-ef4fa12f8543",
+      "routeName": "Canitoan (R2) Calaanan (Relocation)",
+      "inDistance": 10.04,
+      "outDistance": 9.43,
+      "coordsCount": 955
+    },
+    {
+      "label": "Carmen (R1) Silver Creek Subdivision – Cogon Public Market",
+      "routeId": "carmen-r1-silver-creek",
+      "routeName": "Carmen (R1) Silver Creek Subdivision",
+      "inDistance": 6.52,
+      "outDistance": 6.4,
+      "coordsCount": 679
+    },
+    {
+      "label": "Carmen (R2) San Agustin – Cogon Public Market",
+      "routeId": "78591a6d-93f2-4004-9e27-de1ea933fe40",
+      "routeName": "Carmen (R2) San Agustin",
+      "inDistance": 8.85,
+      "outDistance": 8.51,
+      "coordsCount": 910
+    },
+    {
+      "label": "Carmen (R3) Pueblo de Oro (Xavier Estates Gate 3) – Carmen Public Market",
+      "routeId": "73ee07c7-8966-4ef9-9290-1ba03e441066",
+      "routeName": "Carmen (R3) Pueblo de Oro (Xavier Estates Gate 3)",
+      "inDistance": 8.35,
+      "outDistance": 6.03,
+      "coordsCount": 561
+    },
+    {
+      "label": "Carmen (R4) Pueblo de Oro (Xavier Estates Gate 3) – Agora Market City and Terminal",
+      "routeId": "ffa2a646-6ffd-4a4b-ae1f-76632fd95ac9",
+      "routeName": "Carmen (R4) Pueblo de Oro (Xavier Estates Gate 3)",
+      "inDistance": 9.34,
+      "outDistance": 9.81,
+      "coordsCount": 760
+    },
+    {
+      "label": "Carmen (R5) Carmen Public Market – Agora Market City and Terminal",
+      "routeId": "564269a7-bf89-4bff-a955-e8c518ba4dea",
+      "routeName": "Carmen (R5) Carmen Public Market",
+      "inDistance": 6.39,
+      "outDistance": 4.92,
+      "coordsCount": 314
+    },
+    {
+      "label": "Carmen (R6) Zone 10 – Cogon Public Market",
+      "routeId": "ba94b1e9-984d-4f95-957f-c057be47592a",
+      "routeName": "Carmen (R6) Zone 10",
+      "inDistance": 5.53,
+      "outDistance": 5.27,
+      "coordsCount": 539
+    },
+    {
+      "label": "Dansolihon (R1) – Carmen Public Market",
+      "routeId": "082eb47c-7157-498d-ac13-6b425c22b0f4",
+      "routeName": "Dansolihon (R1)",
+      "inDistance": 35.13,
+      "outDistance": 36.18,
+      "coordsCount": 2638
+    },
+    {
+      "label": "Dansolihon (R2) – Carmen Public Market",
+      "routeId": "5a862524-7c07-4ae3-99e7-36df8fd05a58",
+      "routeName": "Dansolihon (R2)",
+      "inDistance": 25.45,
+      "outDistance": 29.6,
+      "coordsCount": 1249
+    },
+    {
+      "label": "Iponan (R1) Bulao – Carmen Public Market",
+      "routeId": "18036ed4-a14e-4b05-8a1a-2cd9dc624b6d",
+      "routeName": "Iponan (R1) Bulao",
+      "inDistance": 14.78,
+      "outDistance": 12.48,
+      "coordsCount": 901
+    },
+    {
+      "label": "Iponan (R3) Kinasanghan Iponan – Limketkai via Agora Market City and Terminal",
+      "routeId": "cb0010d4-bbf2-4261-9499-c69506f9f358",
+      "routeName": "Iponan (R3) Kinasanghan Iponan",
+      "inDistance": 11.69,
+      "outDistance": 11.07,
+      "coordsCount": 715
+    },
+    {
+      "label": "Iponan (R4) Kisanlu/Regency – Gaisano City",
+      "routeId": "iponan-r4-kisanlu-regency",
+      "routeName": "Iponan (R4) Kisanlu/Regency",
+      "inDistance": 11.41,
+      "outDistance": 8.95,
+      "coordsCount": 588
+    },
+    {
+      "label": "Iponan (R5) Bulao – Cogon Public Market",
+      "routeId": "b1f9e0a2-b320-457b-b4c8-192ee1599fcf",
+      "routeName": "Iponan (R5) Bulao",
+      "inDistance": 12.27,
+      "outDistance": 11.67,
+      "coordsCount": 843
+    },
+    {
+      "label": "Kauswagan (R1) NHA – Agora Terminal",
+      "routeId": "55f15c69-1061-4ca1-9989-95253b08d41f",
+      "routeName": "Kauswagan (R1) NHA",
+      "inDistance": 5.51,
+      "outDistance": 5.38,
+      "coordsCount": 278
+    },
+    {
+      "label": "Kauswagan (R2) NHA – Carmen Public Market",
+      "routeId": "b2682fed-e85e-43ce-b05d-d4a472c6097a",
+      "routeName": "Kauswagan (R2) NHA",
+      "inDistance": 7.3,
+      "outDistance": 3.8,
+      "coordsCount": 374
+    },
+    {
+      "label": "Kauswagan (R3) – Carmen Public Market",
+      "routeId": "ea9487f6-f749-41b1-b6df-a836cccb6b5e",
+      "routeName": "Kauswagan (R3)",
+      "inDistance": 12.04,
+      "outDistance": 9.65,
+      "coordsCount": 625
+    },
+    {
+      "label": "Lumbia (R1) – Cogon Public Market",
+      "routeId": "a5d4d87e-c1d5-4cc3-b67d-eddd1c149726",
+      "routeName": "Lumbia (R1)",
+      "inDistance": 14.65,
+      "outDistance": 14.5,
+      "coordsCount": 1438
+    },
+    {
+      "label": "Lumbia (R2) – Carmen Public Market",
+      "routeId": "f9f9ff75-5901-4026-8cca-2024912ff3e6",
+      "routeName": "Lumbia (R2)",
+      "inDistance": 15.15,
+      "outDistance": 16.27,
+      "coordsCount": 1093
+    },
+    {
+      "label": "Lumbia (R3) Gran Europa – Carmen Public Market",
+      "routeId": "04f8a2d2-6a9c-41a4-80fb-64368d6fe41c",
+      "routeName": "Lumbia (R3) Gran Europa",
+      "inDistance": 11.44,
+      "outDistance": 8.5,
+      "coordsCount": 977
+    },
+    {
+      "label": "Lumbia (R4) Gran Europa – Cogon Public Market",
+      "routeId": "1968ec8a-8ee1-463f-a65d-422139448693",
+      "routeName": "Lumbia (R4) Gran Europa",
+      "inDistance": 13.41,
+      "outDistance": 12.91,
+      "coordsCount": 1404
+    },
+    {
+      "label": "Pagatpat (R1) Centro – Westbound Terminal",
+      "routeId": "34117c32-2d1f-432e-9830-22b1d668938b",
+      "routeName": "Pagatpat (R1) Centro",
+      "inDistance": 10.81,
+      "outDistance": 10.23,
+      "coordsCount": 921
+    },
+    {
+      "label": "Pagatpat (R2) – Carmen Public Market",
+      "routeId": "aa5ba6ae-c762-4e70-911b-d297b8ce3bbc",
+      "routeName": "Pagatpat (R2)",
+      "inDistance": 9.59,
+      "outDistance": 10.55,
+      "coordsCount": 963
+    },
+    {
+      "label": "Pagatpat (R3) Pamalihi – Carmen Public Market",
+      "routeId": "817c0c59-4a20-480c-a688-a8ac93f90966",
+      "routeName": "Pagatpat (R3) Pamalihi",
+      "inDistance": 12.03,
+      "outDistance": 13.01,
+      "coordsCount": 1374
+    },
+    {
+      "label": "Patag Camp Evangelista – Divisoria Park",
+      "routeId": "e8a63394-79d4-4850-926a-1b34fe8c9ae1",
+      "routeName": "Patag Camp Evangelsita (R-PAT)",
+      "inDistance": 4.42,
+      "outDistance": 3.06,
+      "coordsCount": 224
+    },
+    {
+      "label": "San Simon – Carmen Public Market",
+      "routeId": "62d7936c-9a93-42de-beb9-15a51494bfc9",
+      "routeName": "San Simon (R-SAN)",
+      "inDistance": 12.92,
+      "outDistance": 13.91,
+      "coordsCount": 1488
+    },
+    {
+      "label": "Taglimao – Carmen Public Market",
+      "routeId": "taglimao-r-tagl",
+      "routeName": "Taglimao (R-TAGL)",
+      "inDistance": 27.21,
+      "outDistance": 28.19,
+      "coordsCount": 2095
+    },
+    {
+      "label": "Tuburan – Carmen Public Market",
+      "routeId": "3c120a4a-b96d-4683-ab78-96f110f3e17b",
+      "routeName": "Tuburan (R-TUB)",
+      "inDistance": 31.53,
+      "outDistance": 32.47,
+      "coordsCount": 2824
+    },
+    {
+      "label": "Tagpangi – Carmen Public Market",
+      "routeId": "e0ee4b3c-2045-40d1-bc08-c66da81a82a5",
+      "routeName": "Tagpangi (R-TAG)",
+      "inDistance": 23.42,
+      "outDistance": 24.42,
+      "coordsCount": 1416
+    },
+    {
+      "label": "Tumpagon – Carmen Public Market",
+      "routeId": "d862415f-29c2-413c-b0fb-7861a1c27327",
+      "routeName": "Tumpagon (R-TUM)",
+      "inDistance": 42.02,
+      "outDistance": 42.98,
+      "coordsCount": 3745
+    }
+  ]
+}

@@ -44,6 +44,9 @@ interface RouteDao {
     @Query("DELETE FROM cached_routes WHERE id = :id")
     suspend fun delete(id: String)
 
+    @Query("DELETE FROM cached_routes")
+    suspend fun clearAll()
+
     @Query("UPDATE cached_routes SET isOfflineDownload = 0 WHERE id = :id")
     suspend fun removeOffline(id: String)
 }

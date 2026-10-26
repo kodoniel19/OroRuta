@@ -1154,124 +1154,7 @@ class MapViewModel @Inject constructor(
             if (res is Resource.Success && res.data.isNotEmpty()) {
                 recommendedJeepneyTrip = res.data.first()
             } else {
-                // Find route with closest path to destination, also considering origin proximity
-                data class RouteCandidate(
-                    val route: Route,
-                    val boardingPoint: Pair<Double, Double>,
-                    val boardingName: String,
-                    val dropoffPoint: Pair<Double, Double>,
-                    val dropoffName: String,
-                    val walkToBoard: Int,
-                    val walkFromDrop: Int,
-                    val routeKm: Double
-                )
-
-                var bestCandidate: RouteCandidate? = null
-                var bestScore = Double.MAX_VALUE
-
-                for (route in routes) {
-                    val allPts: List<Triple<Double, Double, String>> = (
-                        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }
-                            .map { Triple(it.lat, it.lng, it.name) } +
-                        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 }
-                            .map { Triple(it.lat, it.lng, it.name) } +
-                        route.path.filter { it.lat != 0.0 && it.lng != 0.0 }
-                            .map { Triple(it.lat, it.lng, "") }
-                    )
-                    if (allPts.isEmpty()) continue
-
-                    // Find closest point on route to origin (boarding point)
-                    var minBoardDist = Double.MAX_VALUE
-                    var boardPt = Triple(fromLat, fromLng, "Nearest Loading Point")
-                    for (pt in allPts) {
-                        val dLat = pt.first - fromLat
-                        val dLng = pt.second - fromLng
-                        val d = dLat * dLat + dLng * dLng
-                        if (d < minBoardDist) { minBoardDist = d; boardPt = pt }
-                    }
-
-                    // Find closest point on route to destination (drop-off point)
-                    var minDropDist = Double.MAX_VALUE
-                    var dropPt = Triple(toLat, toLng, "Stop near $destName")
-                    for (pt in allPts) {
-                        val dLat = pt.first - toLat
-                        val dLng = pt.second - toLng
-                        val d = dLat * dLat + dLng * dLng
-                        if (d < minDropDist) { minDropDist = d; dropPt = pt }
-                    }
-
-                    // Haversine walk distances in meters
-                    fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-                        val r = 6371000.0
-                        val dLat = Math.toRadians(lat2 - lat1)
-                        val dLng = Math.toRadians(lng2 - lng1)
-                        val a = Math.sin(dLat/2)*Math.sin(dLat/2) +
-                                Math.cos(Math.toRadians(lat1))*Math.cos(Math.toRadians(lat2))*
-                                Math.sin(dLng/2)*Math.sin(dLng/2)
-                        return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-                    }
-
-                    val walkToBoard = haversine(fromLat, fromLng, boardPt.first, boardPt.second)
-                    val walkFromDrop = haversine(toLat, toLng, dropPt.first, dropPt.second)
-                    // Score: weighted by walking distance + destination proximity
-                    val score = walkToBoard * 1.5 + walkFromDrop * 2.0
-                    if (score < bestScore) {
-                        bestScore = score
-                        // Estimate route distance: straight-line between board & drop * road factor
-                        val routeKm = Math.max(1.0,
-                            haversine(boardPt.first, boardPt.second, dropPt.first, dropPt.second) / 1000.0 * 1.35
-                        )
-                        bestCandidate = RouteCandidate(
-                            route = route,
-                            boardingPoint = Pair(boardPt.first, boardPt.second),
-                            boardingName = boardPt.third.ifBlank { "Loading point near origin" },
-                            dropoffPoint = Pair(dropPt.first, dropPt.second),
-                            dropoffName = dropPt.third.ifBlank { "Stop near $destName" },
-                            walkToBoard = walkToBoard.toInt(),
-                            walkFromDrop = walkFromDrop.toInt(),
-                            routeKm = routeKm
-                        )
-                    }
-                }
-
-                if (bestCandidate != null) {
-                    val cand = bestCandidate
-                    val r = cand.route
-                    // Use route's actual fare and travel time where available
-                    val regularFare = if (r.fare > 0) r.fare else Math.max(13.0, 13.0 + (cand.routeKm - 4.0).coerceAtLeast(0.0) * 1.25)
-                    val discountFare = regularFare * 0.8
-                    val totalWalk = cand.walkToBoard + cand.walkFromDrop
-                    val walkMinutes = Math.max(1, (totalWalk / 70.0).toInt())
-                    // Jeepney speed ~20 km/h in CDO traffic
-                    val rideMinutes = if (r.travelTime > 0) r.travelTime else Math.max(10, (cand.routeKm / 20.0 * 60.0).toInt())
-                    val totalMinutes = walkMinutes + rideMinutes
-
-                    recommendedJeepneyTrip = TripOption(
-                        id = "rec-${r.id}",
-                        originPlaceId = "current",
-                        destinationPlaceId = "dest",
-                        minutes = totalMinutes,
-                        walkMeters = totalWalk,
-                        transfers = 0,
-                        boardingName = cand.boardingName,
-                        boardingLat = cand.boardingPoint.first,
-                        boardingLng = cand.boardingPoint.second,
-                        dropoffName = cand.dropoffName,
-                        totalKm = (cand.routeKm * 10.0).toLong() / 10.0,
-                        regularFare = (regularFare * 100.0).toLong() / 100.0,
-                        discountFare = (discountFare * 100.0).toLong() / 100.0,
-                        segments = listOf(
-                            TripSegment(
-                                tripOptionId = "rec-${r.id}",
-                                routeId = r.id,
-                                code = r.code,
-                                routeName = r.name,
-                                color = r.color,
-                                km = (cand.routeKm * 10.0).toLong() / 10.0
-                            )
-                        )
-                    )
-                }
+                recommendedJeepneyTrip = null
             }
             isLoadingJeepneyRoute = false
         }
@@ -1333,59 +1216,107 @@ class MapViewModel @Inject constructor(
     ) {
         val routePoints = com.ororuta.app.ui.screens.parseGeometries(route, direction)
 
-        // Gather all verified boarding points: Terminals, Loading Points, Transfers
-        val boardingCandidates = mutableListOf<RouteStopPoint>()
-        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
-            boardingCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
-        }
-        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) }.forEach {
-            boardingCandidates.add(RouteStopPoint(it.id, it.name, "loading", it.lat, it.lng, it.note))
-        }
-        route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
-            boardingCandidates.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
-        }
-
-        if (boardingCandidates.isEmpty() && routePoints.isNotEmpty()) {
-            boardingCandidates.add(
-                RouteStopPoint(
-                    id = "origin_${route.id}",
-                    name = route.origin,
-                    type = "terminal",
-                    lat = routePoints.first().latitude,
-                    lng = routePoints.first().longitude,
-                    note = "Route Origin Point"
-                )
-            )
+        fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+            val r = 6371000.0
+            val dLat = Math.toRadians(lat2 - lat1)
+            val dLon = Math.toRadians(lon2 - lon1)
+            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2)
+            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+            return r * c
         }
 
-        // Gather verified drop-off points
+        val isOutbound = direction.equals("Outbound", ignoreCase = true)
+        val routeOriginTitle = if (isOutbound) route.destination else route.origin
+        val routeDestTitle = if (isOutbound) route.origin else route.destination
+
+        // 1. Gather verified drop-off points and determine dropoff stop at/near the route destination
         val dropoffCandidates = mutableListOf<RouteStopPoint>()
-        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 }.reversed().forEach {
-            dropoffCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
-        }
-        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && it.pointType.equals("unloading", ignoreCase = true) }.forEach {
-            dropoffCandidates.add(RouteStopPoint(it.id, it.name, "unloading", it.lat, it.lng, it.note))
-        }
-        if (dropoffCandidates.isEmpty() && routePoints.isNotEmpty()) {
+        if (routePoints.isNotEmpty()) {
+            val endP = routePoints.last()
             dropoffCandidates.add(
                 RouteStopPoint(
-                    id = "dest_${route.id}",
-                    name = route.destination,
+                    id = "dest_${route.id}_$direction",
+                    name = "$routeDestTitle Terminal",
                     type = "terminal",
-                    lat = routePoints.last().latitude,
-                    lng = routePoints.last().longitude,
-                    note = "Route Destination Point"
+                    lat = endP.latitude,
+                    lng = endP.longitude,
+                    note = "Route Arrival Point"
                 )
             )
         }
+        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 && !it.name.contains("Miami", ignoreCase = true) }.forEach {
+            dropoffCandidates.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
+        }
+        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && it.pointType.equals("unloading", ignoreCase = true) && !it.name.contains("Miami", ignoreCase = true) }.forEach {
+            dropoffCandidates.add(RouteStopPoint(it.id, it.name, "unloading", it.lat, it.lng, it.note))
+        }
+
+        if (routePoints.isNotEmpty()) {
+            val endP = routePoints.last()
+            dropoffCandidates.sortBy { haversineMeters(it.lat, it.lng, endP.latitude, endP.longitude) }
+        }
+
         val dropoffStop = dropoffCandidates.firstOrNull() ?: RouteStopPoint(
-            id = "dest_${route.id}",
-            name = route.destination,
+            id = "dest_${route.id}_$direction",
+            name = "$routeDestTitle Terminal",
             type = "terminal",
             lat = routePoints.lastOrNull()?.latitude ?: 8.4842,
             lng = routePoints.lastOrNull()?.longitude ?: 124.6568,
-            note = "Route Destination Point"
+            note = "Route Arrival Point"
         )
+
+        val dropoffIdx = if (routePoints.isNotEmpty()) {
+            routePoints.indices.minByOrNull { haversineMeters(routePoints[it].latitude, routePoints[it].longitude, dropoffStop.lat, dropoffStop.lng) } ?: (routePoints.size - 1)
+        } else 0
+
+        // 2. Gather verified boarding points aligned with direction and occurring before dropoff
+        val rawBoarding = mutableListOf<RouteStopPoint>()
+        route.terminals.filter { it.lat != 0.0 && it.lng != 0.0 && !it.name.contains("Miami", ignoreCase = true) }.forEach {
+            rawBoarding.add(RouteStopPoint(it.id, it.name, "terminal", it.lat, it.lng, it.note))
+        }
+        route.stops.filter { it.lat != 0.0 && it.lng != 0.0 && !it.pointType.equals("unloading", ignoreCase = true) && !it.name.contains("Miami", ignoreCase = true) }.forEach {
+            rawBoarding.add(RouteStopPoint(it.id, it.name, "loading", it.lat, it.lng, it.note))
+        }
+        route.transfers.filter { it.lat != 0.0 && it.lng != 0.0 }.forEach {
+            rawBoarding.add(RouteStopPoint(it.id, it.name, "transfer", it.lat, it.lng, it.note))
+        }
+
+        val boardingCandidates = mutableListOf<RouteStopPoint>()
+        for (s in rawBoarding) {
+            if (routePoints.isNotEmpty()) {
+                val sIdx = routePoints.indices.minByOrNull { haversineMeters(routePoints[it].latitude, routePoints[it].longitude, s.lat, s.lng) } ?: 0
+                val minD = haversineMeters(routePoints[sIdx].latitude, routePoints[sIdx].longitude, s.lat, s.lng)
+                if (minD <= 100.0 && (dropoffIdx <= 0 || sIdx < dropoffIdx)) {
+                    boardingCandidates.add(s)
+                }
+            } else {
+                boardingCandidates.add(s)
+            }
+        }
+
+        if (routePoints.isNotEmpty()) {
+            val startP = routePoints.first()
+            val hasStart = boardingCandidates.any { haversineMeters(it.lat, it.lng, startP.latitude, startP.longitude) < 80.0 }
+            if (!hasStart) {
+                boardingCandidates.add(
+                    0,
+                    RouteStopPoint(
+                        id = "origin_${route.id}_$direction",
+                        name = "$routeOriginTitle Departure Terminal",
+                        type = "terminal",
+                        lat = startP.latitude,
+                        lng = startP.longitude,
+                        note = "Route Departure Point"
+                    )
+                )
+            }
+            // Sort boarding candidates along route geometry from start to dropoff
+            boardingCandidates.sortBy { s ->
+                routePoints.indices.minByOrNull { haversineMeters(routePoints[it].latitude, routePoints[it].longitude, s.lat, s.lng) } ?: 0
+            }
+        }
 
         if (userLoc == null) {
             val nearestStop = boardingCandidates.firstOrNull()
@@ -1405,17 +1336,6 @@ class MapViewModel @Inject constructor(
             return
         }
 
-        fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-            val r = 6371000.0
-            val dLat = Math.toRadians(lat2 - lat1)
-            val dLon = Math.toRadians(lon2 - lon1)
-            val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                    Math.sin(dLon / 2) * Math.sin(dLon / 2)
-            val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-            return r * c
-        }
-
         val eligibleBoardingCandidates = if (dropoffStop != null) {
             val distToDrop = haversineMeters(userLoc.latitude, userLoc.longitude, dropoffStop.lat, dropoffStop.lng)
             if (distToDrop > 400.0) {
@@ -1426,9 +1346,14 @@ class MapViewModel @Inject constructor(
             } else boardingCandidates
         } else boardingCandidates
 
-        val nearestStop = (eligibleBoardingCandidates.takeIf { it.isNotEmpty() } ?: boardingCandidates)
+        val userNearest = (eligibleBoardingCandidates.takeIf { it.isNotEmpty() } ?: boardingCandidates)
             .minByOrNull { haversineMeters(userLoc.latitude, userLoc.longitude, it.lat, it.lng) }
-            ?: boardingCandidates.firstOrNull()
+
+        val nearestStop = if (userNearest != null && haversineMeters(userLoc.latitude, userLoc.longitude, userNearest.lat, userNearest.lng) <= 1500.0) {
+            userNearest
+        } else {
+            boardingCandidates.firstOrNull()
+        }
 
         if (nearestStop == null) {
             routeGuidance = RouteGuidance(
@@ -1441,7 +1366,7 @@ class MapViewModel @Inject constructor(
                 walkingPathToBoarding = emptyList(),
                 walkingTimeMinutes = 0,
                 dropoffStop = dropoffStop,
-                guidanceMessage = "Ride Traditional Jeepney Route ${route.code} (${direction}) heading towards ${route.destination}.",
+                guidanceMessage = "Ride Traditional Jeepney Route ${route.code} (${direction}) heading towards $routeDestTitle.",
                 routePoints = routePoints
             )
             return
@@ -1461,7 +1386,7 @@ class MapViewModel @Inject constructor(
                 walkingPathToBoarding = emptyList(),
                 walkingTimeMinutes = 0,
                 dropoffStop = dropoffStop,
-                guidanceMessage = "You are at ${nearestStop.name}. Board Traditional Jeepney Route ${route.code} (${direction}) here heading towards ${route.destination}.",
+                guidanceMessage = "You are at ${nearestStop.name}. Board Traditional Jeepney Route ${route.code} (${direction}) here heading towards $routeDestTitle.",
                 routePoints = routePoints
             )
         } else {

@@ -262,7 +262,7 @@ async function getOfflineBundle(req, res, next) {
     }
     if (!rows.length) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Route not found" } });
     const route = rows[0];
-    const [terminals] = await db.execute(`SELECT t.* FROM terminals t JOIN route_terminals rt ON rt.terminal_id=t.id WHERE rt.route_id=?`, [route.id]);
+    const [terminals] = await db.execute(`SELECT t.* FROM terminals t JOIN route_terminals rt ON rt.terminal_id=t.id WHERE rt.route_id=? ORDER BY rt.seq`, [route.id]);
     const [stops] = await db.execute("SELECT * FROM loading_points WHERE route_id=?", [route.id]);
     const [transfers] = await db.execute("SELECT * FROM transfer_points WHERE route_id=?", [route.id]);
     

@@ -1,0 +1,86 @@
+5e26a5b7-ab6e-470e-96f9-a109990ffbe0 | R-BAI | Baikingon (R-BAI) | Baikingon -> Carmen Public Market
+6ab4bbb9-0b0d-4392-92c5-886de139ef1b | R1 | Balubal (R1) | Balubal -> Puerto Public Market
+be4ced47-a35a-4c38-bc63-3d1a92d1f28c | R2 | Balubal (R2) | Balubal -> Puerto Public Market
+198cf03a-e7fa-4163-8bfd-48978a076e67 | R2 | Balulang (R2) Villa Verde | Balulang  Villa Verde -> Cogon Public Market
+a4aaa660-ff0d-48a2-9b3d-ef11221be3cf | R3 | Balulang (R3) Xavier Heights | Balulang  Xavier Heights -> Cogon Public Market
+70d79bf1-bb70-4eec-9673-43b92cd1f420 | R-BAL | Balulang R1 Centro (R-BAL) | Balulang R1 Centro -> Carmen Public Market
+d0402f5d-da95-4132-913e-fef5733feed2 | R1 | Bayabas (R1) | Bayabas -> Cogon Public Market
+262139a4-3be7-44fc-ac8a-b5f44ed01b03 | R2 | Bayabas (R2) | Bayabas -> Carmen Public Market
+401b4d1b-e91b-4c6d-b1c9-034aa1c87b6d | R3 | Bayabas (R3) | Bayabas -> Carmen Public Market
+27375732-79e9-4c12-8658-afeb4e07faad | R4 | Bayabas (R4) | Bayabas -> Carmen Public Market
+a38aba4f-1cfe-404a-862c-7603ad1a67e9 | R5 | Bayabas (R5) | Bayabas -> Agora Market City and Terminal
+bayabas-carmen-loop-line | R-BAY-CAR | Bayabas–Carmen Loop Line | Brgy. Bayabas Centro -> Carmen Public Market
+3bcdc4d3-4790-4a3e-a1bf-ad48b2241ee0 | R2 | Bonbon (R2) | Bonbon -> Carmen Public Market
+2e8ed762-ee8d-4694-b3ae-2c529cb926f3 | R3 | Bonbon (R3) | Bonbon -> Agora Market City and Terminal
+c2978310-a016-4889-b5d2-454f8919135e | R4 | Bonbon (R4) | Bonbon -> Carmen Public Market
+bonbon-cogon-loop-line | R-BON-COG | Bonbon–Cogon Loop Line | Brgy. Bonbon Centro -> Cogon Public Market
+7f29e17a-f3e8-46b2-932c-c02377a48da3 | R1 | Bugo (R1) | Bugo -> Agora Market City and Terminal
+eebc29e6-2f6f-4c21-afa4-8348627fe8b7 | R2 | Bugo (R2) | Bugo -> Cogon Public Market
+bugo-cogon-line | R-BUG-COG | Bugo–Cogon Line | Bugo Centro -> Cogon Public Market
+785b6016-46e6-4dbb-9e9d-147d2ba36ef7 | R1 | Bulua (R1) | Bulua -> Agora Market City and Terminal
+09cfc7ea-4f4a-477e-89a4-13666ddf29a1 | R2 | Bulua (R2) | Bulua -> Agora Market City and Terminal
+de9f41f7-b13e-4b48-9e43-8380dd04da26 | R3 | Bulua (R3) | Bulua -> Carmen Public Market
+31241d2e-0166-4c9d-9e9a-3e89b9d8a8a9 | R4 | Bulua (R4) | Bulua -> Cogon Public Market
+ab2932ac-f720-4ddf-b8da-d1ce269bf890 | R5 | Bulua (R5) | Bulua -> Divisoria Park
+92f61e2e-6336-4010-9109-7789dd23a8eb | R6 | Bulua (R6) | Bulua -> Carmen Public Market
+ffa2c813-c332-4387-a01a-895aeab6dcbc | R7 | Bulua (R7) | Bulua -> Terry Hills Subdivision - Divisoria Park
+bulua-cogon-line-highway | R-BUL-COG | Bulua–Cogon Line via Highway | Westbound Terminal (Bulua) -> Cogon Public Market
+c2-patag-gaisano-limketkai-cogon | C2 | C2 — Patag–Gaisano–Limketkai–Cogon Loop Line | Carmen Public Market / Patag -> Plaza Divisoria / Cogon
+18e68cfd-1df1-4701-bf40-205b40bdbea4 | R3 | Camaman-an (R3) Macapaya | Camaman-an  Macapaya -> Cogon Public Market
+f71ecc15-efb2-4c29-bf3e-3a7808a81e8b | R1 | Canitoan (R1) | Canitoan -> Cogon Public Market
+8234f496-03d7-4652-b359-ef4fa12f8543 | R2 | Canitoan (R2) Calaanan (Relocation) | Canitoan  Calaanan (Relocation) -> Cogon Public Market
+78591a6d-93f2-4004-9e27-de1ea933fe40 | R2 | Carmen (R2) San Agustin | Carmen  San Agustin -> Cogon Public Market
+73ee07c7-8966-4ef9-9290-1ba03e441066 | R3 | Carmen (R3) Pueblo de Oro (Xavier Estates Gate 3) | Carmen  Pueblo de Oro (Xavier Estates Gate 3) -> Carmen Public Market
+ffa2a646-6ffd-4a4b-ae1f-76632fd95ac9 | R4 | Carmen (R4) Pueblo de Oro (Xavier Estates Gate 3) | Carmen  Pueblo de Oro (Xavier Estates Gate 3) -> Agora Market City and Terminal
+564269a7-bf89-4bff-a955-e8c518ba4dea | R5 | Carmen (R5) Carmen Public Market | Carmen  Carmen Public Market -> Agora Market City and Terminal
+ba94b1e9-984d-4f95-957f-c057be47592a | R6 | Carmen (R6) Zone 10 | Carmen  Zone 10 -> Cogon Public Market
+316030ff-4cc4-4138-a08a-abfb6b12bdbb | R-CUG | Cugman (R-CUG) | Cugman -> Cogon Public Market
+082eb47c-7157-498d-ac13-6b425c22b0f4 | R1 | Dansolihon (R1) | Dansolihon -> Carmen Public Market
+5a862524-7c07-4ae3-99e7-36df8fd05a58 | R2 | Dansolihon (R2) | Dansolihon -> Carmen Public Market
+cfd1871b-76c1-4c6d-a732-91e3abc9fc2e | R-FS  | FS Catanico (R-FS ) | FS Catanico -> Agora Market City and Terminal
+27664ce0-cf5b-4256-8deb-64da0a65b968 | R1 | Gusa (R1) | Gusa -> Puerto Public Market
+306c43f2-66bd-4fa2-b90c-2f4a1ddde665 | R2 | Gusa (R2) | Gusa -> Divisoria Park
+caaa37ea-c14f-4653-ba5e-4c162a5dc805 | R1 | Indahag (R1) | Indahag -> Cogon Public Market
+indahag-r1-cogon-line | R-IND-COG | Indahag (R1)–Cogon Line | Brgy. Indahag Centro -> Cogon Public Market
+6be43e1b-1a51-4f3d-9ce5-41d2c41145a6 | R2 | Indahag (R2) | Indahag -> Cogon Public Market
+3d5d5000-37a0-40a2-854a-559adc221066 | R3 | Indahag (R3) Taguanao | Indahag  Taguanao -> Cogon Public Market
+18036ed4-a14e-4b05-8a1a-2cd9dc624b6d | R1 | Iponan (R1) Bulao | Iponan  Bulao -> Carmen Public Market
+cb0010d4-bbf2-4261-9499-c69506f9f358 | R3 | Iponan (R3) Kinasanghan Iponan | Iponan  Kinasanghan Iponan -> Limketkai via Agora Market City and Terminal
+b1f9e0a2-b320-457b-b4c8-192ee1599fcf | R5 | Iponan (R5) Bulao | Iponan  Bulao -> Cogon Public Market
+iponan-bulua-cogon-line | R-IPO-BUL-COG | Iponan–Bulua–Cogon Line | Brgy. Iponan Centro -> Cogon Public Market
+55f15c69-1061-4ca1-9989-95253b08d41f | R1 | Kauswagan (R1) NHA | Kauswagan  NHA -> Agora Terminal
+b2682fed-e85e-43ce-b05d-d4a472c6097a | R2 | Kauswagan (R2) NHA | Kauswagan  NHA -> Carmen Public Market
+ea9487f6-f749-41b1-b6df-a836cccb6b5e | R3 | Kauswagan (R3) | Kauswagan -> Carmen Public Market
+la-lapasan-cogon-agora-divisoria | LA | LA — Lapasan–Cogon–Agora–Divisoria Loop | Brgy. Lapasan Centro -> Plaza Divisoria
+38f1362f-d2a7-4e36-a989-9e178f2ddfae | R1 | Lapasan (R1) | Lapasan -> Carmen Public Market
+2ce1cf85-2573-441b-affa-4e7c93124908 | R2 | Lapasan (R2) | Lapasan -> Cogon Public Market
+48b1687f-4271-41a1-983f-ca6b93a2fa46 | R3 | Lapasan (R3) | Lapasan -> Cogon Public Market
+lb-lapasan-agora-loop | LB | LB — Lapasan–Agora Loop | Puregold Lapasan -> Agora Bus Terminal
+a5d4d87e-c1d5-4cc3-b67d-eddd1c149726 | R1 | Lumbia (R1) | Lumbia -> Cogon Public Market
+f9f9ff75-5901-4026-8cca-2024912ff3e6 | R2 | Lumbia (R2) | Lumbia -> Carmen Public Market
+04f8a2d2-6a9c-41a4-80fb-64368d6fe41c | R3 | Lumbia (R3) Gran Europa | Lumbia  Gran Europa -> Carmen Public Market
+1968ec8a-8ee1-463f-a65d-422139448693 | R4 | Lumbia (R4) Gran Europa | Lumbia  Gran Europa -> Cogon Public Market via Taguanao
+lumbia-carmen-line | R-LUM-CAR | Lumbia–Carmen Line | Lumbia Airport Grounds -> Carmen Public Market
+62f521fd-884a-4cbe-a02e-6bf47bc65017 | R1 | Macabalan (R1) Centro | Macabalan  Centro -> Cogon Public Market
+35e62a9b-9819-4620-9a56-a13393e288b3 | R2 | Macabalan (R2) Centro | Macabalan  Centro -> Westbound Terminal and Public Market
+126d970d-92b6-479a-bc84-ff91e86bd5b0 | R3 | Macabalan (R3) Centro | Macabalan  Centro -> Cogon Public Market
+4392dd9b-fe97-46da-921d-390e60728a62 | R4 | Macabalan (R4) Centro | Macabalan  Centro -> Cogon Public Market
+9ef925b0-d6b4-4565-bd92-05b28173336d | R5 | Macabalan (R5) Centro | Macabalan  Centro -> Carmen Public Market
+ed4b755a-1a27-4ef6-8b89-1abc2a2f5f75 | R-MAC | Macasandig (Centro Buena Oro) (R-MAC) | Macasandig (Centro Buena Oro) -> Cogon Public Market
+macasandig-cogon-line | R-MAC-COG | Macasandig–Cogon Line | Brgy. Macasandig Centro -> Cogon Public Market
+34117c32-2d1f-432e-9830-22b1d668938b | R1 | Pagatpat (R1) Centro | Pagatpat  Centro -> Westbound Terminal
+aa5ba6ae-c762-4e70-911b-d297b8ce3bbc | R2 | Pagatpat (R2) | Pagatpat -> Carmen Public Market
+817c0c59-4a20-480c-a688-a8ac93f90966 | R3 | Pagatpat (R3) Pamalihi | Pagatpat  Pamalihi -> Carmen Public Market
+e8a63394-79d4-4850-926a-1b34fe8c9ae1 | R-PAT | Patag Camp Evangelsita (R-PAT) | Patag Camp Evangelsita -> Divisoria Park
+c80f880d-6491-4e83-89e7-1142a1c06749 | R1 | Puerto (R1) Puerto Public Market | Puerto  Puerto Public Market -> Agora Terminal
+puerto-cogon-divisoria-line | R-PUE-COG | Puerto–Cogon / Divisoria Line | Puerto Public Market -> Plaza Divisoria
+r1-gaisano-carmen-loop | R1 | R1 — Gaisano–Carmen Loop Line | NMMC / Gaisano City Mall -> Carmen Public Market
+r2-gaisano-agora-cogon-carmen | R2 | R2 — Gaisano–Agora–Cogon–Carmen Loop Line | Carmen Public Market -> Plaza Divisoria / Cogon
+ra-pier-cogon-line | RA | RA — Pier–Cogon Line | CDO Port Terminal (Macabalan) -> Cogon Public Market (Ororama)
+rbc-pier-macabalan-agora-limketkai | RBC | RBC — Pier–Macabalan–Agora–Limketkai–Cogon–Velez Line | CDO Port Terminal (Macabalan) -> Provincial Capitol / Velez
+rd-gusa-cugman-limketkai-cogon | RD | RD — Gusa–Cugman–Limketkai–Cogon Line | Cugman Centro -> Cogon Public Market / Centrio
+62d7936c-9a93-42de-beb9-15a51494bfc9 | R-SAN | San Simon (R-SAN) | San Simon -> Carmen Public Market
+e0ee4b3c-2045-40d1-bc08-c66da81a82a5 | R-TAG | Tagpangi (R-TAG) | Tagpangi -> Carmen Public Market
+3c120a4a-b96d-4683-ab78-96f110f3e17b | R-TUB | Tuburan (R-TUB) | Tuburan -> Carmen Public Market
+d862415f-29c2-413c-b0fb-7861a1c27327 | R-TUM | Tumpagon (R-TUM) | Tumpagon -> Carmen Public Market
+uptown-gran-europa-sm-cogon | R-UPT-COG | Uptown — Gran Europa/SM Uptown–Cogon Line | Gran Europa Subdivision -> Cogon Public Market

@@ -106,23 +106,30 @@ async function getRoutes(req, res, next) {
       const [geometries] = await db.execute(
         'SELECT * FROM route_geometry WHERE route_id = ?', [r.id]
       );
-      r.geometries = geometries;
+      r.geometries = geometries.map((g) => {
+        let geomObj = null;
+        try {
+          geomObj = typeof g.geometry === 'string' ? JSON.parse(g.geometry) : g.geometry;
+        } catch (e) {}
+        return {
+          id: g.id,
+          direction: g.direction,
+          geometry: geomObj,
+          distance_km: g.distance_km,
+        };
+      });
 
       // Construct path from geometry for map rendering
       r.path = [];
-      if (geometries && geometries.length > 0) {
-        const inbound = geometries.find(g => g.direction === 'Inbound');
-        if (inbound && inbound.geometry) {
-          try {
-            const geom = JSON.parse(inbound.geometry);
-            if (geom.coordinates) {
-              r.path = geom.coordinates.map((c, i) => [c[1], c[0]]);
-              r.coordinates = geom.coordinates.map(c => ({ latitude: c[1], longitude: c[0] }));
-            }
-          } catch (e) {}
+      r.coordinates = [];
+      if (r.geometries && r.geometries.length > 0) {
+        const primary = r.geometries.find((g) => g.direction === 'Inbound') || r.geometries[0];
+        if (primary && primary.geometry && Array.isArray(primary.geometry.coordinates)) {
+          r.path = primary.geometry.coordinates.map((c) => [c[1], c[0]]);
+          r.coordinates = primary.geometry.coordinates.map((c) => ({ latitude: c[1], longitude: c[0] }));
+          if (primary.direction) r.direction = primary.direction;
         }
       }
-      if (!r.coordinates) r.coordinates = [];
 
       // Major roads
       const [roads] = await db.execute(
@@ -132,6 +139,21 @@ async function getRoutes(req, res, next) {
         [r.id]
       );
       r.majorRoads = roads.map((road) => road.name);
+
+      // Stops and Terminals
+      const [stops] = await db.execute(
+        `SELECT id, name, note, point_type, lat, lng FROM loading_points WHERE route_id = ?`,
+        [r.id]
+      );
+      r.stops = stops.map(s => ({ ...s, lat: parseFloat(s.lat), lng: parseFloat(s.lng) }));
+
+      const [terminals] = await db.execute(
+        `SELECT t.id, t.name, t.note, t.lat, t.lng FROM terminals t
+         JOIN route_terminals rt ON rt.terminal_id = t.id
+         WHERE rt.route_id = ? ORDER BY rt.seq`,
+        [r.id]
+      );
+      r.terminals = terminals.map(t => ({ ...t, lat: parseFloat(t.lat), lng: parseFloat(t.lng) }));
 
       // Estimate fare & travel time
       const km = Math.max(parseFloat(r.inbound_distance_km) || 0, parseFloat(r.outbound_distance_km) || 0);
@@ -812,6 +834,39 @@ async function extractRouteLocations(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ─────────────────────────────────────────────
+// SNAP-TO-ROAD (OSRM)
+// ─────────────────────────────────────────────
+async function snapToRoad(req, res, next) {
+  try {
+    const { waypoints } = req.body; // Array of [lat, lng] pairs
+    if (!waypoints || !Array.isArray(waypoints) || waypoints.length < 2) {
+      return res.status(400).json({ ok: false, error: 'At least 2 waypoints required' });
+    }
+
+    // Convert [lat, lng] to OSRM format [lng, lat] objects
+    const coords = waypoints.map(wp => ({
+      lon: Array.isArray(wp) ? wp[1] : wp.lng,
+      lat: Array.isArray(wp) ? wp[0] : wp.lat
+    }));
+
+    const result = await getRouteGeometry(coords);
+    if (!result || !result.coordinates) {
+      return res.status(400).json({ ok: false, error: 'OSRM routing failed - could not snap to roads' });
+    }
+
+    // OSRM returns [lng, lat], convert to [lat, lng] for Leaflet
+    const snappedPath = result.coordinates.map(c => [c[1], c[0]]);
+
+    res.json({
+      ok: true,
+      path: snappedPath,
+      distanceMeters: result.distanceMeters,
+      durationSeconds: result.durationSeconds
+    });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   login,
   getOverview,
@@ -822,6 +877,7 @@ module.exports = {
   getReports, updateReport, deleteReport,
   getActivity, logActivity,
   getRouteDirections, saveRouteDirections, generateGeometry, verifyRoute,
+  snapToRoad,
   // Location Verification
   getVerificationLocations, geocodeLocation, verifyLocation,
   createVerificationLocation, deleteVerificationLocation,

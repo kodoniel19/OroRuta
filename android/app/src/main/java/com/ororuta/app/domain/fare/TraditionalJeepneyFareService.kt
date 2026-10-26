@@ -189,12 +189,16 @@ object TraditionalJeepneyFareService {
             return null
         }
 
-        // Must board BEFORE drop-off along this directional path
-        if (bIdx >= dIdx || (dIdx - bIdx) < 2) {
-            return null
-        }
+        val isLoop = haversineMeters(
+            routePoints.first().latitude, routePoints.first().longitude,
+            routePoints.last().latitude, routePoints.last().longitude
+        ) < 1000.0
 
-        val polylineSegment = routePoints.subList(bIdx, dIdx + 1)
+        val polylineSegment = when {
+            bIdx < dIdx && (dIdx - bIdx) >= 1 -> routePoints.subList(bIdx, dIdx + 1)
+            bIdx > dIdx && isLoop -> routePoints.subList(bIdx, routePoints.size) + routePoints.subList(0, dIdx + 1)
+            else -> return null
+        }
         if (polylineSegment.size < 2) return null
 
         var totalMeters = 0.0

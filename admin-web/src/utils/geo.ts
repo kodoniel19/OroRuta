@@ -21,3 +21,14 @@ export function distanceKm(a: LatLng, b: LatLng): number {
   const h = sinDlat * sinDlat + Math.cos(lat1) * Math.cos(lat2) * sinDlng * sinDlng;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
+
+/** Compute total path distance in kilometers */
+export function pathDistanceKm(path: LatLng[]): number {
+  if (!path || path.length < 2) return 0;
+  let total = 0;
+  for (let i = 0; i < path.length - 1; i++) {
+    total += distanceKm(path[i], path[i + 1]);
+  }
+  return Number(total.toFixed(2));
+}
+
