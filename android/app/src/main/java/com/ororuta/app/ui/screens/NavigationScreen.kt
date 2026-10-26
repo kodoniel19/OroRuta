@@ -2,6 +2,7 @@ package com.ororuta.app.ui.screens
 
 import android.app.Activity
 import android.view.WindowManager
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -9,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -317,32 +319,41 @@ fun NavigationScreen(
                 }
 
                 // Horizontal Step Chips
+                val stepNames = listOf("Walk", "Wait", "Ride", "Alight", "Arrive")
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    legs.forEachIndexed { idx, _ ->
+                    legs.forEachIndexed { idx, leg ->
+                        val isActive = idx == viewModel.currentStepIndex
+                        val isDone = idx < viewModel.currentStepIndex
                         val (chipBg, chipTextColor) = when {
-                            idx < viewModel.currentStepIndex -> Pair(Ok50, Ok600)
-                            idx == viewModel.currentStepIndex -> Pair(Brand600, Color.White)
+                            isDone -> Pair(Ok50, Ok700)
+                            isActive -> Pair(Brand600, Color.White)
                             else -> Pair(Canvas, InkMuted)
                         }
+                        val stepLabel = stepNames.getOrElse(idx) { leg.title.take(6) }
 
                         Surface(
-                            shape = CircleShape,
+                            shape = RoundedCornerShape(10.dp),
                             color = chipBg,
-                            modifier = Modifier.height(28.dp)
+                            border = BorderStroke(1.dp, if (isActive) Brand600 else if (isDone) Ok600.copy(alpha = 0.35f) else Line),
+                            modifier = Modifier.height(30.dp)
                         ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.padding(horizontal = 12.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp)
                             ) {
+                                if (isDone) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = chipTextColor, modifier = Modifier.size(13.dp))
+                                }
                                 Text(
-                                    text = "Step ${idx + 1}",
+                                    text = "${idx + 1}. $stepLabel",
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.SemiBold,
                                     color = chipTextColor
                                 )
                             }
@@ -350,7 +361,7 @@ fun NavigationScreen(
                     }
                 }
 
-                // Contextual primary CTA
+                // Contextual primary CTA & Prev button
                 val ctaText = when {
                     viewModel.currentStepIndex >= legs.size - 1 -> "I've arrived"
                     currentStep.kind == "walk" && viewModel.currentStepIndex == 0 -> "I'm at the loading point"
@@ -360,13 +371,28 @@ fun NavigationScreen(
                     else -> "Next step"
                 }
 
-                OroButton(
-                    text = ctaText,
-                    onClick = { viewModel.nextStep() },
-                    variant = ButtonVariant.Primary,
-                    size = ButtonSize.Lg,
-                    fullWidth = true
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (viewModel.currentStepIndex > 0) {
+                        OroButton(
+                            text = "Prev",
+                            onClick = { viewModel.previousStep() },
+                            variant = ButtonVariant.Secondary,
+                            size = ButtonSize.Lg,
+                            icon = Icons.AutoMirrored.Filled.ArrowBack,
+                            modifier = Modifier.width(96.dp)
+                        )
+                    }
+                    OroButton(
+                        text = ctaText,
+                        onClick = { viewModel.nextStep() },
+                        variant = ButtonVariant.Primary,
+                        size = ButtonSize.Lg,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
                 // Footnote
                 Text(

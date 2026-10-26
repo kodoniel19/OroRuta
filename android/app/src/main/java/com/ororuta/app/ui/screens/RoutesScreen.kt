@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -13,18 +12,26 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ororuta.app.domain.fare.PassengerCategory
@@ -48,80 +55,166 @@ fun RoutesScreen(
         topBar = {
             Surface(
                 color = Color.White,
-                shadowElevation = 1.dp
+                shadowElevation = 1.dp,
+                border = BorderStroke(0.5.dp, Line)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)
                 ) {
-                    Text(
-                        text = "Jeepney routes",
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Ink,
-                        letterSpacing = (-0.5).sp
-                    )
-                    Text(
-                        text = "Official routes in Cagayan de Oro City",
-                        fontSize = 13.sp,
-                        color = InkMuted
-                    )
+                    // Header title row with transit badge
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Brand50),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DirectionsBus,
+                                contentDescription = null,
+                                tint = Brand600,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Jeepney routes",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Ink,
+                                letterSpacing = (-0.3).sp
+                            )
+                            Text(
+                                text = "Official routes in Cagayan de Oro City",
+                                fontSize = 12.sp,
+                                color = InkMuted
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Search field
-                    OutlinedTextField(
-                        value = viewModel.searchQuery,
-                        onValueChange = { newValue: String -> viewModel.onSearchChange(newValue) },
-                        placeholder = { Text("Search routes, stops, or landmarks…", fontSize = 13.sp) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = InkMuted) },
-                        trailingIcon = {
-                            if (viewModel.searchQuery.isNotBlank()) {
-                                IconButton(onClick = { viewModel.onSearchChange("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = InkMuted)
+                    // Modern mobility search bar (Google Maps / Grab style)
+                    var isSearchFocused by remember { mutableStateOf(false) }
+                    Surface(
+                        color = Canvas,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(
+                            width = if (isSearchFocused) 1.5.dp else 1.dp,
+                            color = if (isSearchFocused) Brand600 else Line
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = if (isSearchFocused) Brand600 else InkMuted,
+                                modifier = Modifier.size(20.dp)
+                            )
+
+                            Box(modifier = Modifier.weight(1f)) {
+                                if (viewModel.searchQuery.isEmpty()) {
+                                    Text(
+                                        text = "Search routes, stops, or landmarks...",
+                                        fontSize = 13.5.sp,
+                                        color = InkMuted
+                                    )
+                                }
+                                BasicTextField(
+                                    value = viewModel.searchQuery,
+                                    onValueChange = { viewModel.onSearchChange(it) },
+                                    singleLine = true,
+                                    textStyle = TextStyle(
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Ink
+                                    ),
+                                    cursorBrush = SolidColor(Brand600),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .onFocusChanged {
+                                            isSearchFocused = it.isFocused
+                                        }
+                                )
+                            }
+
+                            if (viewModel.searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { viewModel.onSearchChange("") },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear",
+                                        tint = InkMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Brand600,
-                            unfocusedBorderColor = Line,
-                            focusedContainerColor = Canvas,
-                            unfocusedContainerColor = Canvas
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Filter chips: All routes | Popular Routes | With updates
-                    val filterChips = listOf("All", "Popular", "Updated")
+                    // Polished pill-shaped filter chips with subtle icons
+                    val filterChips = listOf(
+                        Triple("All", "All routes", Icons.AutoMirrored.Filled.AltRoute),
+                        Triple("Popular", "Popular Routes", Icons.AutoMirrored.Filled.TrendingUp),
+                        Triple("Updated", "With updates", Icons.Default.Update)
+                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        filterChips.forEach { chip ->
-                            FilterChip(
-                                selected = viewModel.selectedFilter == chip,
-                                onClick = { viewModel.onFilterChange(chip) },
-                                modifier = Modifier.heightIn(min = 40.dp),
-                                label = {
+                        filterChips.forEach { (chipKey, label, icon) ->
+                            val isSelected = viewModel.selectedFilter == chipKey
+                            Surface(
+                                onClick = { viewModel.onFilterChange(chipKey) },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isSelected) Brand600 else Color.White,
+                                border = if (isSelected) null else BorderStroke(1.dp, Line),
+                                shadowElevation = if (isSelected) 1.dp else 0.dp,
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = if (isSelected) Color.White else InkMuted,
+                                        modifier = Modifier.size(13.dp)
+                                    )
                                     Text(
-                                        text = when (chip) {
-                                            "All" -> "All routes"
-                                            "Popular" -> "Popular Routes"
-                                            else -> "With updates"
-                                        },
+                                        text = label,
                                         fontSize = 12.sp,
-                                        fontWeight = if (viewModel.selectedFilter == chip) FontWeight.Bold else FontWeight.Medium
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else InkSoft
                                     )
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -137,7 +230,7 @@ fun RoutesScreen(
             when (state) {
                 is Resource.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Brand600)
+                        CircularProgressIndicator(color = Brand600, strokeWidth = 3.dp)
                     }
                 }
 
@@ -188,6 +281,12 @@ fun RoutesScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
+                                Icon(
+                                    imageVector = Icons.Default.SearchOff,
+                                    contentDescription = null,
+                                    tint = InkMuted,
+                                    modifier = Modifier.size(40.dp)
+                                )
                                 Text(
                                     text = "No routes found",
                                     fontSize = 16.sp,
@@ -203,20 +302,26 @@ fun RoutesScreen(
                         }
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                            contentPadding = PaddingValues(
+                                start = 12.dp,
+                                end = 12.dp,
+                                top = 8.dp,
+                                bottom = 12.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             item {
                                 Text(
                                     text = "${routes.size} routes found",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = InkMuted
+                                    color = InkMuted,
+                                    modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
                                 )
                             }
 
                             items(routes, key = { it.id }) { route ->
-                                RouteDirectoryRow(route = route, onClick = { onSelectRoute(route.id) })
+                                CompactRouteCard(route = route, onClick = { onSelectRoute(route.id) })
                             }
                         }
                     }
@@ -227,41 +332,53 @@ fun RoutesScreen(
 }
 
 @Composable
-fun RouteDirectoryRow(route: Route, onClick: () -> Unit) {
+fun CompactRouteCard(route: Route, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.975f else 1f,
-        animationSpec = spring(
-            dampingRatio = 0.75f,
-            stiffness = 800f
-        ),
-        label = "routeRowScale"
+        targetValue = if (isPressed) 0.98f else 1f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 800f),
+        label = "routeCardScale"
     )
     val elevation by animateDpAsState(
-        targetValue = if (isPressed) 0.5.dp else 1.5.dp,
-        label = "routeRowElevation"
+        targetValue = if (isPressed) 0.dp else 1.dp,
+        label = "routeCardElevation"
     )
+
+    // Precompute fare
+    val fareRes = remember(route) {
+        TraditionalJeepneyFareService.calculateFareForDistance(
+            distanceKm = if (route.lengthKm > 0) route.lengthKm else 4.0,
+            category = PassengerCategory.REGULAR,
+            jeepneyType = route.jeepneyType
+        )
+    }
 
     Surface(
         onClick = onClick,
         interactionSource = interactionSource,
         color = Color.White,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         shadowElevation = elevation,
-        border = BorderStroke(1.dp, Line),
         modifier = Modifier
             .fillMaxWidth()
             .scale(scale)
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            RouteBadge(code = route.code, colorHex = route.color, size = BadgeSize.Lg)
+            // Compact route badge — vertically centered in the card
+            Box(
+                modifier = Modifier.padding(top = 2.dp)
+            ) {
+                RouteBadge(code = route.code, colorHex = route.color, size = BadgeSize.Md)
+            }
 
+            // Route information column
             Column(modifier = Modifier.weight(1f)) {
+                // Route name + status
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -269,64 +386,84 @@ fun RouteDirectoryRow(route: Route, onClick: () -> Unit) {
                 ) {
                     Text(
                         text = route.name,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = Ink,
+                        lineHeight = 18.sp,
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     if (route.status != "Active") {
+                        Spacer(modifier = Modifier.width(6.dp))
                         StatusPill(status = route.status)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(2.dp))
 
+                // Origin → destination
                 Text(
                     text = "${route.origin} → ${route.destination}",
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     color = InkSoft,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Normal,
+                    lineHeight = 16.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
+                // Via roads
                 if (route.roads.isNotEmpty()) {
                     Text(
                         text = "Via " + route.roads.joinToString(", ") { it.name },
                         fontSize = 11.sp,
                         color = InkMuted,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 14.sp
                     )
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                val fareRes = remember(route) {
-                    TraditionalJeepneyFareService.calculateFareForDistance(
-                        distanceKm = if (route.lengthKm > 0) route.lengthKm else 4.0,
-                        category = PassengerCategory.REGULAR,
-                        jeepneyType = route.jeepneyType
-                    )
-                }
-
+                // Bottom info row: terminals · stops · fare
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // Terminals & stops
                     Text(
                         text = "${route.terminalCount} terminals · ${route.stopCount} stops",
                         fontSize = 11.sp,
                         color = InkMuted
                     )
+
+                    // Fare
                     if (fareRes.isAvailable) {
                         Text("·", fontSize = 11.sp, color = InkMuted)
                         Text(
-                            text = "₱${"%.2f".format(fareRes.regularFare)} (₱${"%.2f".format(fareRes.discountedFare)} disc)",
+                            text = "₱${"%.2f".format(fareRes.regularFare)}",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Bold,
+                            color = Brand600
+                        )
+                        Text(
+                            text = "(₱${"%.2f".format(fareRes.discountedFare)} disc)",
+                            fontSize = 10.sp,
                             color = Brand700
                         )
                     }
                 }
             }
+
+            // Chevron indicator
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Line,
+                modifier = Modifier
+                    .size(18.dp)
+                    .align(Alignment.CenterVertically)
+            )
         }
     }
 }

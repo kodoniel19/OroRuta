@@ -1247,36 +1247,74 @@ fun MapScreen(
                                         }
 
                                         // Route segments header
+                                        val cleanRouteName = remember(routeName, routeCode) {
+                                            routeName
+                                                .replace(Regex("^(Route\\s+)?$routeCode\\s*[-:–—]\\s*", RegexOption.IGNORE_CASE), "")
+                                                .trim()
+                                                .ifEmpty { routeName }
+                                        }
+
                                         if (trip.segments.size == 1 && firstSeg != null) {
                                             // Single-route trip
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
+                                                verticalAlignment = Alignment.Top
                                             ) {
                                                 Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    verticalAlignment = Alignment.Top,
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                     modifier = Modifier.weight(1f)
                                                 ) {
                                                     RouteBadge(code = routeCode, colorHex = routeColor, size = BadgeSize.Md)
                                                     Column {
                                                         Text(
-                                                            text = "Route $routeCode – $routeName",
+                                                            text = "Route $routeCode – $cleanRouteName",
                                                             fontSize = 14.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = Ink,
-                                                            maxLines = 1,
+                                                            maxLines = 2,
                                                             overflow = TextOverflow.Ellipsis
                                                         )
-                                                        if (trip.direction != null) {
-                                                            Text(
-                                                                text = trip.direction,
-                                                                fontSize = 12.sp,
-                                                                color = InkSoft,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis
-                                                            )
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                            modifier = Modifier.padding(top = 3.dp)
+                                                        ) {
+                                                            if (trip.direction != null) {
+                                                                Surface(
+                                                                    color = Canvas,
+                                                                    shape = RoundedCornerShape(4.dp),
+                                                                    border = BorderStroke(0.5.dp, Line)
+                                                                ) {
+                                                                    Text(
+                                                                        text = trip.direction,
+                                                                        fontSize = 11.sp,
+                                                                        fontWeight = FontWeight.SemiBold,
+                                                                        color = InkSoft,
+                                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                    )
+                                                                }
+                                                            }
+
+                                                            val matchType = trip.destinationMatchType.ifBlank {
+                                                                if (trip.transfers > 0) "Transfer Route"
+                                                                else if (trip.walkFromDropMeters <= 120) "Direct Route"
+                                                                else "Nearby Drop-off"
+                                                            }
+                                                            val isDirect = matchType.contains("Direct", ignoreCase = true)
+                                                            Surface(
+                                                                color = if (isDirect) Ok50 else Brand50,
+                                                                shape = RoundedCornerShape(4.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = if (isDirect) "🎯 Direct Route" else "📍 $matchType",
+                                                                    fontSize = 11.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = if (isDirect) Ok700 else Brand700,
+                                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                )
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -1329,8 +1367,12 @@ fun MapScreen(
                                             // Show route names
                                             Column(modifier = Modifier.padding(top = 4.dp)) {
                                                 trip.segments.forEach { seg ->
+                                                    val cleanSegName = seg.routeName
+                                                        .replace(Regex("^(Route\\s+)?${seg.code}\\s*[-:–—]\\s*", RegexOption.IGNORE_CASE), "")
+                                                        .trim()
+                                                        .ifEmpty { seg.routeName }
                                                     Text(
-                                                        text = "Route ${seg.code} – ${seg.routeName}",
+                                                        text = "Route ${seg.code} – $cleanSegName",
                                                         fontSize = 12.sp,
                                                         color = InkSoft,
                                                         maxLines = 1,
@@ -1349,66 +1391,105 @@ fun MapScreen(
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
                                             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-                                                // Walk to boarding stop
+                                                val boardM = if (trip.walkToBoardMeters > 0) trip.walkToBoardMeters else trip.walkMeters
+                                                val walkMins = Math.max(1, Math.round(boardM / 75.0).toInt())
+                                                val isNearby = boardM <= 200
+
+                                                // Boarding stop
                                                 Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    verticalAlignment = Alignment.Top,
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Default.DirectionsWalk,
                                                         contentDescription = null,
                                                         tint = Brand600,
-                                                        modifier = Modifier.size(16.dp)
+                                                        modifier = Modifier.size(16.dp).padding(top = 2.dp)
                                                     )
                                                     Column {
                                                         Text(
                                                             text = "Board at: ${trip.boardingName ?: "Nearest Stop"}",
-                                                            fontSize = 12.sp,
-                                                            fontWeight = FontWeight.SemiBold,
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Bold,
                                                             color = Ink
                                                         )
-                                                        if (trip.walkMeters > 0) {
-                                                            val distM = trip.walkMeters
-                                                            val distLabel = when {
-                                                                distM < 1000 -> "Walk $distM m to boarding stop"
-                                                                else -> "Walk ${"%.1f".format(distM / 1000.0)} km to boarding stop"
-                                                            }
-                                                            val walkMins = Math.max(1, Math.round(distM / 80.0).toInt())
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                            modifier = Modifier.padding(top = 2.dp)
+                                                        ) {
+                                                            val distLabel = if (boardM < 1000) "$boardM m" else "${"%.1f".format(boardM / 1000.0)} km"
                                                             Text(
-                                                                text = "$distLabel (~$walkMins min walk)",
+                                                                text = "Distance: $distLabel from your current location (~$walkMins min walk)",
                                                                 fontSize = 11.sp,
-                                                                fontWeight = FontWeight.Medium,
-                                                                color = Ok600
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = if (isNearby) Ok600 else InkSoft
                                                             )
+                                                            if (isNearby) {
+                                                                Surface(
+                                                                    color = Ok50,
+                                                                    shape = RoundedCornerShape(3.dp)
+                                                                ) {
+                                                                    Text(
+                                                                        text = "✓ Nearby",
+                                                                        fontSize = 9.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = Ok700,
+                                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                    )
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
 
                                                 // Dropoff info
                                                 if (!trip.dropoffName.isNullOrBlank()) {
-                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Spacer(modifier = Modifier.height(8.dp))
                                                     Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        verticalAlignment = Alignment.Top,
                                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Default.Place,
                                                             contentDescription = null,
                                                             tint = Bad600,
-                                                            modifier = Modifier.size(16.dp)
+                                                            modifier = Modifier.size(16.dp).padding(top = 2.dp)
                                                         )
-                                                        Text(
-                                                            text = "Alight at: ${trip.dropoffName}",
-                                                            fontSize = 12.sp,
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            color = Ink
-                                                        )
+                                                        Column {
+                                                            Text(
+                                                                text = "Alight at: ${trip.dropoffName}",
+                                                                fontSize = 12.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = Ink
+                                                            )
+                                                            val dropM = trip.walkFromDropMeters
+                                                            if (dropM in 1..60) {
+                                                                Text(
+                                                                    text = "Direct drop-off at destination",
+                                                                    fontSize = 11.sp,
+                                                                    fontWeight = FontWeight.SemiBold,
+                                                                    color = Ok600,
+                                                                    modifier = Modifier.padding(top = 1.dp)
+                                                                )
+                                                            } else if (dropM > 60) {
+                                                                val dropWalkMins = Math.max(1, Math.round(dropM / 75.0).toInt())
+                                                                val distLabel = if (dropM < 1000) "$dropM m" else "${"%.1f".format(dropM / 1000.0)} km"
+                                                                Text(
+                                                                    text = "Walk $distLabel from alighting stop to destination (~$dropWalkMins min walk)",
+                                                                    fontSize = 11.sp,
+                                                                    fontWeight = FontWeight.Medium,
+                                                                    color = InkSoft,
+                                                                    modifier = Modifier.padding(top = 1.dp)
+                                                                )
+                                                            }
+                                                        }
                                                     }
                                                 }
 
                                                 // Transfer info
-                                                if (!trip.transferName.isNullOrBlank()) {
-                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                if (trip.transfers > 0 && !trip.transferName.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(8.dp))
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -3086,59 +3167,18 @@ fun MapScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Inbound / Outbound Direction Filter Pills
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            FilterChip(
-                                selected = guidance.direction.equals("Inbound", ignoreCase = true),
-                                onClick = {
-                                    viewModel.setGuidanceDirection("Inbound", userLocation)
-                                },
-                                label = {
-                                    Text(
-                                        "Inbound (→ ${route.destination.take(15)})",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Brand50,
-                                    selectedLabelColor = Brand600
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    enabled = true,
-                                    selected = guidance.direction.equals("Inbound", ignoreCase = true),
-                                    borderColor = Line,
-                                    selectedBorderColor = Brand600
-                                )
-                            )
-
-                            FilterChip(
-                                selected = guidance.direction.equals("Outbound", ignoreCase = true),
-                                onClick = {
-                                    viewModel.setGuidanceDirection("Outbound", userLocation)
-                                },
-                                label = {
-                                    Text(
-                                        "Outbound (→ ${route.origin.take(15)})",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Brand50,
-                                    selectedLabelColor = Brand600
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    enabled = true,
-                                    selected = guidance.direction.equals("Outbound", ignoreCase = true),
-                                    borderColor = Line,
-                                    selectedBorderColor = Brand600
-                                )
-                            )
-                        }
+                        // Inbound / Outbound Direction Segmented Control
+                        OroSegmentedControl(
+                            items = listOf("Inbound", "Outbound"),
+                            selectedItem = if (guidance.direction.equals("Outbound", ignoreCase = true)) "Outbound" else "Inbound",
+                            onItemSelected = { dir ->
+                                viewModel.setGuidanceDirection(dir, userLocation)
+                            },
+                            itemLabel = { dir ->
+                                if (dir == "Inbound") "Inbound (→ ${route.destination.take(14)})" else "Outbound (→ ${route.origin.take(14)})"
+                            },
+                            itemIcon = { Icons.Default.AltRoute }
+                        )
 
                         Spacer(modifier = Modifier.height(10.dp))
 

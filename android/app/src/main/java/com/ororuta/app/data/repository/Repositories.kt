@@ -122,6 +122,7 @@ class TripRepository @Inject constructor(
             data class LocalCandidate(
                 val route: Route,
                 val direction: String,
+                val destMatchType: String,
                 val boardingName: String,
                 val boardingLat: Double,
                 val boardingLng: Double,
@@ -219,16 +220,21 @@ class TripRepository @Inject constructor(
                             jeepneyType = route.jeepneyType
                         )
 
-                        val dropPenalty = if (walkDrop > 200) Math.pow((walkDrop - 200.0) / 45.0, 1.35) * 3.5 else 0.0
-                        val boardPenalty = if (walkBoard > 350) Math.pow((walkBoard - 350.0) / 60.0, 1.2) * 2.0 else 0.0
-                        val directBonus = if (textMatch) 10.0 else 0.0
-                        val compositeScore = (walkMinutesToBoard * 1.8) + (walkMinutesFromDrop * 2.5) + (rideMinutes * 1.0) + (fareCalc.regularFare * 0.2) + dropPenalty + boardPenalty - directBonus
+                        val destMatchType = if (walkDrop <= 120) "Direct Route" else "Nearby Drop-off"
+                        val tierBase = if (walkDrop <= 120) {
+                            if (walkBoard <= 250) 0.0 else 2000.0
+                        } else if (walkDrop <= 500) {
+                            5000.0
+                        } else {
+                            20000.0
+                        }
+                        val compositeScore = tierBase + (walkDrop * 3.5) + (walkBoard * 1.5) + (rideMinutes * 1.0) + (fareCalc.regularFare * 0.1)
 
                         val bStop = route.stops.filter { !it.name.contains("Miami", ignoreCase = true) }.minByOrNull { haversine(coords[bIdx].first, coords[bIdx].second, it.lat, it.lng) }
                         val dStop = route.stops.filter { !it.name.contains("Miami", ignoreCase = true) }.minByOrNull { haversine(coords[dIdx].first, coords[dIdx].second, it.lat, it.lng) }
-                        val boardName = bStop?.name?.takeIf { haversine(coords[bIdx].first, coords[bIdx].second, bStop.lat, bStop.lng) <= 120 }
-                            ?: "Loading point on ${route.name.take(24)}"
-                        val dropName = dStop?.name?.takeIf { haversine(coords[dIdx].first, coords[dIdx].second, dStop.lat, dStop.lng) <= 120 }
+                        val boardName = bStop?.name?.takeIf { haversine(coords[bIdx].first, coords[bIdx].second, bStop.lat, bStop.lng) <= 150 }
+                            ?: "Loading point along corridor"
+                        val dropName = dStop?.name?.takeIf { haversine(coords[dIdx].first, coords[dIdx].second, dStop.lat, dStop.lng) <= 150 }
                             ?: (if (destination.isNotBlank()) "Stop near $destination" else "Drop-off stop")
 
                         val rideCoordsSlice = (bIdx..dIdx).map { listOf(coords[it].second, coords[it].first) }
@@ -237,6 +243,7 @@ class TripRepository @Inject constructor(
                             LocalCandidate(
                                 route = route,
                                 direction = dir,
+                                destMatchType = destMatchType,
                                 boardingName = boardName,
                                 boardingLat = coords[bIdx].first,
                                 boardingLng = coords[bIdx].second,
@@ -280,11 +287,13 @@ class TripRepository @Inject constructor(
                                 category = com.ororuta.app.domain.fare.PassengerCategory.REGULAR,
                                 jeepneyType = route.jeepneyType
                             )
-                            val compScore = (walkMinutes * 2.0) + rideMinutes + (fareCalc.regularFare * 0.2)
+                            val destMatchType = if (walkDrop <= 120) "Direct Route" else "Nearby Drop-off"
+                            val compScore = 5000.0 + (walkDrop * 3.5) + (walkBoard * 1.5) + (rideMinutes * 1.0) + (fareCalc.regularFare * 0.1)
                             candidateList.add(
                                 LocalCandidate(
                                     route = route,
                                     direction = "Inbound",
+                                    destMatchType = destMatchType,
                                     boardingName = bStop.first,
                                     boardingLat = bStop.second,
                                     boardingLng = bStop.third,
@@ -333,6 +342,11 @@ class TripRepository @Inject constructor(
                     destinationPlaceId = cand.route.id,
                     minutes = cand.totalMinutes,
                     walkMeters = cand.walkToBoardM + cand.walkFromDropM,
+                    walkToBoardMeters = cand.walkToBoardM,
+                    walkFromDropMeters = cand.walkFromDropM,
+                    destinationMatchType = cand.destMatchType,
+                    alightingDistanceMeters = cand.walkFromDropM,
+                    isNearbyBoarding = cand.walkToBoardM <= 200,
                     transfers = 0,
                     direction = cand.direction,
                     status = cand.route.status,

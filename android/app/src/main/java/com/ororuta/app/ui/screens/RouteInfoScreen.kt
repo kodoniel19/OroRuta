@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -654,46 +655,27 @@ fun RouteInfoScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        // Direction Tabs (Inbound / Outbound)
-                        val directions = if (route.directions.isNotEmpty()) {
-                            route.directions
-                        } else {
-                            listOf(
-                                RouteDirection("1", route.id, "Inbound", route.inboundDistanceKm, ""),
-                                RouteDirection("2", route.id, "Outbound", route.outboundDistanceKm, "")
-                            )
+                        // Direction Segmented Control (Inbound / Outbound)
+                        val directions = remember(route.directions) {
+                            if (route.directions.isNotEmpty()) {
+                                route.directions.map { it.direction }
+                            } else {
+                                listOf("Inbound", "Outbound")
+                            }
                         }
                         Surface(color = Color.White, modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                directions.forEach { dir ->
-                                    val isSelected = dir.direction.equals(selectedDirection, ignoreCase = true)
-                                    Surface(
-                                        shape = RoundedCornerShape(20.dp),
-                                        color = if (isSelected) Brand600 else Canvas,
-                                        border = BorderStroke(1.dp, if (isSelected) Brand600 else Line),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable { selectedDirection = dir.direction }
-                                    ) {
-                                        Row(
-                                            horizontalArrangement = Arrangement.Center,
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(vertical = 7.dp)
-                                        ) {
-                                            Text(
-                                                text = "${dir.direction} (${dir.distanceKm} km)",
-                                                color = if (isSelected) Color.White else Ink,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                fontSize = 12.sp
-                                            )
-                                        }
-                                    }
-                                }
+                            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                OroSegmentedControl(
+                                    items = directions,
+                                    selectedItem = selectedDirection,
+                                    onItemSelected = { selectedDirection = it },
+                                    itemLabel = { dir ->
+                                        val dirObj = route.directions.find { it.direction.equals(dir, ignoreCase = true) }
+                                        val distStr = if (dirObj != null && dirObj.distanceKm > 0) " (${dirObj.distanceKm} km)" else ""
+                                        "$dir$distStr"
+                                    },
+                                    itemIcon = { Icons.Default.AltRoute }
+                                )
                             }
                         }
 
@@ -1818,35 +1800,53 @@ private fun StepIndicatorTabs(
     onSelectStep: (Int) -> Unit
 ) {
     val steps = listOf(
-        1 to "1. Walk",
-        2 to "2. Wait",
-        3 to "3. Ride",
-        4 to "4. Alight",
-        5 to "5. Arrive"
+        Triple(1, "Walk", Icons.AutoMirrored.Filled.DirectionsWalk),
+        Triple(2, "Wait", Icons.Default.Schedule),
+        Triple(3, "Ride", Icons.Default.DirectionsBus),
+        Triple(4, "Alight", Icons.Default.Place),
+        Triple(5, "Arrive", Icons.Default.CheckCircle)
     )
 
-    Surface(color = Color.White, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        color = Color.White,
+        shadowElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            steps.forEach { (num, label) ->
+            steps.forEach { (num, label, icon) ->
                 val isActive = currentStep == num
                 val isDone = currentStep > num
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = when {
+
+                val animatedBg by animateColorAsState(
+                    targetValue = when {
                         isActive -> Brand600
-                        isDone -> Brand50
+                        isDone -> Ok50
                         else -> Canvas
                     },
+                    label = "stepBg"
+                )
+                val animatedColor by animateColorAsState(
+                    targetValue = when {
+                        isActive -> Color.White
+                        isDone -> Ok700
+                        else -> InkMuted
+                    },
+                    label = "stepColor"
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = animatedBg,
                     border = BorderStroke(
                         1.dp,
                         when {
                             isActive -> Brand600
-                            isDone -> Brand600.copy(alpha = 0.3f)
+                            isDone -> Ok600.copy(alpha = 0.35f)
                             else -> Line
                         }
                     ),
@@ -1855,20 +1855,35 @@ private fun StepIndicatorTabs(
                         .clickable { onSelectStep(num) }
                 ) {
                     Column(
-                        modifier = Modifier.padding(vertical = 6.dp),
+                        modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isDone) Icons.Default.Check else icon,
+                                contentDescription = null,
+                                tint = animatedColor,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "$num",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = animatedColor
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = label,
                             fontSize = 11.sp,
-                            fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            color = when {
-                                isActive -> Color.White
-                                isDone -> Brand700
-                                else -> InkMuted
-                            },
-                            maxLines = 1
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                            color = animatedColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }

@@ -33,6 +33,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.sp
 import com.ororuta.app.R
 import com.ororuta.app.domain.models.*
@@ -45,45 +48,104 @@ enum class BadgeSize { Sm, Md, Lg }
 enum class EmptyTone { Brand, Warn, Neutral }
 enum class StopKind { Terminal, Loading, Unloading, Transfer }
 
-// 1. OroRutaLogo
+// 1. OroRutaLogo — Uses the authentic official OroRuta App Icon (res/drawable/ororuta_app_icon.png)
 @Composable
 fun OroRutaLogo(
     size: Dp = 40.dp,
     tone: LogoTone = LogoTone.Brand,
     modifier: Modifier = Modifier
 ) {
-    val bg = if (tone == LogoTone.Brand) Brand700 else Color.White
-    val goldDot = Oro400
-    val mainDot = if (tone == LogoTone.Brand) Color.White else Brand700
-
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(size * (11f / 40f)))
-            .background(bg)
-            .border(
-                width = if (tone == LogoTone.Light) 1.5.dp else 1.dp,
-                color = if (tone == LogoTone.Light) Line else Color.White.copy(alpha = 0.18f),
-                shape = RoundedCornerShape(size * (11f / 40f))
-            ),
+            .clip(RoundedCornerShape(size * 0.20f)),
         contentAlignment = Alignment.Center
     ) {
+        Image(
+            painter = painterResource(id = R.drawable.ororuta_app_icon),
+            contentDescription = "OroRuta Official App Icon",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+// OroSegmentedControl for Inbound/Outbound and view switching
+@Composable
+fun <T> OroSegmentedControl(
+    items: List<T>,
+    selectedItem: T,
+    onItemSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    itemLabel: (T) -> String = { it.toString() },
+    itemIcon: ((T) -> ImageVector)? = null
+) {
+    Surface(
+        color = Canvas,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, Line),
+        modifier = modifier.fillMaxWidth()
+    ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(size * 0.12f),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(size * 0.28f)
-                    .clip(CircleShape)
-                    .background(goldDot)
-            )
-            Box(
-                modifier = Modifier
-                    .size(size * 0.28f)
-                    .clip(CircleShape)
-                    .background(mainDot)
-            )
+            items.forEach { item ->
+                val isSelected = item == selectedItem
+                val animatedBg by animateColorAsState(
+                    targetValue = if (isSelected) Color.White else Color.Transparent,
+                    animationSpec = tween(180),
+                    label = "segBg"
+                )
+                val animatedTextColor by animateColorAsState(
+                    targetValue = if (isSelected) Brand600 else InkSoft,
+                    animationSpec = tween(180),
+                    label = "segTextColor"
+                )
+                val animatedElevation by animateDpAsState(
+                    targetValue = if (isSelected) 2.dp else 0.dp,
+                    animationSpec = tween(180),
+                    label = "segElevation"
+                )
+
+                Surface(
+                    color = animatedBg,
+                    shadowElevation = animatedElevation,
+                    shape = RoundedCornerShape(9.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(9.dp))
+                        .clickable { onItemSelected(item) }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp, horizontal = 6.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (itemIcon != null) {
+                            val icon = itemIcon(item)
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = animatedTextColor,
+                                modifier = Modifier.size(16.dp).padding(end = 4.dp)
+                            )
+                        }
+                        Text(
+                            text = itemLabel(item),
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = animatedTextColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -687,6 +749,16 @@ fun TripCard(
         border = androidx.compose.foundation.BorderStroke(1.dp, Line)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            val firstSeg = trip.segments.firstOrNull()
+            val cleanRouteName = remember(firstSeg?.routeName, firstSeg?.code) {
+                val rName = firstSeg?.routeName ?: ""
+                val rCode = firstSeg?.code ?: ""
+                rName
+                    .replace(Regex("^(Route\\s+)?$rCode\\s*[-:–—]\\s*", RegexOption.IGNORE_CASE), "")
+                    .trim()
+                    .ifEmpty { rName }
+            }
+
             // Header: badges + direction + status
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -708,20 +780,54 @@ fun TripCard(
                             )
                         }
                     }
+
+                    if (trip.direction != null) {
+                        Surface(
+                            color = Canvas,
+                            shape = RoundedCornerShape(4.dp),
+                            border = androidx.compose.foundation.BorderStroke(0.5.dp, Line)
+                        ) {
+                            Text(
+                                text = trip.direction,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = InkSoft,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    val matchType = trip.destinationMatchType.ifBlank {
+                        if (trip.transfers > 0) "Transfer Route"
+                        else if (trip.walkFromDropMeters <= 120) "Direct Route"
+                        else "Nearby Drop-off"
+                    }
+                    val isDirect = matchType.contains("Direct", ignoreCase = true)
+                    Surface(
+                        color = if (isDirect) Ok50 else Brand50,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = if (isDirect) "🎯 Direct" else "📍 $matchType",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDirect) Ok700 else Brand700,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
                 StatusPill(status = trip.status)
             }
 
-            // Route name subtitle — formatted by backend as "Code: Origin ↔ Destination"
-            val firstSeg = trip.segments.firstOrNull()
-            if (firstSeg != null && firstSeg.routeName.isNotBlank()) {
-                Spacer(modifier = Modifier.height(3.dp))
+            // Route name subtitle
+            if (cleanRouteName.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = firstSeg.routeName,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = InkSoft,
-                    maxLines = 1,
+                    text = cleanRouteName,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Ink,
+                    maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
@@ -777,18 +883,15 @@ fun TripCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Subtitle stats: Walk & Transfers
-            val walkLabel = when {
-                trip.walkMeters < 50 -> "No significant walking"
-                trip.walkMeters < 1000 -> "${trip.walkMeters}m walk"
-                else -> "${".1f".let { fmt -> "%.${fmt}f".format(trip.walkMeters / 1000.0) }} km walk"
-            }
+            val boardM = if (trip.walkToBoardMeters > 0) trip.walkToBoardMeters else trip.walkMeters
+            val dropM = trip.walkFromDropMeters
             val transferLabel = if (trip.transfers == 0) "Direct route" else "${trip.transfers} transfer(s)"
             Text(
-                text = "$walkLabel · $transferLabel",
+                text = "${trip.totalKm} km ride · $transferLabel",
                 style = MaterialTheme.typography.bodySmall.copy(color = InkMuted)
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Mini timeline box
             Surface(
@@ -796,23 +899,48 @@ fun TripCard(
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (trip.boardingName != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Ok600))
-                            Text("Board at ${trip.boardingName}", fontSize = 12.sp, color = InkSoft, maxLines = 1)
+                        val walkMins = Math.max(1, Math.round(boardM / 75.0).toInt())
+                        val isNearby = boardM <= 200
+                        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(modifier = Modifier.padding(top = 4.dp).size(8.dp).clip(CircleShape).background(Ok600))
+                            Column {
+                                Text("Board at: ${trip.boardingName}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = "Distance: ${boardM}m (~$walkMins min walk)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isNearby) Ok600 else InkSoft
+                                    )
+                                    if (isNearby) {
+                                        Surface(color = Ok50, shape = RoundedCornerShape(2.dp)) {
+                                            Text("✓ Nearby", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Ok700, modifier = Modifier.padding(horizontal = 3.dp))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     if (trip.transferName != null) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(modifier = Modifier.size(8.dp).rotate(45f).background(Oro500))
-                            Text("Transfer at ${trip.transferName}", fontSize = 12.sp, color = InkSoft, maxLines = 1)
+                            Text("Transfer at: ${trip.transferName}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Oro700, maxLines = 1)
                         }
                     }
                     if (trip.dropoffName != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Bad600))
-                            Text("Get off at ${trip.dropoffName}", fontSize = 12.sp, color = InkSoft, maxLines = 1)
+                        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(modifier = Modifier.padding(top = 4.dp).size(8.dp).clip(CircleShape).background(Bad600))
+                            Column {
+                                Text("Alight at: ${trip.dropoffName}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Ink, maxLines = 1)
+                                if (dropM in 1..60) {
+                                    Text("Direct drop-off at destination", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Ok600)
+                                } else if (dropM > 60) {
+                                    val dropWalkMins = Math.max(1, Math.round(dropM / 75.0).toInt())
+                                    Text("Walk ${dropM}m to destination (~$dropWalkMins min walk)", fontSize = 11.sp, color = InkSoft)
+                                }
+                            }
                         }
                     }
                 }

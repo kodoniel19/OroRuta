@@ -12,6 +12,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,7 +42,7 @@ import java.net.URLEncoder
 
 sealed class BottomTab(val route: String, val title: String, val icon: ImageVector) {
     object Home : BottomTab("home", "Home", Icons.Default.Home)
-    object Routes : BottomTab("routes", "Routes", Icons.Default.AltRoute)
+    object Routes : BottomTab("routes", "Routes", Icons.AutoMirrored.Filled.AltRoute)
     object Map : BottomTab("map", "Map", Icons.Default.Map)
     object Saved : BottomTab("saved", "Saved", Icons.Default.Bookmark)
     object More : BottomTab("more", "More", Icons.Default.MoreHoriz)
@@ -225,11 +226,15 @@ fun OroRutaApp(initialRoute: String? = null) {
 
                 HomeScreen(
                     uiState = uiState,
+                    onNavigateSearch = { navController.navigate("search") },
                     onNavigateAnnouncements = { navController.navigate("announcements") },
                     onNavigateAnnouncementDetail = { id -> navController.navigate("announcement_detail/$id") },
                     onNavigateSaved = { navController.navigate("saved") },
                     onNavigateFare = { navController.navigate("fare") },
-                    onNavigateResults = { from, to -> navController.navigate("results?from=$from&to=$to&sort=time") }
+                    onNavigateResults = { from, to -> navController.navigate("results?from=$from&to=$to&sort=time") },
+                    onNavigateRoutes = { navController.navigate("routes") },
+                    onNavigateNearby = { navController.navigate("nearby") },
+                    onSelectRoute = { routeId -> navController.navigate("route_info/$routeId") }
                 )
             }
 
@@ -627,6 +632,34 @@ fun OroRutaApp(initialRoute: String? = null) {
                     onSelectLocation = { place ->
                         homeVm.setManualStart(place)
                         navController.popBackStack()
+                    }
+                )
+            }
+
+            composable(
+                "search?from={from}&to={to}",
+                arguments = listOf(
+                    navArgument("from") { defaultValue = "" },
+                    navArgument("to") { defaultValue = "" }
+                )
+            ) { backStack ->
+                val searchVm = hiltViewModel<SearchViewModel>()
+                val prefillFrom = backStack.arguments?.getString("from") ?: ""
+                val prefillTo = backStack.arguments?.getString("to") ?: ""
+                SearchScreen(
+                    viewModel = searchVm,
+                    prefillFrom = prefillFrom,
+                    prefillTo = prefillTo,
+                    onBack = { navController.popBackStack() },
+                    onSearchSubmit = { from, to, fLat, fLng, tLat, tLng ->
+                        val f = if (from.isNotBlank()) from else "Current Location"
+                        val latParams = if (fLat != null && fLng != null && tLat != null && tLng != null) {
+                            "&fromLat=$fLat&fromLng=$fLng&toLat=$tLat&toLng=$tLng"
+                        } else ""
+                        navController.navigate("results?from=$f&to=$to$latParams&sort=time")
+                    },
+                    onViewPlaceOnMap = { place ->
+                        navController.navigate("map")
                     }
                 )
             }

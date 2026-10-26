@@ -121,12 +121,6 @@ fun SplashScreen(
                 style = Stroke(width = 2.dp.toPx())
             )
 
-            // Subtle glowing transit nodes
-            drawCircle(
-                color = Oro400.copy(alpha = 0.12f),
-                radius = 120.dp.toPx(),
-                center = Offset(w * 0.5f, h * 0.42f)
-            )
         }
 
         // Center Content
@@ -137,21 +131,14 @@ fun SplashScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Logo with ambient aura and smooth scale/fade
+            // Official OroRuta Logo with smooth scale/fade
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .scale(logoScale.value)
                     .alpha(logoAlpha.value)
             ) {
-                // Subtle glowing halo
-                Box(
-                    modifier = Modifier
-                        .size(118.dp)
-                        .clip(CircleShape)
-                        .background(Oro400.copy(alpha = 0.12f))
-                )
-                OroRutaLogo(size = 96.dp, tone = LogoTone.Light)
+                OroRutaLogo(size = 104.dp, tone = LogoTone.Light)
             }
 
             Spacer(modifier = Modifier.height(28.dp))

@@ -159,7 +159,7 @@ async function resolvePlace(queryStr, lat, lng, isOrigin = true) {
  * Identify a friendly boarding or dropoff stop name near coordinates.
  */
 function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, loadingPointsList = []) {
-  // 1. Check verified loading points (strict <= 120m)
+  // 1. Check verified loading points (strict <= 250m)
   if (loadingPointsList && loadingPointsList.length > 0) {
     let closest = null, closestDist = Infinity;
     for (const lp of loadingPointsList) {
@@ -168,10 +168,10 @@ function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, 
         if (d < closestDist) { closestDist = d; closest = lp; }
       }
     }
-    if (closest && closestDist <= 120) return closest.name;
+    if (closest && closestDist <= 250) return closest.name;
   }
 
-  // 2. Check terminals (strict <= 150m)
+  // 2. Check terminals (strict <= 250m)
   if (terminalList && terminalList.length > 0) {
     let closest = null, closestDist = Infinity;
     for (const t of terminalList) {
@@ -180,7 +180,7 @@ function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, 
         if (d < closestDist) { closestDist = d; closest = t; }
       }
     }
-    if (closest && closestDist <= 150) return closest.name;
+    if (closest && closestDist <= 250) return closest.name;
   }
 
   // 3. Approximate by CDO street corridors
@@ -202,21 +202,19 @@ function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, 
     }
   }
 
-  return `${defaultPrefix} near ${fallbackLandmark}`;
+  return fallbackLandmark ? `${defaultPrefix} near ${fallbackLandmark}` : `${defaultPrefix} stop`;
 }
 
 /**
  * Geometric jeepney route finder.
  * Finds all genuine traditional routes from the database that pass near origin and destination,
- * ensuring correct direction of travel and valid walking distances.
+ * ensuring correct direction of travel, verified boarding and drop-off points, and tiered ranking.
  */
-/**
- * Geometric jeepney route finder.
- * Finds all genuine traditional routes from the database that pass near origin and destination,
- * ensuring correct direction of travel, optimal boarding/dropoff points, and valid walking distances.
- */
-async function findDirectJeepneyRoutes(origLat, origLng, destLat, destLng, originName, destName, allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints, maxWalkOrig = 850, maxWalkDest = 750) {
-  const directDistM = haversineMeters(origLat, origLng, destLat, destLng);
+async function findDirectJeepneyRoutes(
+  origLat, origLng, destLat, destLng, originName, destName,
+  allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints, allRouteTerminals = [],
+  maxWalkOrig = 850, maxWalkDest = 750
+) {
   const fareConfig = await getDynamicFareConfig();
 
   const geoByRoute = {};
@@ -225,139 +223,162 @@ async function findDirectJeepneyRoutes(origLat, origLng, destLat, destLng, origi
     geoByRoute[g.route_id].push(g);
   }
 
-  const dirByRoute = {};
-  for (const d of allDirs) {
-    if (!dirByRoute[d.route_id]) dirByRoute[d.route_id] = {};
-    dirByRoute[d.route_id][d.direction] = d;
+  const termsByRoute = {};
+  for (const rt of (allRouteTerminals || [])) {
+    if (!termsByRoute[rt.route_id]) termsByRoute[rt.route_id] = [];
+    termsByRoute[rt.route_id].push(rt);
+  }
+
+  const lpsByRoute = {};
+  for (const lp of (allLoadingPoints || [])) {
+    if (!lpsByRoute[lp.route_id]) lpsByRoute[lp.route_id] = [];
+    lpsByRoute[lp.route_id].push(lp);
   }
 
   const candidates = [];
 
   for (const r of allRoutes) {
     const geos = geoByRoute[r.id] || [];
-    const dirMap = dirByRoute[r.id] || {};
+    const rTerms = termsByRoute[r.id] || [];
+    const rLps = lpsByRoute[r.id] || [];
 
     for (const g of geos) {
-      const direction = g.direction;
+      const direction = g.direction || "Inbound";
+      const isOutbound = direction.toLowerCase() === 'outbound';
       let geom = g.geometry;
       if (typeof geom === "string") {
         try { geom = JSON.parse(geom); } catch (_) { geom = null; }
       }
       if (!geom || !geom.coordinates || geom.coordinates.length < 2) continue;
-
       const coords = geom.coordinates; // [[lng, lat], ...]
 
-      // 1. Collect all candidate boarding indices within maxWalkOrig
-      const origCandidates = [];
-      for (let i = 0; i < coords.length; i++) {
-        const d = haversineMeters(origLat, origLng, coords[i][1], coords[i][0]);
-        if (d <= maxWalkOrig) {
-          origCandidates.push({ idx: i, dist: d });
-        }
-      }
-      if (origCandidates.length === 0) continue;
+      // Identify route terminals for this direction
+      const depTerm = rTerms.find(t => t.seq === (isOutbound ? 2 : 1)) || rTerms[0];
+      const arrTerm = rTerms.find(t => t.seq === (isOutbound ? 1 : 2)) || rTerms[rTerms.length - 1];
 
-      // 2. Collect all candidate dropoff indices within maxWalkDest
-      const destCandidates = [];
+      // 1. Find optimal drop-off point along geometry near destination
+      let bestDestIdx = -1;
+      let minDestDist = Infinity;
       for (let i = 0; i < coords.length; i++) {
         const d = haversineMeters(destLat, destLng, coords[i][1], coords[i][0]);
-        if (d <= maxWalkDest) {
-          destCandidates.push({ idx: i, dist: d });
-        }
-      }
-      if (destCandidates.length === 0) continue;
-
-      // 3. Find the best valid pair where boarding is BEFORE dropoff
-      let bestPair = null;
-      let minPairCost = Infinity;
-
-      for (const o of origCandidates) {
-        for (const d of destCandidates) {
-          // Direction check: Must board BEFORE dropoff with minimum progression along route
-          if (o.idx >= d.idx || (d.idx - o.idx) < 3) continue;
-
-          // Estimate ride distance between these coordinates
-          const rideCoords = coords.slice(o.idx, d.idx + 1);
-          const rideDistMeters = calculatePolylineMeters(rideCoords);
-
-          // Must be a meaningful transit ride (at least 300 meters)
-          if (rideDistMeters < 300) continue;
-
-          // Reject extreme detours for very short direct trips
-          if (directDistM < 1600 && rideDistMeters > directDistM * 2.8) continue;
-
-          // Score this pair: strongly prioritize shortest walking distance (especially dropoff walk)
-          const pairCost = (o.dist * 1.2) + (d.dist * 2.2) + (rideDistMeters / 400.0);
-          if (pairCost < minPairCost) {
-            minPairCost = pairCost;
-            bestPair = {
-              origIdx: o.idx,
-              destIdx: d.idx,
-              rideCoords,
-              rideDistMeters,
-              walkToBoardM: Math.round(o.dist),
-              walkFromDropM: Math.round(d.dist)
-            };
-          }
+        if (d < minDestDist) {
+          minDestDist = d;
+          bestDestIdx = i;
         }
       }
 
-      if (!bestPair) continue;
+      // Check distance to arrival terminal
+      const arrTermDist = arrTerm ? haversineMeters(destLat, destLng, arrTerm.lat, arrTerm.lng) : Infinity;
 
-      const { origIdx, destIdx, rideCoords, rideDistMeters, walkToBoardM, walkFromDropM } = bestPair;
+      // Must be within maxWalkDest of destination
+      if (minDestDist > maxWalkDest && arrTermDist > maxWalkDest) continue;
+
+      let dropoffCoord = [coords[bestDestIdx][0], coords[bestDestIdx][1]];
+      let walkFromDropM = Math.round(minDestDist);
+      let dropoffName = "";
+      let destMatchType = "Nearby Drop-off";
+
+      // If arrival terminal is within 250m of destination and route terminates near it
+      if (arrTerm && arrTermDist <= 250) {
+        dropoffCoord = [arrTerm.lng, arrTerm.lat];
+        walkFromDropM = Math.round(arrTermDist);
+        dropoffName = arrTerm.name;
+        if (walkFromDropM <= 120) destMatchType = "Direct Route";
+      } else {
+        // Check closest verified loading point
+        let closestLp = null, closestLpDist = Infinity;
+        for (const lp of rLps) {
+          const d = haversineMeters(coords[bestDestIdx][1], coords[bestDestIdx][0], lp.lat, lp.lng);
+          if (d < closestLpDist) { closestLpDist = d; closestLp = lp; }
+        }
+        if (closestLp && closestLpDist <= 200) {
+          dropoffCoord = [closestLp.lng, closestLp.lat];
+          walkFromDropM = Math.round(haversineMeters(destLat, destLng, closestLp.lat, closestLp.lng));
+          dropoffName = closestLp.name;
+        } else {
+          dropoffName = findStopLabel(coords[bestDestIdx][1], coords[bestDestIdx][0], "Drop-off stop", destName, allTerminals, rLps);
+        }
+        if (walkFromDropM <= 120) destMatchType = "Direct Route";
+      }
+
+      // 2. Find optimal boarding point that occurs BEFORE bestDestIdx along the route
+      let bestOrigIdx = -1;
+      let minOrigDist = Infinity;
+      for (let i = 0; i < bestDestIdx; i++) {
+        const d = haversineMeters(origLat, origLng, coords[i][1], coords[i][0]);
+        if (d < minOrigDist) {
+          minOrigDist = d;
+          bestOrigIdx = i;
+        }
+      }
+
+      // Must be within maxWalkOrig of origin
+      if (bestOrigIdx === -1 || minOrigDist > maxWalkOrig) continue;
+
+      // Ride distance along route geometry
+      const rideCoords = coords.slice(bestOrigIdx, bestDestIdx + 1);
+      const rideDistMeters = calculatePolylineMeters(rideCoords);
+      if (rideDistMeters < 300) continue;
+
+      let boardingCoord = [coords[bestOrigIdx][0], coords[bestOrigIdx][1]];
+      let walkToBoardM = Math.round(minOrigDist);
+      let boardingName = "";
+
+      // Check if departure terminal is within 250m and boarding is near start of route
+      const depTermDist = depTerm ? haversineMeters(origLat, origLng, depTerm.lat, depTerm.lng) : Infinity;
+      if (depTerm && depTermDist <= 250 && bestOrigIdx <= 3) {
+        boardingCoord = [depTerm.lng, depTerm.lat];
+        walkToBoardM = Math.round(depTermDist);
+        boardingName = depTerm.name;
+      } else {
+        let closestLp = null, closestLpDist = Infinity;
+        for (const lp of rLps) {
+          const d = haversineMeters(coords[bestOrigIdx][1], coords[bestOrigIdx][0], lp.lat, lp.lng);
+          if (d < closestLpDist) { closestLpDist = d; closestLp = lp; }
+        }
+        if (closestLp && closestLpDist <= 200) {
+          boardingCoord = [closestLp.lng, closestLp.lat];
+          walkToBoardM = Math.round(haversineMeters(origLat, origLng, closestLp.lat, closestLp.lng));
+          boardingName = closestLp.name;
+        } else {
+          boardingName = findStopLabel(coords[bestOrigIdx][1], coords[bestOrigIdx][0], "Loading point", originName, allTerminals, rLps);
+        }
+      }
+
       const totalWalkM = walkToBoardM + walkFromDropM;
-
-      const rideKm = Math.round((rideDistMeters / 1000) * 10) / 10 || 0.4;
+      const rideKm = Math.round((rideDistMeters / 1000) * 10) / 10 || 0.5;
       const walkMinutesToBoard = Math.max(1, Math.round(walkToBoardM / 75));
       const walkMinutesFromDrop = Math.max(1, Math.round(walkFromDropM / 75));
       const walkMinutes = walkMinutesToBoard + walkMinutesFromDrop;
-      const rideMinutes = Math.max(3, Math.round((rideKm / 18) * 60)); // ~18 km/h typical CDO jeepney speed
+      const rideMinutes = Math.max(3, Math.round((rideKm / 18) * 60));
       const totalMinutes = walkMinutes + rideMinutes;
 
       const fareRes = calculateTraditionalFare(rideKm, "Regular", r.jeepney_type, fareConfig);
       const regularFare = fareRes.regularFare;
       const discountFare = fareRes.discountedFare;
 
-      const boardingCoord = [rideCoords[0][0], rideCoords[0][1]]; // [lng, lat]
-      const dropoffCoord = [rideCoords[rideCoords.length - 1][0], rideCoords[rideCoords.length - 1][1]];
-
-      const routeLps = (allLoadingPoints || []).filter(lp => lp.route_id === r.id);
-      const boardingName = findStopLabel(boardingCoord[1], boardingCoord[0], "Loading point", originName, allTerminals, routeLps);
-      const dropoffName = findStopLabel(dropoffCoord[1], dropoffCoord[0], "Drop-off stop", destName, allTerminals, routeLps);
-
-      // Direct service bonus: check if route explicitly serves destination by name
-      const cleanDest = (destName || "").toLowerCase();
-      let directServiceBonus = 0;
-      if (cleanDest && cleanDest.length > 2) {
-        const rName = (r.name || "").toLowerCase();
-        const rDest = (r.destination || "").toLowerCase();
-        const rOrig = (r.origin || "").toLowerCase();
-        const rDesc = (r.description || "").toLowerCase();
-        if (rDest.includes(cleanDest) || rName.includes(cleanDest) || rOrig.includes(cleanDest) || rDesc.includes(cleanDest)) {
-          directServiceBonus = 12.0; // Significant boost for officially serving the destination
-        } else {
-          const tokens = cleanDest.split(/\s+/).filter(t => t.length > 3 && !["market", "terminal", "mall", "hospital", "line"].includes(t));
-          if (tokens.some(t => rDest.includes(t) || rName.includes(t))) {
-            directServiceBonus = 8.0;
-          }
-        }
+      // Tiered Ranking:
+      // Tier 1: Direct Route (dropoff <= 120m) AND passenger is near boarding point (<= 250m) -> Tier base = 0
+      // Tier 2: Direct Route (dropoff <= 120m) AND longer walk to board (> 250m) -> Tier base = 2000
+      // Tier 3: Nearby Drop-off (120m < dropoff <= 500m) -> Tier base = 5000
+      // Tier 5: Less convenient alternatives (> 500m) -> Tier base = 20000
+      let tierBase = 5000;
+      if (destMatchType === "Direct Route") {
+        tierBase = (walkToBoardM <= 250) ? 0 : 2000;
+      } else if (walkFromDropM > 500) {
+        tierBase = 20000;
       }
 
-      // Dropoff penalty: steep disutility when dropoff walk exceeds 200m
-      const dropoffPenalty = walkFromDropM > 200 ? Math.pow((walkFromDropM - 200) / 45, 1.35) * 3.5 : 0;
-      // Boarding penalty for walking > 350m to board
-      const boardingPenalty = walkToBoardM > 350 ? Math.pow((walkToBoardM - 350) / 60, 1.2) * 2.0 : 0;
-
-      // Composite convenience score: Generalized Travel Cost (lower is better)
-      const compositeScore = (walkMinutesToBoard * 1.8) + (walkMinutesFromDrop * 2.5) + (rideMinutes * 1.0) + (regularFare * 0.2) + dropoffPenalty + boardingPenalty - directServiceBonus;
+      const compositeScore = tierBase + (walkFromDropM * 3.5) + (walkToBoardM * 1.5) + (rideMinutes * 1.0) + (regularFare * 0.1);
 
       candidates.push({
         type: "direct",
         transfers: 0,
         route: r,
         direction,
-        origIdx,
-        destIdx,
+        destMatchType,
+        origIdx: bestOrigIdx,
+        destIdx: bestDestIdx,
         rideCoords,
         rideDistMeters,
         rideKm,
@@ -375,8 +396,7 @@ async function findDirectJeepneyRoutes(origLat, origLng, destLat, destLng, origi
         boardingCoord,
         dropoffCoord,
         boardingName,
-        dropoffName,
-        streetSequence: dirMap[direction]?.street_sequence || ""
+        dropoffName
       });
     }
   }
@@ -387,7 +407,10 @@ async function findDirectJeepneyRoutes(origLat, origLng, destLat, destLng, origi
 /**
  * Finds valid multi-jeepney journeys with 1 transfer when a direct route is unavailable or suboptimal.
  */
-async function findTransferJeepneyRoutes(origLat, origLng, destLat, destLng, originName, destName, allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints) {
+async function findTransferJeepneyRoutes(
+  origLat, origLng, destLat, destLng, originName, destName,
+  allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints, allRouteTerminals = []
+) {
   const directDistM = haversineMeters(origLat, origLng, destLat, destLng);
   const fareConfig = await getDynamicFareConfig();
   const transferCandidates = [];
@@ -405,7 +428,7 @@ async function findTransferJeepneyRoutes(origLat, origLng, destLat, destLng, ori
     // Find Leg 1 candidates: Origin -> Hub
     const leg1Candidates = await findDirectJeepneyRoutes(
       origLat, origLng, hub.lat, hub.lng, originName, hub.name,
-      allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints,
+      allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints, allRouteTerminals,
       850, 300
     );
     if (!leg1Candidates.length) continue;
@@ -413,7 +436,7 @@ async function findTransferJeepneyRoutes(origLat, origLng, destLat, destLng, ori
     // Find Leg 2 candidates: Hub -> Destination
     const leg2Candidates = await findDirectJeepneyRoutes(
       hub.lat, hub.lng, destLat, destLng, hub.name, destName,
-      allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints,
+      allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints, allRouteTerminals,
       300, 750
     );
     if (!leg2Candidates.length) continue;
@@ -445,14 +468,14 @@ async function findTransferJeepneyRoutes(origLat, origLng, destLat, destLng, ori
         const regularFare = fare1.regularFare + fare2.regularFare;
         const discountFare = fare1.discountedFare + fare2.discountedFare;
 
-        const dropoffPenalty = l2.walkFromDropM > 200 ? Math.pow((l2.walkFromDropM - 200) / 45, 1.35) * 3.5 : 0;
-        // Transfer penalty: reflects changing vehicles, extra wait, and road crossing
-        const compositeScore = (l1.walkMinutesToBoard * 1.8) + (l2.walkMinutesFromDrop * 2.5) + (l1.rideMinutes + l2.rideMinutes) + (regularFare * 0.2) + 16.0 + dropoffPenalty;
+        // Tier 4: Practical transfers base score = 10000
+        const compositeScore = 10000 + (l2.walkFromDropM * 3.5) + (l1.walkToBoardM * 1.5) + (transferWalkM * 2.0) + ((l1.rideMinutes + l2.rideMinutes) * 1.0) + (regularFare * 0.1);
 
         transferCandidates.push({
           type: "transfer",
           transfers: 1,
           hub,
+          destMatchType: "Transfer Route",
           transferWalkM,
           leg1: l1,
           leg2: l2,
@@ -506,19 +529,24 @@ async function search(req, res, next) {
     );
     const [allGeos] = await db.execute("SELECT route_id, direction, geometry FROM route_geometry");
     const [allDirs] = await db.execute("SELECT route_id, direction, distance_km, street_sequence FROM route_directions");
-    const [allTerminals] = await db.execute("SELECT id, name, lat, lng FROM terminals");
-    const [allLoadingPoints] = await db.execute("SELECT id, name, note, point_type, lat, lng FROM loading_points WHERE lat != 0 AND lng != 0");
+    const [allTerminals] = await db.execute("SELECT id, name, lat, lng FROM terminals WHERE lat != 0 AND lng != 0");
+    const [allRouteTerminals] = await db.execute(
+      "SELECT rt.route_id, rt.terminal_id, rt.seq, t.name, t.lat, t.lng FROM route_terminals rt JOIN terminals t ON rt.terminal_id = t.id WHERE t.lat != 0 AND t.lng != 0 ORDER BY rt.seq"
+    );
+    const [allLoadingPoints] = await db.execute(
+      "SELECT id, route_id, name, note, point_type, lat, lng FROM loading_points WHERE lat != 0 AND lng != 0"
+    );
 
     // 1. Direct candidates
     const directCandidates = await findDirectJeepneyRoutes(
       oLat, oLng, dLat, dLng, originPlace.name, destPlace.name,
-      allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints
+      allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints, allRouteTerminals
     );
 
     // 2. Transfer candidates (multi-jeepney journeys)
     const transferCandidates = await findTransferJeepneyRoutes(
       oLat, oLng, dLat, dLng, originPlace.name, destPlace.name,
-      allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints
+      allRoutes, allGeos, allDirs, allTerminals, allLoadingPoints, allRouteTerminals
     );
 
     // Filter direct candidates: If some direct candidates drop passenger close (<= 300m),
@@ -554,9 +582,9 @@ async function search(req, res, next) {
     }
 
     // Sort according to requested criterion:
-    // When ranking recommendations, compositeScore represents overall journey convenience,
-    // prioritizing nearest boarding point, shortest walking distance, correct jeepney route,
-    // proximity to destination, and minimal transfers.
+    // compositeScore represents overall journey convenience,
+    // prioritizing direct destination arrival, nearest boarding point, shortest walking distance,
+    // and minimal transfers.
     combined.sort((a, b) => {
       if (sort === "fare") {
         return a.regularFare - b.regularFare || a.compositeScore - b.compositeScore;
@@ -626,6 +654,11 @@ async function search(req, res, next) {
           minutes: c.totalMinutes,
           transfers: 0,
           walk_meters: c.totalWalkM,
+          walk_to_board_meters: c.walkToBoardM,
+          walk_from_drop_meters: c.walkFromDropM,
+          alighting_distance_meters: c.walkFromDropM,
+          destination_match_type: c.destMatchType,
+          is_nearby_boarding: c.walkToBoardM <= 200,
           walk_minutes: c.walkMinutes,
           totalKm: c.rideKm,
           regularFare: c.regularFare,
@@ -655,7 +688,7 @@ async function search(req, res, next) {
               route_id: r.id,
               seq: 1,
               code: r.code,
-              route_name: `${r.code}: ${r.origin} ↔ ${r.destination}`,
+              route_name: r.name,
               color: r.color,
               jeepney_type: r.jeepney_type || "Traditional",
               route_status: r.status || "Active",
@@ -784,6 +817,11 @@ async function search(req, res, next) {
           minutes: c.totalMinutes,
           transfers: 1,
           walk_meters: c.totalWalkM,
+          walk_to_board_meters: l1.walkToBoardM,
+          walk_from_drop_meters: l2.walkFromDropM,
+          alighting_distance_meters: l2.walkFromDropM,
+          destination_match_type: "Transfer Route",
+          is_nearby_boarding: l1.walkToBoardM <= 200,
           walk_minutes: c.walkMinutes,
           totalKm: c.totalKm,
           regularFare: c.regularFare,

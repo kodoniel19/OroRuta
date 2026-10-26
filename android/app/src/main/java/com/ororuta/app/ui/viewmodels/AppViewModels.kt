@@ -495,6 +495,19 @@ class NavigationViewModel @Inject constructor(
         }
     }
 
+    fun previousStep() {
+        if (currentStepIndex > 0) {
+            currentStepIndex--
+            val t = trip
+            if (t != null && t.legs.isNotEmpty()) {
+                val remainingLegs = t.legs.drop(currentStepIndex)
+                remainingMinutes = maxOf(1, remainingLegs.sumOf { it.minutes })
+                val remainingM = remainingLegs.sumOf { it.distanceM }
+                remainingDistanceKm = Math.round((remainingM / 1000.0) * 10.0) / 10.0
+            }
+        }
+    }
+
     private fun recordCompletion() {
         viewModelScope.launch {
             tripRepo.recordCompleted(trip?.id)
