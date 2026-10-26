@@ -366,9 +366,9 @@ fun RouteInfoScreen(
                         if (routeGeomPts.isNotEmpty()) {
                             val endP = routeGeomPts.last()
                             val terminusName = if (isOutbound) {
-                                "${route.origin} Terminal"
+                                if (route.origin.endsWith("Market", ignoreCase = true) || route.origin.endsWith("Evangelista", ignoreCase = true) || route.origin.endsWith("Terminal", ignoreCase = true)) route.origin else "${route.origin} Terminal"
                             } else {
-                                "${route.destination} Terminal"
+                                if (route.destination.endsWith("Market", ignoreCase = true) || route.destination.endsWith("Evangelista", ignoreCase = true) || route.destination.endsWith("Terminal", ignoreCase = true)) route.destination else "${route.destination} Terminal"
                             }
                             val hasEnd = list.any { computeDistanceMeters(it.lat, it.lng, endP.latitude, endP.longitude) < 80.0 }
                             if (!hasEnd) {
@@ -396,8 +396,9 @@ fun RouteInfoScreen(
                             candidateDropoffStops.lastOrNull()
                         } ?: if (routeGeomPts.isNotEmpty()) {
                             val p = routeGeomPts.last()
-                            val endName = if (isOutbound) route.origin else route.destination
-                            RouteStopPoint("end_${selectedDirection.lowercase()}", "$endName Terminal", "terminal", p.latitude, p.longitude, "Route Corridor Drop-off")
+                            val endTitle = if (isOutbound) route.origin else route.destination
+                            val endName = if (endTitle.endsWith("Market", ignoreCase = true) || endTitle.endsWith("Evangelista", ignoreCase = true) || endTitle.endsWith("Terminal", ignoreCase = true)) endTitle else "$endTitle Terminal"
+                            RouteStopPoint("end_${selectedDirection.lowercase()}", endName, "terminal", p.latitude, p.longitude, "Route Corridor Drop-off")
                         } else {
                             RouteStopPoint("dest_default", route.destination, "terminal", 8.4822, 124.6472, "CDO Destination")
                         }
@@ -445,9 +446,9 @@ fun RouteInfoScreen(
                             val hasStart = list.any { computeDistanceMeters(it.lat, it.lng, startP.latitude, startP.longitude) < 80.0 }
                             if (!hasStart) {
                                 val startName = if (isOutbound) {
-                                    "${route.destination} Departure Terminal"
+                                    if (route.destination.endsWith("Market", ignoreCase = true) || route.destination.endsWith("Evangelista", ignoreCase = true) || route.destination.endsWith("Terminal", ignoreCase = true)) route.destination else "${route.destination} Departure Terminal"
                                 } else {
-                                    "${route.origin} Terminal / Origin"
+                                    if (route.origin.endsWith("Market", ignoreCase = true) || route.origin.endsWith("Evangelista", ignoreCase = true) || route.origin.endsWith("Terminal", ignoreCase = true)) route.origin else "${route.origin} Terminal / Origin"
                                 }
                                 list.add(0, RouteStopPoint("origin_start_${selectedDirection.lowercase()}", startName, "terminal", startP.latitude, startP.longitude, "Route Origin"))
                             }
@@ -479,29 +480,15 @@ fun RouteInfoScreen(
                             } else {
                                 candidateBoardingStops.firstOrNull() ?: RouteStopPoint("start_${selectedDirection.lowercase()}", "Boarding Point", "loading", routeGeomPts.first().latitude, routeGeomPts.first().longitude, "Route Origin")
                             }
-                        } else if (userLocation != null && candidateBoardingStops.isNotEmpty()) {
-                            val eligibleStops = candidateBoardingStops.filter { s ->
-                                if (routeGeomPts.isNotEmpty() && dropoffIdx > 0) {
-                                    val sIdx = routeGeomPts.indices.minByOrNull { computeDistanceMeters(routeGeomPts[it].latitude, routeGeomPts[it].longitude, s.lat, s.lng) } ?: 0
-                                    sIdx < dropoffIdx
-                                } else true
-                            }
-                            val nearest = eligibleStops.minByOrNull {
-                                computeDistanceMeters(userLocation!!.latitude, userLocation!!.longitude, it.lat, it.lng)
-                            }
-                            if (nearest != null && computeDistanceMeters(userLocation!!.latitude, userLocation!!.longitude, nearest.lat, nearest.lng) <= 1500.0) {
-                                nearest
+                        } else {
+                            candidateBoardingStops.firstOrNull() ?: if (routeGeomPts.isNotEmpty()) {
+                                val p = routeGeomPts.first()
+                                val originTitle = if (isOutbound) route.destination else route.origin
+                                val startTitle = if (originTitle.endsWith("Market", ignoreCase = true) || originTitle.endsWith("Evangelista", ignoreCase = true) || originTitle.endsWith("Terminal", ignoreCase = true)) originTitle else "$originTitle Terminal"
+                                RouteStopPoint("start_${selectedDirection.lowercase()}", startTitle, "terminal", p.latitude, p.longitude, "Route Corridor Boarding")
                             } else {
-                                candidateBoardingStops.firstOrNull()
+                                RouteStopPoint("default", route.origin, "terminal", 8.4822, 124.6472, "CDO Corridor")
                             }
-                        } else {
-                            candidateBoardingStops.firstOrNull()
-                        } ?: if (routeGeomPts.isNotEmpty()) {
-                            val p = routeGeomPts.first()
-                            val originTitle = if (isOutbound) route.destination else route.origin
-                            RouteStopPoint("start_${selectedDirection.lowercase()}", "$originTitle Terminal", "terminal", p.latitude, p.longitude, "Route Corridor Boarding")
-                        } else {
-                            RouteStopPoint("default", route.origin, "terminal", 8.4822, 124.6472, "CDO Corridor")
                         }
                     }
 

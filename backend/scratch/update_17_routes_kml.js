@@ -24,7 +24,7 @@ const ROUTES = [
     reqName: 'C2 - Patag- Gaisano - Limketkai - Cogon',
     reqCode: 'C2',
     type: 'c2_lines',
-    originName: 'Patag (Camp Evangelista)',
+    originName: 'Patag Camp Evangelista',
     destName: 'Cogon Public Market'
   },
   {

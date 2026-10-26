@@ -1238,7 +1238,7 @@ class MapViewModel @Inject constructor(
             dropoffCandidates.add(
                 RouteStopPoint(
                     id = "dest_${route.id}_$direction",
-                    name = "$routeDestTitle Terminal",
+                    name = if (routeDestTitle.endsWith("Market", ignoreCase = true) || routeDestTitle.endsWith("Evangelista", ignoreCase = true) || routeDestTitle.endsWith("Terminal", ignoreCase = true)) routeDestTitle else "$routeDestTitle Terminal",
                     type = "terminal",
                     lat = endP.latitude,
                     lng = endP.longitude,
@@ -1260,7 +1260,7 @@ class MapViewModel @Inject constructor(
 
         val dropoffStop = dropoffCandidates.firstOrNull() ?: RouteStopPoint(
             id = "dest_${route.id}_$direction",
-            name = "$routeDestTitle Terminal",
+            name = if (routeDestTitle.endsWith("Market", ignoreCase = true) || routeDestTitle.endsWith("Evangelista", ignoreCase = true) || routeDestTitle.endsWith("Terminal", ignoreCase = true)) routeDestTitle else "$routeDestTitle Terminal",
             type = "terminal",
             lat = routePoints.lastOrNull()?.latitude ?: 8.4842,
             lng = routePoints.lastOrNull()?.longitude ?: 124.6568,
@@ -1300,11 +1300,16 @@ class MapViewModel @Inject constructor(
             val startP = routePoints.first()
             val hasStart = boardingCandidates.any { haversineMeters(it.lat, it.lng, startP.latitude, startP.longitude) < 80.0 }
             if (!hasStart) {
+                val startName = if (routeOriginTitle.endsWith("Market", ignoreCase = true) || routeOriginTitle.endsWith("Evangelista", ignoreCase = true) || routeOriginTitle.endsWith("Terminal", ignoreCase = true)) {
+                    routeOriginTitle
+                } else {
+                    "$routeOriginTitle Departure Terminal"
+                }
                 boardingCandidates.add(
                     0,
                     RouteStopPoint(
                         id = "origin_${route.id}_$direction",
-                        name = "$routeOriginTitle Departure Terminal",
+                        name = startName,
                         type = "terminal",
                         lat = startP.latitude,
                         lng = startP.longitude,

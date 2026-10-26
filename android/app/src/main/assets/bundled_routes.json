@@ -3,7 +3,7 @@
     "id": "c2-patag-gaisano-limketkai-cogon",
     "code": "C2",
     "name": "C2 - Patag- Gaisano - Limketkai - Cogon",
-    "origin": "Patag (Camp Evangelista)",
+    "origin": "Patag Camp Evangelista",
     "destination": "Cogon Public Market",
     "jeepney_type": "Traditional",
     "description": "Carmen Market → Camp Evangelista (Patag) → Liceo de Cagayan Univ → Gaisano City Mall → SM CDO Downtown → Limketkai Center → Cogon Market → Divisoria.",
@@ -13,23 +13,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#D97706",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
-    "terminal_count": 1,
-    "stop_count": 0,
+    "last_updated_at": "2026-10-27T01:37:02.000Z",
+    "terminal_count": 2,
+    "stop_count": 4,
     "directions": [
       {
         "id": "d-c2-patag-gaisano-limketka-in",
         "route_id": "c2-patag-gaisano-limketkai-cogon",
         "direction": "Inbound",
         "distance_km": 5.44,
-        "street_sequence": "Patag (Camp Evangelista) → Butuan-CDO-Iligan Rd → Marcos Bridge → CM Recto Ave → Gaisano City Mall → Limketkai Center → Cogon Public Market"
+        "street_sequence": "Patag Camp Evangelista → Butuan-CDO-Iligan Rd → Marcos Bridge → CM Recto Ave → Gaisano City Mall → Limketkai Center → Cogon Public Market"
       },
       {
         "id": "d-c2-patag-gaisano-limketka-out",
         "route_id": "c2-patag-gaisano-limketkai-cogon",
         "direction": "Outbound",
         "distance_km": 4.32,
-        "street_sequence": "Cogon Public Market → JR Borja St → Plaza Divisoria → Carmen Bridge → Vamenta Blvd → Max Suniel St → Patag Road → Patag (Camp Evangelista)"
+        "street_sequence": "Cogon Public Market → JR Borja St → Plaza Divisoria → Carmen Bridge → Vamenta Blvd → Max Suniel St → Patag Road → Patag Camp Evangelista"
       }
     ],
     "geometries": [
@@ -478,19 +478,98 @@
     ],
     "direction": "Bidirectional",
     "length_km": 5.44,
-    "roads": [],
-    "terminals": [
+    "roads": [
       {
-        "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
-        "map_x": 0,
-        "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "id": "rd-10",
+        "name": "Patag Rd"
+      },
+      {
+        "id": "rd-01",
+        "name": "National Highway"
+      },
+      {
+        "id": "rd-02",
+        "name": "CM Recto Ave"
+      },
+      {
+        "id": "rd-07",
+        "name": "Limketkai Dr"
+      },
+      {
+        "id": "rd-11",
+        "name": "Osmeña St"
+      },
+      {
+        "id": "rd-06",
+        "name": "Max Suniel St"
       }
     ],
-    "stops": [],
+    "terminals": [
+      {
+        "id": "t-patag",
+        "name": "Patag Camp Evangelista",
+        "note": "Camp Evangelista, 4th Infantry Division, Patag",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.487726,
+        "lng": 124.625783
+      },
+      {
+        "id": "t-cogon",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.476986,
+        "lng": 124.651284
+      }
+    ],
+    "stops": [
+      {
+        "id": "lp-c2-cogon",
+        "route_id": "c2-patag-gaisano-limketkai-cogon",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Boarding Point",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.476986,
+        "lng": 124.651284
+      },
+      {
+        "id": "lp-c2-gaisano",
+        "route_id": "c2-patag-gaisano-limketkai-cogon",
+        "name": "Gaisano City Mall",
+        "note": "CM Recto Ave Boarding Point",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.486359,
+        "lng": 124.649879
+      },
+      {
+        "id": "lp-c2-lkk",
+        "route_id": "c2-patag-gaisano-limketkai-cogon",
+        "name": "Limketkai Center",
+        "note": "Limketkai Center Boarding Area",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.481583,
+        "lng": 124.65606
+      },
+      {
+        "id": "lp-c2-patag",
+        "route_id": "c2-patag-gaisano-limketkai-cogon",
+        "name": "Patag Camp Evangelista",
+        "note": "Camp Evangelista Gate / Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.487726,
+        "lng": 124.625783
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -21382,12 +21461,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -23286,12 +23365,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -25302,12 +25381,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -31962,12 +32041,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -35410,12 +35489,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -41522,12 +41601,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [
@@ -43294,12 +43373,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -44413,12 +44492,12 @@
     "terminals": [
       {
         "id": "t-patag",
-        "name": "Patag Terminal",
-        "note": "Patag upper terminus",
+        "name": "Patag Camp Evangelista",
+        "note": "Camp Evangelista, 4th Infantry Division, Patag",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.487848,
-        "lng": 124.625586
+        "lat": 8.487726,
+        "lng": 124.625783
       },
       {
         "id": "t-divisoria",
@@ -103418,12 +103497,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -108586,12 +108665,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -118723,12 +118802,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -121556,12 +121635,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -138792,12 +138871,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -151437,12 +151516,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -153005,12 +153084,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -169184,12 +169263,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [
@@ -179762,12 +179841,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -186204,12 +186283,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -189957,12 +190036,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -200861,12 +200940,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -204074,12 +204153,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -218433,12 +218512,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -229071,12 +229150,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -235007,12 +235086,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -242689,12 +242768,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -248693,12 +248772,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [
@@ -262280,12 +262359,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -274021,12 +274100,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -275637,12 +275716,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -285474,12 +285553,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
@@ -294638,12 +294717,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [
@@ -301466,12 +301545,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Market Jeepney Terminal",
-        "note": "Main downtown terminal",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.47716,
-        "lng": 124.651208
+        "lat": 8.476986,
+        "lng": 124.651284
       }
     ],
     "stops": [],
