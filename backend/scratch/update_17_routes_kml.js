@@ -19,13 +19,13 @@ const { v4: uuidv4 } = require('uuid');
 const ROUTES = [
   // --- Routes with 2 separate LineString Placemarks (Inbound first, Outbound second) ---
   {
-    mid: '14XIiHN5Yge3Op6yRfY8fS4onQ1fUGpw',
+    mid: '1hrIfl6wuWD2_JkawDAIYRcDlyarNsaQ',
     id: 'c2-patag-gaisano-limketkai-cogon',
     reqName: 'C2 - Patag- Gaisano - Limketkai - Cogon',
     reqCode: 'C2',
-    type: 'dual', // 2 separate LineString Placemarks
+    type: 'c2_lines',
     originName: 'Patag (Camp Evangelista)',
-    destName: 'Divisoria Park'
+    destName: 'Cogon Public Market'
   },
   {
     mid: '1ZfAOkDpR1OVVBU8zp9EiQNVGLZup2BQ',
@@ -490,6 +490,59 @@ function parseRCRoute(kml) {
   return { inbound, outbound, points };
 }
 
+function parseC2Route(kml) {
+  const placemarks = kml.match(/<Placemark>[\s\S]*?<\/Placemark>/g) || [];
+  const linesByName = {};
+  const points = [];
+
+  for (const pm of placemarks) {
+    const nameMatch = pm.match(/<name>(.*?)<\/name>/);
+    const name = nameMatch ? nameMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim() : '';
+
+    if (pm.includes('<LineString>')) {
+      const coordMatch = pm.match(/<coordinates>([\s\S]*?)<\/coordinates>/);
+      if (coordMatch) linesByName[name] = parseCoords(coordMatch[1]);
+    } else if (pm.includes('<Point>')) {
+      const coordMatch = pm.match(/<coordinates>([\s\S]*?)<\/coordinates>/);
+      if (coordMatch) points.push({ name, coords: parseCoords(coordMatch[1])[0] });
+    }
+  }
+
+  function concatLines(lines) {
+    const result = [];
+    for (const line of lines) {
+      if (!line || line.length === 0) continue;
+      if (result.length === 0) {
+        result.push(...line);
+      } else {
+        const last = result[result.length - 1];
+        const start = line[0];
+        const d = distCoord(last, start);
+        if (d < 1) {
+          result.push(...line.slice(1));
+        } else {
+          result.push(...line);
+        }
+      }
+    }
+    return result;
+  }
+
+  const l5 = linesByName['Line 5'];
+  const l6 = linesByName['Line 6'];
+  const l7 = linesByName['Line 7'];
+  const l8 = linesByName['Line 8'];
+  const l9 = linesByName['Line 9'];
+  const l11 = linesByName['Line 11'];
+  const l12 = linesByName['Line 12'];
+
+  const inbound = concatLines([l5, l6, l7, l8.slice(0, 14)]);
+  const l5Return = l5.slice(0, 13).reverse();
+  const outbound = concatLines([l8.slice(13), l9, l11, l12, l5Return]);
+
+  return { inbound, outbound, points };
+}
+
 // ── Main update logic ───────────────────────────────────────────────────────
 
 async function updateRoute(conn, route, kml) {
@@ -498,6 +551,7 @@ async function updateRoute(conn, route, kml) {
   let parsed;
   switch (route.type) {
     case 'dual':     parsed = parseDualRoute(kml); break;
+    case 'c2_lines': parsed = parseC2Route(kml); break;
     case 'r1_named': parsed = parseR1Route(kml); break;
     case 'r2_multi': parsed = parseR2Route(kml); break;
     case 'ra_multi': parsed = parseRARoute(kml); break;
