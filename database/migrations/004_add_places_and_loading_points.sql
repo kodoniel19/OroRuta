@@ -11,6 +11,8 @@ VALUES
   ('pl-miami-inn', 'Miami Inn Carmen', 'Carmen', 'landmark', 0, 0, 8.4772850, 124.6376330),
   ('pl-gumamela-ext', 'Gumamela Extension, Carmen', 'Carmen', 'landmark', 0, 0, 8.4908000, 124.6338000),
   ('pl-gaisano-city', 'Gaisano City Mall', 'Lapasan', 'mall', 0, 0, 8.4842000, 124.6515000),
+  ('pl-gaisano-puerto', 'Gaisano Puerto Mall', 'Puerto', 'mall', 0, 0, 8.5005640, 124.7517570),
+  ('pl-cobsat', 'Cagayan de Oro (Bugo) School of Arts and Trades (COBSAT)', 'Bugo', 'school', 0, 0, 8.5067180, 124.7615330),
   ('pl-capitol-univ', 'Capitol University', 'Lapasan', 'school', 0, 0, 8.4870000, 124.6550000),
   ('pl-polymedic-plaza', 'Cagayan de Oro Polymedic Plaza', 'Kauswagan', 'hospital', 0, 0, 8.4940000, 124.6305000),
   ('pl-savemore-kauswagan', 'Savemore Market Kauswagan', 'Kauswagan', 'market', 0, 0, 8.4960000, 124.6340000)

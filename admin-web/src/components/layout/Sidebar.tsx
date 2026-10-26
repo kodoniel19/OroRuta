@@ -64,11 +64,6 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="shrink-0 border-t border-white/10 px-3 py-3">
-        <p className="px-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
-          OroRuta Admin · v1.0.0
-        </p>
-      </div>
     </aside>
   );
 }

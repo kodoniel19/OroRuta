@@ -399,10 +399,11 @@ async function getAnnouncements(req, res, next) {
       );
       a.affectedRoutes = rIds.map((r) => r.route_id);
       a.body = a.description || '';
-      a.startDate = a.date;
+      a.startDate = a.date ? (typeof a.date === 'string' ? a.date.split('T')[0] : a.date.toISOString().split('T')[0]) : '';
       a.endDate = a.effective || '';
-      a.updatedAt = a.date;
-      a.author = 'RTA CDO';
+      a.updatedAt = a.date ? (typeof a.date === 'string' ? a.date : a.date.toISOString()) : new Date().toISOString();
+      a.author = a.author || 'Doniel Eunson Ko';
+      a.type = a.category;
     }
     res.json(rows);
   } catch (err) {
@@ -412,14 +413,27 @@ async function getAnnouncements(req, res, next) {
 
 async function createAnnouncement(req, res, next) {
   try {
-    const { title, date = new Date().toISOString().split('T')[0], category = 'Route update', body, description, effective = '', status = 'Active', affectedRoutes = [], routeIds = [] } = req.body;
+    const {
+      title,
+      type,
+      category = type || 'General Update',
+      body,
+      description = body || '',
+      startDate,
+      date = startDate || new Date().toISOString().split('T')[0],
+      endDate,
+      effective = endDate || '',
+      status = 'Published',
+      affectedRoutes = [],
+      routeIds = []
+    } = req.body;
     const id = req.body.id || uuidv4();
-    const desc = body || description || '';
+    const cleanDate = typeof date === 'string' ? date.split('T')[0] : new Date().toISOString().split('T')[0];
     const routesToLink = affectedRoutes.length > 0 ? affectedRoutes : routeIds;
 
     await db.execute(
       'INSERT INTO announcements (id, title, date, category, description, effective, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, title, date, category, desc, effective, status]
+      [id, title, cleanDate, category, description, effective, status]
     );
 
     for (const rId of routesToLink) {
@@ -438,13 +452,30 @@ async function createAnnouncement(req, res, next) {
 async function updateAnnouncement(req, res, next) {
   try {
     const { id } = req.params;
-    const { title, category, body, description, effective, status, affectedRoutes = [] } = req.body;
+    const {
+      title,
+      type,
+      category = type,
+      body,
+      description = body,
+      startDate,
+      date = startDate,
+      endDate,
+      effective = endDate,
+      status,
+      affectedRoutes = []
+    } = req.body;
 
     const fields = [];
     const vals = [];
     if (title !== undefined) { fields.push('title = ?'); vals.push(title); }
     if (category !== undefined) { fields.push('category = ?'); vals.push(category); }
-    if (body !== undefined || description !== undefined) { fields.push('description = ?'); vals.push(body || description); }
+    if (description !== undefined) { fields.push('description = ?'); vals.push(description); }
+    if (date !== undefined) {
+      const cleanDate = typeof date === 'string' ? date.split('T')[0] : new Date().toISOString().split('T')[0];
+      fields.push('date = ?');
+      vals.push(cleanDate);
+    }
     if (effective !== undefined) { fields.push('effective = ?'); vals.push(effective); }
     if (status !== undefined) { fields.push('status = ?'); vals.push(status); }
 

@@ -35,13 +35,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -52,6 +55,7 @@ import com.ororuta.app.data.local.entities.RecentSearchEntity
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.MapsInitializer
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.Dash
@@ -61,6 +65,7 @@ import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.maps.android.compose.*
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.ororuta.app.domain.CdoServiceArea
 import com.ororuta.app.domain.fare.PassengerCategory
 import com.ororuta.app.domain.fare.TraditionalJeepneyFareService
 import com.ororuta.app.domain.models.Place
@@ -233,6 +238,10 @@ private fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): D
             Math.sin(dLng / 2) * Math.sin(dLng / 2)
     return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
+
+/** Delegates to shared [CdoServiceArea.isOutsideServiceArea]. */
+private fun isOutsideCdoServiceArea(destinationName: String?, lat: Double?, lng: Double?): Boolean =
+    CdoServiceArea.isOutsideServiceArea(destinationName, lat, lng)
 
 data class NearbyRoutesSheetTarget(
 
@@ -480,6 +489,71 @@ fun MapScreen(
         position = defaultCamera
     }
 
+    // Synchronously initialize MapsInitializer to ensure BitmapDescriptorFactory is available
+    val mapsInitialized = remember {
+        try {
+            MapsInitializer.initialize(context)
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun safeMarker(hue: Float): com.google.android.gms.maps.model.BitmapDescriptor? {
+        return try {
+            BitmapDescriptorFactory.defaultMarker(hue)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    // Pre-allocated marker icon descriptors (guarded against early invocation before native initialization)
+    val markerAzure = remember(mapsInitialized, mapReady) { safeMarker(BitmapDescriptorFactory.HUE_AZURE) }
+    val markerGreen = remember(mapsInitialized, mapReady) { safeMarker(BitmapDescriptorFactory.HUE_GREEN) }
+    val markerRose = remember(mapsInitialized, mapReady) { safeMarker(BitmapDescriptorFactory.HUE_ROSE) }
+    val markerOrange = remember(mapsInitialized, mapReady) { safeMarker(BitmapDescriptorFactory.HUE_ORANGE) }
+    val markerYellow = remember(mapsInitialized, mapReady) { safeMarker(BitmapDescriptorFactory.HUE_YELLOW) }
+    val markerRed = remember(mapsInitialized, mapReady) { safeMarker(BitmapDescriptorFactory.HUE_RED) }
+
+    // Pre-parsed route geometries for citywide jeepney routes mode to avoid parsing on movement/recomposition
+    val parsedAllRoutes = remember(dbRoutes) {
+        dbRoutes.mapNotNull { route ->
+            val pts = parseGeometries(route)
+            if (pts.size >= 2) {
+                val color = try {
+                    Color(android.graphics.Color.parseColor(route.color))
+                } catch (_: Exception) {
+                    Color(0xFF1471B0)
+                }
+                Triple(route, pts, color)
+            } else null
+        }
+    }
+
+    // Memoized MapProperties & MapUiSettings to avoid re-triggering native map config setters on recomposition
+    val mapProperties = remember(hasLocationPermission, cdoCameraBounds) {
+        MapProperties(
+            isMyLocationEnabled = hasLocationPermission,
+            minZoomPreference = 9.5f,
+            maxZoomPreference = 20.0f,
+            latLngBoundsForCameraTarget = cdoCameraBounds
+        )
+    }
+    val mapUiSettings = remember {
+        MapUiSettings(
+            myLocationButtonEnabled = false, // Using custom OroRuta styled location button
+            zoomControlsEnabled = false,
+            compassEnabled = true,
+            mapToolbarEnabled = false,
+            indoorLevelPickerEnabled = false,
+            tiltGesturesEnabled = false,
+            rotationGesturesEnabled = true,
+            scrollGesturesEnabled = true,
+            scrollGesturesEnabledDuringRotateOrZoom = true,
+            zoomGesturesEnabled = true // normal pinch-to-zoom & double-tap zoom
+        )
+    }
+
     // Handle initial place selection from navigation (e.g. from Search Screen "View on Map")
     LaunchedEffect(initialPlaceName, initialLat, initialLng) {
         if (!initialPlaceName.isNullOrBlank() && initialLat != null && initialLat != 0.0 && initialLng != null && initialLng != 0.0) {
@@ -601,19 +675,16 @@ fun MapScreen(
             delay(400)
             permissionLauncher.launch(LocationPermissions.runtimePermissions)
         } else if (hasLocationPermission) {
-            // If already permitted, fetch current location and update marker silently
+            // If already permitted, fetch current location and update marker silently without snapping camera
             coroutineScope.launch {
-                centerOnDeviceLocation(
-                    context = context,
-                    cameraPositionState = cameraPositionState,
-                    onLocationFound = { loc ->
-                        userLocation = loc
-                        if (viewModel.routeGuidance != null) {
-                            viewModel.updateGuidanceLocation(loc)
-                        }
-                    },
-                    onUnavailable = { /* silent on auto-launch; user can tap button to retry */ }
-                )
+                val loc = obtainBestDeviceLocation(context)
+                if (loc != null) {
+                    val target = LatLng(loc.latitude, loc.longitude)
+                    userLocation = target
+                    if (viewModel.routeGuidance != null) {
+                        viewModel.updateGuidanceLocation(target)
+                    }
+                }
             }
         }
     }
@@ -718,17 +789,14 @@ fun MapScreen(
                     showDeniedBanner = false
                     if (!wasGranted) {
                         coroutineScope.launch {
-                            centerOnDeviceLocation(
-                                context = context,
-                                cameraPositionState = cameraPositionState,
-                                onLocationFound = { loc ->
-                                    userLocation = loc
-                                    if (viewModel.routeGuidance != null) {
-                                        viewModel.updateGuidanceLocation(loc)
-                                    }
-                                },
-                                onUnavailable = { /* silent on resume */ }
-                            )
+                            val loc = obtainBestDeviceLocation(context)
+                            if (loc != null) {
+                                val target = LatLng(loc.latitude, loc.longitude)
+                                userLocation = target
+                                if (viewModel.routeGuidance != null) {
+                                    viewModel.updateGuidanceLocation(target)
+                                }
+                            }
                         }
                     }
                 }
@@ -738,50 +806,8 @@ fun MapScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Track pre-gesture camera position to detect and correct double-tap zoom drift.
-    // When a gesture-initiated zoom changes the center significantly (> ~220m),
-    // we snap back to the pre-gesture center at the new zoom level.
-    // This neutralizes the "zoom into tapped point" behavior of Google Maps' double-tap.
-    var preGestureTarget by remember { mutableStateOf<LatLng?>(null) }
-    var preGestureZoom by remember { mutableStateOf<Float?>(null) }
-
-    LaunchedEffect(cameraPositionState.isMoving, mapReady) {
-        if (!mapReady) return@LaunchedEffect
-
-        if (cameraPositionState.isMoving) {
-            // Camera movement started — save the pre-gesture state
-            if (cameraPositionState.cameraMoveStartedReason == CameraMoveStartedReason.GESTURE) {
-                if (preGestureTarget == null) {
-                    preGestureTarget = cameraPositionState.position.target
-                    preGestureZoom = cameraPositionState.position.zoom
-                }
-            }
-        } else {
-            // Camera movement ended — check for double-tap drift
-            val savedTarget = preGestureTarget
-            val savedZoom = preGestureZoom
-            val currentTarget = cameraPositionState.position.target
-            val currentZoom = cameraPositionState.position.zoom
-
-            // Reset tracking state
-            preGestureTarget = null
-            preGestureZoom = null
-
-            // Out-of-bounds / NaN safety check (prevents camera stranded at 0,0 or NaN)
-            if ((currentTarget.latitude == 0.0 && currentTarget.longitude == 0.0) ||
-                currentTarget.latitude.isNaN() || currentTarget.longitude.isNaN()
-            ) {
-                cameraPositionState.animate(
-                    CameraUpdateFactory.newLatLngZoom(cdoCenter, 14.0f),
-                    500
-                )
-                return@LaunchedEffect
-            }
-
-            // Allow smooth, natural user pan and zoom gestures without artificial jumps
-            // Strict boundaries check above guarantees camera never leaves Cagayan de Oro
-        }
-    }
+    // Out-of-bounds & NaN safety: Native Google Maps latLngBoundsForCameraTarget
+    // constrains camera panning smoothly within Cagayan de Oro at the C++ engine level.
 
 
 
@@ -817,23 +843,42 @@ fun MapScreen(
         }
     }
 
+    var lastSearchedLoc by remember { mutableStateOf<LatLng?>(null) }
+    var lastSearchedTargetKey by remember { mutableStateOf<String?>(null) }
+
     if (nearbyRoutesTarget != null) {
         val target = nearbyRoutesTarget!!
-        // Call backend API for route matching when target or user location changes
-        LaunchedEffect(target, userLocation) {
+        val targetKey = "${target.title}_${target.lat}_${target.lng}"
+
+        // Call backend API for route matching when target changes or user moves significantly
+        LaunchedEffect(targetKey, userLocation) {
             val uLat = userLocation?.latitude
             val uLng = userLocation?.longitude
             if (uLat != null && uLng != null && !(uLat == 0.0 && uLng == 0.0)) {
-                val tLat = target.lat ?: uLat
-                val tLng = target.lng ?: uLng
-                viewModel.searchNearbyTrips(
-                    fromLat = uLat,
-                    fromLng = uLng,
-                    fromName = "My Location",
-                    toLat = tLat,
-                    toLng = tLng,
-                    toName = target.title
-                )
+                val lastLoc = lastSearchedLoc
+                val distMeters = if (lastLoc != null) {
+                    val dLat = Math.toRadians(uLat - lastLoc.latitude)
+                    val dLng = Math.toRadians(uLng - lastLoc.longitude)
+                    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                            Math.cos(Math.toRadians(lastLoc.latitude)) * Math.cos(Math.toRadians(uLat)) *
+                            Math.sin(dLng / 2) * Math.sin(dLng / 2)
+                    6371000.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                } else Double.MAX_VALUE
+
+                if (targetKey != lastSearchedTargetKey || distMeters > 40.0) {
+                    lastSearchedTargetKey = targetKey
+                    lastSearchedLoc = LatLng(uLat, uLng)
+                    val tLat = target.lat ?: uLat
+                    val tLng = target.lng ?: uLng
+                    viewModel.searchNearbyTrips(
+                        fromLat = uLat,
+                        fromLng = uLng,
+                        fromName = "My Location",
+                        toLat = tLat,
+                        toLng = tLng,
+                        toName = target.title
+                    )
+                }
             }
         }
 
@@ -848,14 +893,16 @@ fun MapScreen(
         ModalBottomSheet(
             onDismissRequest = { nearbyRoutesTarget = null },
             containerColor = Color.White,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             dragHandle = { BottomSheetDefaults.DragHandle() },
-            modifier = Modifier.fillMaxHeight(0.85f)
+            modifier = Modifier
+                .fillMaxHeight(0.85f)
+                .navigationBarsPadding()
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
                 // Header Row
                 Row(
@@ -865,12 +912,12 @@ fun MapScreen(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(34.dp)
                                 .clip(CircleShape)
                                 .background(Brand50),
                             contentAlignment = Alignment.Center
@@ -879,13 +926,13 @@ fun MapScreen(
                                 imageVector = Icons.Default.DirectionsBus,
                                 contentDescription = null,
                                 tint = Brand600,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
-                        Column {
+                        Column(modifier = Modifier.weight(1f, fill = false)) {
                             Text(
                                 text = "Jeepney Routes",
-                                fontSize = 18.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Ink
                             )
@@ -898,11 +945,11 @@ fun MapScreen(
                                         imageVector = Icons.Default.NearMe,
                                         contentDescription = null,
                                         tint = Ok600,
-                                        modifier = Modifier.size(12.dp)
+                                        modifier = Modifier.size(11.dp)
                                     )
                                     Text(
                                         text = "Nearest from My Location",
-                                        fontSize = 12.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = Ok600
                                     )
@@ -916,11 +963,11 @@ fun MapScreen(
                                         imageVector = Icons.Default.NearMe,
                                         contentDescription = null,
                                         tint = Brand600,
-                                        modifier = Modifier.size(12.dp)
+                                        modifier = Modifier.size(11.dp)
                                     )
                                     Text(
                                         text = "From My Location to ${target.title}",
-                                        fontSize = 12.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = Brand600,
                                         maxLines = 1,
@@ -932,7 +979,7 @@ fun MapScreen(
                     }
 
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Refresh button — available to refresh device GPS location
@@ -958,7 +1005,7 @@ fun MapScreen(
                             modifier = Modifier.size(32.dp)
                         ) {
                             if (isLocatingForRoutes) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Brand600, strokeWidth = 2.dp)
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Brand600, strokeWidth = 2.dp)
                             } else {
                                 Icon(Icons.Default.Refresh, contentDescription = "Refresh location", tint = Brand600, modifier = Modifier.size(18.dp))
                             }
@@ -968,14 +1015,14 @@ fun MapScreen(
                             onClick = { nearbyRoutesTarget = null },
                             modifier = Modifier.size(32.dp)
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = "Close", tint = InkMuted)
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = InkMuted, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Line, thickness = 1.dp)
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = Line, thickness = 0.5.dp)
+                Spacer(modifier = Modifier.height(8.dp))
 
                 when {
                     !hasLocationPermission -> {
@@ -1075,94 +1122,144 @@ fun MapScreen(
                     }
 
                     backendError != null -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 32.dp, horizontal = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(52.dp)
-                                        .clip(CircleShape)
-                                        .background(Bad50),
-                                    contentAlignment = Alignment.Center
+                        // Genuine server/connection error (non-IOException exceptions)
+                        EmptyState(
+                            icon = Icons.Default.CloudOff,
+                            title = "Connection Error",
+                            message = "Unable to connect to transit server. Please check your internet connection and try again.",
+                            tone = EmptyTone.Warn,
+                            action = {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ErrorOutline,
-                                        contentDescription = null,
-                                        tint = Bad600,
-                                        modifier = Modifier.size(28.dp)
+                                    OroButton(
+                                        text = "Retry",
+                                        onClick = {
+                                            val uLat = userLocation?.latitude ?: return@OroButton
+                                            val uLng = userLocation?.longitude ?: return@OroButton
+                                            viewModel.searchNearbyTrips(
+                                                fromLat = uLat, fromLng = uLng, fromName = "My Location",
+                                                toLat = target.lat ?: uLat, toLng = target.lng ?: uLng,
+                                                toName = target.title
+                                            )
+                                        },
+                                        variant = ButtonVariant.Primary,
+                                        size = ButtonSize.Sm
+                                    )
+                                    OroButton(
+                                        text = "Return to Map",
+                                        onClick = { nearbyRoutesTarget = null },
+                                        variant = ButtonVariant.Ghost,
+                                        size = ButtonSize.Sm
                                     )
                                 }
-                                Text(
-                                    text = "Failed to load routes",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Ink
-                                )
-                                Text(
-                                    text = backendError.ifBlank { "Could not connect to OroRuta servers. Please check your internet connection." },
-                                    fontSize = 13.sp,
-                                    color = InkMuted,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                OroButton(
-                                    text = "Retry",
-                                    onClick = {
-                                        val uLat = userLocation?.latitude ?: return@OroButton
-                                        val uLng = userLocation?.longitude ?: return@OroButton
-                                        viewModel.searchNearbyTrips(
-                                            fromLat = uLat, fromLng = uLng, fromName = "My Location",
-                                            toLat = target.lat ?: uLat, toLng = target.lng ?: uLng,
-                                            toName = target.title
-                                        )
-                                    },
-                                    variant = ButtonVariant.Primary,
-                                    size = ButtonSize.Sm
-                                )
                             }
-                        }
+                        )
                     }
 
                     backendTrips.isEmpty() -> {
-                        EmptyState(
-                            icon = if (target.isGpsBasedNearMe) Icons.Default.NearMe else Icons.Default.DirectionsBus,
-                            title = if (target.isGpsBasedNearMe) "No Nearby Routes Found" else "No verified jeepney route found for this destination",
-                            message = if (target.isGpsBasedNearMe)
-                                "No traditional jeepney boarding stops found within walking distance (maximum 1.0 km) of your current location. Please verify that you are within Cagayan de Oro transit corridors."
-                            else
-                                "No verified jeepney route found for this destination directly from your location within walking distance (maximum 1.0 km). You may need to transfer at Agora, Carmen, or Bulua terminals.",
-                            tone = EmptyTone.Neutral,
-                            action = {
-                                OroButton(
-                                    text = if (target.isGpsBasedNearMe) "Retry with GPS" else "Explore All Routes",
-                                    onClick = {
-                                        if (target.isGpsBasedNearMe) {
-                                            isLocatingForRoutes = true
-                                            coroutineScope.launch {
-                                                try {
-                                                    val loc = obtainBestDeviceLocation(context)
-                                                    if (loc != null) userLocation = LatLng(loc.latitude, loc.longitude)
-                                                } finally {
-                                                    isLocatingForRoutes = false
+                        // Determine whether destination is outside CDO service area
+                        val isOutsideArea = remember(target.title, target.lat, target.lng) {
+                            isOutsideCdoServiceArea(target.title, target.lat, target.lng)
+                        }
+
+                        when {
+                            target.isGpsBasedNearMe -> {
+                                // GPS-based "Near Me" search with no results
+                                EmptyState(
+                                    icon = Icons.Default.NearMe,
+                                    title = "No Nearby Routes Found",
+                                    message = "No traditional jeepney boarding stops found within walking distance (maximum 1.0 km) of your current location. Please verify that you are within Cagayan de Oro transit corridors.",
+                                    tone = EmptyTone.Neutral,
+                                    action = {
+                                        OroButton(
+                                            text = "Retry with GPS",
+                                            onClick = {
+                                                isLocatingForRoutes = true
+                                                coroutineScope.launch {
+                                                    try {
+                                                        val loc = obtainBestDeviceLocation(context)
+                                                        if (loc != null) userLocation = LatLng(loc.latitude, loc.longitude)
+                                                    } finally {
+                                                        isLocatingForRoutes = false
+                                                    }
                                                 }
-                                            }
-                                        } else {
-                                            nearbyRoutesTarget = null
-                                            onSearchClick?.invoke()
-                                        }
-                                    },
-                                    variant = ButtonVariant.Secondary,
-                                    size = ButtonSize.Sm
+                                            },
+                                            variant = ButtonVariant.Secondary,
+                                            size = ButtonSize.Sm
+                                        )
+                                    }
                                 )
                             }
-                        )
+
+                            isOutsideArea -> {
+                                // Destination is outside CDO jeepney service area
+                                EmptyState(
+                                    icon = Icons.Default.LocationOff,
+                                    title = "Destination Outside Service Area",
+                                    message = "This destination is outside OroRuta\u2019s current jeepney route coverage in Cagayan de Oro City. Please choose a destination within the supported service area to find available jeepney routes.",
+                                    tone = EmptyTone.Neutral,
+                                    action = {
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            OroButton(
+                                                text = "Choose Another Destination",
+                                                onClick = {
+                                                    nearbyRoutesTarget = null
+                                                    onSearchClick?.invoke()
+                                                },
+                                                variant = ButtonVariant.Primary,
+                                                size = ButtonSize.Sm
+                                            )
+                                            OroButton(
+                                                text = "Return to Map",
+                                                onClick = { nearbyRoutesTarget = null },
+                                                variant = ButtonVariant.Ghost,
+                                                size = ButtonSize.Sm
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+
+                            else -> {
+                                // Inside CDO but no matching route found
+                                EmptyState(
+                                    icon = Icons.Default.DirectionsBus,
+                                    title = "No Suitable Route Found",
+                                    message = "No verified jeepney route connects your location to this destination within walking distance (maximum 1.0 km). You may need to transfer at Agora, Carmen, or Bulua terminals.",
+                                    tone = EmptyTone.Neutral,
+                                    action = {
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            OroButton(
+                                                text = "Choose Another Destination",
+                                                onClick = {
+                                                    nearbyRoutesTarget = null
+                                                    onSearchClick?.invoke()
+                                                },
+                                                variant = ButtonVariant.Primary,
+                                                size = ButtonSize.Sm
+                                            )
+                                            OroButton(
+                                                text = "Explore All Routes",
+                                                onClick = {
+                                                    nearbyRoutesTarget = null
+                                                    onSearchClick?.invoke()
+                                                },
+                                                variant = ButtonVariant.Ghost,
+                                                size = ButtonSize.Sm
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
 
                     else -> {
@@ -1176,13 +1273,15 @@ fun MapScreen(
                         }
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "${backendTrips.size} trip ${if (backendTrips.size == 1) "option" else "options"} found",
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Brand600
                             )
@@ -1194,11 +1293,9 @@ fun MapScreen(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
                         LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(bottom = 32.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(bottom = 28.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             items(backendTrips, key = { it.id }) { trip ->
@@ -1217,17 +1314,21 @@ fun MapScreen(
 
                                 Surface(
                                     color = Color.White,
-                                    shape = RoundedCornerShape(14.dp),
-                                    shadowElevation = 2.dp,
+                                    shape = RoundedCornerShape(12.dp),
+                                    shadowElevation = 1.dp,
                                     border = BorderStroke(1.dp, Line),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Column(modifier = Modifier.padding(14.dp)) {
-                                        // Trip highlight badges
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                                    ) {
+                                        // Highlight badges row (Cheapest / Fastest / Least Walk)
                                         if (tripBadges.isNotEmpty()) {
                                             Row(
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                modifier = Modifier.padding(bottom = 6.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                modifier = Modifier.padding(bottom = 5.dp)
                                             ) {
                                                 tripBadges.forEach { badge ->
                                                     Surface(
@@ -1236,121 +1337,78 @@ fun MapScreen(
                                                     ) {
                                                         Text(
                                                             text = badge,
-                                                            fontSize = 10.sp,
+                                                            fontSize = 9.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = Brand700,
-                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                                         )
                                                     }
                                                 }
                                             }
                                         }
 
-                                        // Route segments header
-                                        val cleanRouteName = remember(routeName, routeCode) {
-                                            routeName
-                                                .replace(Regex("^(Route\\s+)?$routeCode\\s*[-:–—]\\s*", RegexOption.IGNORE_CASE), "")
-                                                .trim()
-                                                .ifEmpty { routeName }
-                                        }
-
-                                        if (trip.segments.size == 1 && firstSeg != null) {
-                                            // Single-route trip
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.Top
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.Top,
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                    modifier = Modifier.weight(1f)
-                                                ) {
-                                                    RouteBadge(code = routeCode, colorHex = routeColor, size = BadgeSize.Md)
-                                                    Column {
-                                                        Text(
-                                                            text = "Route $routeCode – $cleanRouteName",
-                                                            fontSize = 14.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = Ink,
-                                                            maxLines = 2,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                        Row(
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                            modifier = Modifier.padding(top = 3.dp)
-                                                        ) {
-                                                            if (trip.direction != null) {
-                                                                Surface(
-                                                                    color = Canvas,
-                                                                    shape = RoundedCornerShape(4.dp),
-                                                                    border = BorderStroke(0.5.dp, Line)
-                                                                ) {
-                                                                    Text(
-                                                                        text = trip.direction,
-                                                                        fontSize = 11.sp,
-                                                                        fontWeight = FontWeight.SemiBold,
-                                                                        color = InkSoft,
-                                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                                    )
-                                                                }
-                                                            }
-
-                                                            val matchType = trip.destinationMatchType.ifBlank {
-                                                                if (trip.transfers > 0) "Transfer Route"
-                                                                else if (trip.walkFromDropMeters <= 120) "Direct Route"
-                                                                else "Nearby Drop-off"
-                                                            }
-                                                            val isDirect = matchType.contains("Direct", ignoreCase = true)
-                                                            Surface(
-                                                                color = if (isDirect) Ok50 else Brand50,
-                                                                shape = RoundedCornerShape(4.dp)
-                                                            ) {
-                                                                Text(
-                                                                    text = if (isDirect) "🎯 Direct Route" else "📍 $matchType",
-                                                                    fontSize = 11.sp,
-                                                                    fontWeight = FontWeight.Bold,
-                                                                    color = if (isDirect) Ok700 else Brand700,
-                                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                Surface(
-                                                    color = Brand50,
-                                                    shape = RoundedCornerShape(6.dp)
-                                                ) {
-                                                    Text(
-                                                        text = jeepneyType,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Brand700,
-                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                                    )
-                                                }
-                                            }
-                                        } else if (trip.segments.size > 1) {
-                                            // Multi-route (transfer) trip
+                                        // A. Route and transfer summary
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // Route badges
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                modifier = Modifier.fillMaxWidth()
+                                                modifier = Modifier.weight(1f, fill = false)
                                             ) {
-                                                trip.segments.forEachIndexed { idx, seg ->
-                                                    RouteBadge(code = seg.code, colorHex = seg.color, size = BadgeSize.Sm)
-                                                    if (idx < trip.segments.size - 1) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.ArrowForward,
-                                                            contentDescription = null,
-                                                            tint = InkMuted,
-                                                            modifier = Modifier.size(14.dp)
+                                                if (trip.segments.size <= 1 && firstSeg != null) {
+                                                    RouteBadge(code = routeCode, colorHex = routeColor, size = BadgeSize.Sm)
+                                                    if (trip.direction != null) {
+                                                        Surface(
+                                                            color = Canvas,
+                                                            shape = RoundedCornerShape(4.dp),
+                                                            border = BorderStroke(0.5.dp, Line)
+                                                        ) {
+                                                            Text(
+                                                                text = trip.direction,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = InkSoft,
+                                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                    val matchType = trip.destinationMatchType.ifBlank {
+                                                        if (trip.walkFromDropMeters <= 120) "Direct Route" else "Nearby Drop-off"
+                                                    }
+                                                    val isDirect = matchType.contains("Direct", ignoreCase = true)
+                                                    Surface(
+                                                        color = if (isDirect) Ok50 else Brand50,
+                                                        shape = RoundedCornerShape(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = if (isDirect) "🎯 Direct" else "📍 $matchType",
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (isDirect) Ok700 else Brand700,
+                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                                         )
                                                     }
+                                                } else {
+                                                    trip.segments.forEachIndexed { idx, seg ->
+                                                        RouteBadge(code = seg.code, colorHex = seg.color, size = BadgeSize.Sm)
+                                                        if (idx < trip.segments.size - 1) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.ArrowForward,
+                                                                contentDescription = null,
+                                                                tint = InkMuted,
+                                                                modifier = Modifier.size(12.dp)
+                                                            )
+                                                        }
+                                                    }
                                                 }
-                                                Spacer(modifier = Modifier.weight(1f))
+                                            }
+
+                                            // Transfer count or jeepney type
+                                            if (trip.transfers > 0) {
                                                 Surface(
                                                     color = Oro50,
                                                     shape = RoundedCornerShape(4.dp)
@@ -1363,9 +1421,41 @@ fun MapScreen(
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                                     )
                                                 }
+                                            } else {
+                                                Surface(
+                                                    color = Brand50,
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = jeepneyType,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Brand700,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
                                             }
-                                            // Show route names
-                                            Column(modifier = Modifier.padding(top = 4.dp)) {
+                                        }
+
+                                        // B. Route names
+                                        if (trip.segments.size <= 1 && firstSeg != null) {
+                                            val cleanRouteName = remember(routeName, routeCode) {
+                                                routeName
+                                                    .replace(Regex("^(Route\\s+)?$routeCode\\s*[-:–—]\\s*", RegexOption.IGNORE_CASE), "")
+                                                    .trim()
+                                                    .ifEmpty { routeName }
+                                            }
+                                            Text(
+                                                text = "Route $routeCode – $cleanRouteName",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Ink,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.padding(top = 4.dp)
+                                            )
+                                        } else if (trip.segments.size > 1) {
+                                            Column(modifier = Modifier.padding(top = 3.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                                                 trip.segments.forEach { seg ->
                                                     val cleanSegName = seg.routeName
                                                         .replace(Regex("^(Route\\s+)?${seg.code}\\s*[-:–—]\\s*", RegexOption.IGNORE_CASE), "")
@@ -1373,7 +1463,7 @@ fun MapScreen(
                                                         .ifEmpty { seg.routeName }
                                                     Text(
                                                         text = "Route ${seg.code} – $cleanSegName",
-                                                        fontSize = 12.sp,
+                                                        fontSize = 11.sp,
                                                         color = InkSoft,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
@@ -1382,48 +1472,57 @@ fun MapScreen(
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
 
-                                        // Boarding stop info
+                                        // C, D, E. Journey Stops (Boarding -> Transfer -> Alighting)
                                         Surface(
                                             color = Canvas,
                                             shape = RoundedCornerShape(8.dp),
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                                            ) {
+                                                // C. Boarding stop info
                                                 val boardM = if (trip.walkToBoardMeters > 0) trip.walkToBoardMeters else trip.walkMeters
                                                 val walkMins = Math.max(1, Math.round(boardM / 75.0).toInt())
                                                 val isNearby = boardM <= 200
+                                                val distLabel = if (boardM < 1000) "$boardM m" else "${"%.1f".format(boardM / 1000.0)} km"
 
-                                                // Boarding stop
                                                 Row(
                                                     verticalAlignment = Alignment.Top,
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.fillMaxWidth()
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Default.DirectionsWalk,
                                                         contentDescription = null,
                                                         tint = Brand600,
-                                                        modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                                                        modifier = Modifier
+                                                            .size(15.dp)
+                                                            .padding(top = 1.dp)
                                                     )
-                                                    Column {
-                                                        Text(
-                                                            text = "Board at: ${trip.boardingName ?: "Nearest Stop"}",
-                                                            fontSize = 13.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = Ink
-                                                        )
+                                                    Column(modifier = Modifier.weight(1f)) {
                                                         Row(
                                                             verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                            modifier = Modifier.padding(top = 2.dp)
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                                                         ) {
-                                                            val distLabel = if (boardM < 1000) "$boardM m" else "${"%.1f".format(boardM / 1000.0)} km"
                                                             Text(
-                                                                text = "Distance: $distLabel from your current location (~$walkMins min walk)",
-                                                                fontSize = 11.sp,
-                                                                fontWeight = FontWeight.SemiBold,
-                                                                color = if (isNearby) Ok600 else InkSoft
+                                                                text = buildAnnotatedString {
+                                                                    withStyle(SpanStyle(fontWeight = FontWeight.Medium, color = InkMuted)) {
+                                                                        append("Board at: ")
+                                                                    }
+                                                                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Ink)) {
+                                                                        append(trip.boardingName ?: "Nearest Stop")
+                                                                    }
+                                                                },
+                                                                fontSize = 12.sp,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                                modifier = Modifier.weight(1f, fill = false)
                                                             )
                                                             if (isNearby) {
                                                                 Surface(
@@ -1440,153 +1539,196 @@ fun MapScreen(
                                                                 }
                                                             }
                                                         }
+                                                        Text(
+                                                            text = "Walk $distLabel from your current location (~$walkMins min walk)",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Medium,
+                                                            color = if (isNearby) Ok600 else InkMuted,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
                                                     }
                                                 }
 
-                                                // Dropoff info
+                                                // E. Transfer info (if transfers > 0)
+                                                if (trip.transfers > 0 && !trip.transferName.isNullOrBlank()) {
+                                                    val nextSegCode = trip.segments.getOrNull(1)?.code
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .background(Oro50.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.SwapHoriz,
+                                                            contentDescription = null,
+                                                            tint = Oro700,
+                                                            modifier = Modifier.size(14.dp)
+                                                        )
+                                                        Text(
+                                                            text = buildAnnotatedString {
+                                                                withStyle(SpanStyle(fontWeight = FontWeight.Medium, color = Oro700)) {
+                                                                    append("Transfer at: ")
+                                                                }
+                                                                withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Ink)) {
+                                                                    append(trip.transferName)
+                                                                }
+                                                                if (nextSegCode != null) {
+                                                                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = Oro700)) {
+                                                                        append(" → Take $nextSegCode")
+                                                                    }
+                                                                }
+                                                            },
+                                                            fontSize = 11.sp,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+
+                                                // D. Alighting info
                                                 if (!trip.dropoffName.isNullOrBlank()) {
-                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    val dropM = trip.walkFromDropMeters
                                                     Row(
                                                         verticalAlignment = Alignment.Top,
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        modifier = Modifier.fillMaxWidth()
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Default.Place,
                                                             contentDescription = null,
                                                             tint = Bad600,
-                                                            modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                                                            modifier = Modifier
+                                                                .size(15.dp)
+                                                                .padding(top = 1.dp)
                                                         )
-                                                        Column {
+                                                        Column(modifier = Modifier.weight(1f)) {
                                                             Text(
-                                                                text = "Alight at: ${trip.dropoffName}",
+                                                                text = buildAnnotatedString {
+                                                                    withStyle(SpanStyle(fontWeight = FontWeight.Medium, color = InkMuted)) {
+                                                                        append("Alight at: ")
+                                                                    }
+                                                                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Ink)) {
+                                                                        append(trip.dropoffName)
+                                                                    }
+                                                                },
                                                                 fontSize = 12.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                color = Ink
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
                                                             )
-                                                            val dropM = trip.walkFromDropMeters
                                                             if (dropM in 1..60) {
                                                                 Text(
                                                                     text = "Direct drop-off at destination",
                                                                     fontSize = 11.sp,
                                                                     fontWeight = FontWeight.SemiBold,
-                                                                    color = Ok600,
-                                                                    modifier = Modifier.padding(top = 1.dp)
+                                                                    color = Ok600
                                                                 )
                                                             } else if (dropM > 60) {
                                                                 val dropWalkMins = Math.max(1, Math.round(dropM / 75.0).toInt())
-                                                                val distLabel = if (dropM < 1000) "$dropM m" else "${"%.1f".format(dropM / 1000.0)} km"
+                                                                val dDistLabel = if (dropM < 1000) "$dropM m" else "${"%.1f".format(dropM / 1000.0)} km"
                                                                 Text(
-                                                                    text = "Walk $distLabel from alighting stop to destination (~$dropWalkMins min walk)",
+                                                                    text = "Walk $dDistLabel to destination (~$dropWalkMins min walk)",
                                                                     fontSize = 11.sp,
                                                                     fontWeight = FontWeight.Medium,
-                                                                    color = InkSoft,
-                                                                    modifier = Modifier.padding(top = 1.dp)
+                                                                    color = InkMuted,
+                                                                    maxLines = 1,
+                                                                    overflow = TextOverflow.Ellipsis
                                                                 )
                                                             }
                                                         }
                                                     }
                                                 }
+                                            }
+                                        }
 
-                                                // Transfer info
-                                                if (trip.transfers > 0 && !trip.transferName.isNullOrBlank()) {
-                                                    Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        // F. Route stats: Fare, Travel time, Distance
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                modifier = Modifier.weight(1f, fill = false)
+                                            ) {
+                                                if (trip.regularFare > 0) {
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                                                     ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.SwapHoriz,
-                                                            contentDescription = null,
-                                                            tint = Warn600,
-                                                            modifier = Modifier.size(16.dp)
-                                                        )
                                                         Text(
-                                                            text = "Transfer at: ${trip.transferName}",
-                                                            fontSize = 12.sp,
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            color = Oro700
+                                                            text = "₱${"%.2f".format(trip.regularFare)}",
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            color = Ink
                                                         )
+                                                        if (trip.discountFare > 0 && trip.discountFare < trip.regularFare) {
+                                                            Text(
+                                                                text = "(₱${"%.2f".format(trip.discountFare)} disc)",
+                                                                fontSize = 11.sp,
+                                                                color = InkMuted
+                                                            )
+                                                        }
                                                     }
+                                                } else {
+                                                    Text(
+                                                        text = "Fare unavailable",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = InkMuted
+                                                    )
                                                 }
+                                                Text(
+                                                    text = "·",
+                                                    color = InkMuted,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.sp
+                                                )
+                                                Text(
+                                                    text = "~${trip.minutes} mins",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = InkSoft
+                                                )
+                                                if (trip.totalKm > 0) {
+                                                    Text(
+                                                        text = "·",
+                                                        color = InkMuted,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 11.sp
+                                                    )
+                                                    Text(
+                                                        text = "${"%.1f".format(trip.totalKm)} km",
+                                                        fontSize = 11.sp,
+                                                        color = InkMuted
+                                                    )
+                                                }
+                                            }
+
+                                            // Match reason note if any
+                                            if (!trip.matchReason.isNullOrBlank()) {
+                                                Text(
+                                                    text = trip.matchReason,
+                                                    fontSize = 10.sp,
+                                                    color = InkMuted,
+                                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
                                             }
                                         }
 
                                         Spacer(modifier = Modifier.height(8.dp))
 
-                                        // Route stats: Fare, Travel time, Distance
+                                        // G. Actions: Show on Map & View Details
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            if (trip.regularFare > 0) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    Text(
-                                                        text = "₱${"%.2f".format(trip.regularFare)}",
-                                                        fontSize = 13.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Ink
-                                                    )
-                                                    if (trip.discountFare > 0 && trip.discountFare < trip.regularFare) {
-                                                        Text(
-                                                            text = "(₱${"%.2f".format(trip.discountFare)} disc)",
-                                                            fontSize = 11.sp,
-                                                            color = InkMuted
-                                                        )
-                                                    }
-                                                }
-                                            } else {
-                                                Text(
-                                                    text = "Fare unavailable",
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = InkMuted
-                                                )
-                                            }
-                                            Text(
-                                                text = "·",
-                                                color = InkMuted,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                text = "~${trip.minutes} mins",
-                                                fontSize = 12.sp,
-                                                color = InkSoft
-                                            )
-                                            if (trip.totalKm > 0) {
-                                                Text(
-                                                    text = "·",
-                                                    color = InkMuted,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "${"%.1f".format(trip.totalKm)} km",
-                                                    fontSize = 12.sp,
-                                                    color = InkMuted
-                                                )
-                                            }
-                                        }
-
-                                        // Match reason
-                                        if (!trip.matchReason.isNullOrBlank()) {
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                text = trip.matchReason,
-                                                fontSize = 10.sp,
-                                                color = InkMuted,
-                                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
-
-                                        // Actions: Show on Map & View Details
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             val tripDirection = trip.direction ?: "Inbound"
 
@@ -1660,74 +1802,16 @@ fun MapScreen(
         }
     }
 
-    // CDO city-wide bounds for double-tap zoom-out: covers ~Bulua to Bugo/Puerto
-    val cdoCityWideBounds = remember {
-        LatLngBounds(
-            LatLng(8.4200, 124.5700), // SW — Bulua / Upper Carmen
-            LatLng(8.5350, 124.7550)  // NE — Bugo / Puerto / Macajalar Bay
-        )
-    }
-
-    // Double-tap detection state (survives recomposition without triggering it)
-    var lastTapDownTime by remember { mutableLongStateOf(0L) }
-    var lastTapDownX by remember { mutableFloatStateOf(0f) }
-    var lastTapDownY by remember { mutableFloatStateOf(0f) }
-
-    @OptIn(ExperimentalComposeUiApi::class)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
-            .pointerInteropFilter { event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        val now = SystemClock.uptimeMillis()
-                        val dt = now - lastTapDownTime
-                        val dx = event.x - lastTapDownX
-                        val dy = event.y - lastTapDownY
-                        val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-                        if (event.pointerCount == 1 && dt in 40..350 && dist < 80f) {
-                            // Detected a double-tap — animate to city-wide CDO view and consume
-                            lastTapDownTime = 0L
-                            coroutineScope.launch {
-                                // padding: top 120dp for search pill, bottom 180dp for nav + cards
-                                cameraPositionState.animate(
-                                    CameraUpdateFactory.newLatLngBounds(cdoCityWideBounds, 100),
-                                    600
-                                )
-                            }
-                            true // consume — prevents Maps SDK from zoom-in
-                        } else {
-                            lastTapDownTime = now
-                            lastTapDownX = event.x
-                            lastTapDownY = event.y
-                            false // pass through — single tap / drag start
-                        }
-                    }
-                    else -> false
-                }
-            }
     ) {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
-            properties = MapProperties(
-                isMyLocationEnabled = hasLocationPermission,
-                minZoomPreference = 3.0f,
-                maxZoomPreference = 20.0f
-            ),
-            uiSettings = MapUiSettings(
-                myLocationButtonEnabled = false, // Using our custom OroRuta styled location button
-                zoomControlsEnabled = false,
-                compassEnabled = true,
-                mapToolbarEnabled = false,
-                indoorLevelPickerEnabled = false,
-                tiltGesturesEnabled = false,
-                rotationGesturesEnabled = true,
-                scrollGesturesEnabled = true,
-                scrollGesturesEnabledDuringRotateOrZoom = true,
-                zoomGesturesEnabled = true // pinch-to-zoom remains enabled
-            ),
+            properties = mapProperties,
+            uiSettings = mapUiSettings,
             onMapLoaded = {
                 mapReady = true
                 val cur = cameraPositionState.position.target
@@ -1844,7 +1928,7 @@ fun MapScreen(
                             ),
                             title = originTitle,
                             snippet = "Start of $activeDirection Route",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
+                            icon = markerAzure,
                             zIndex = 10f,
                             onClick = {
                                 selectedMarker = MapMarker(
@@ -1874,7 +1958,7 @@ fun MapScreen(
                             ),
                             title = destTitle,
                             snippet = "End of $activeDirection Route",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
+                            icon = markerRed,
                             zIndex = 10f,
                             onClick = {
                                 selectedMarker = MapMarker(
@@ -1923,7 +2007,7 @@ fun MapScreen(
                             state = rememberMarkerState(key = "spec_term_${term.id}", position = LatLng(term.lat, term.lng)),
                             title = term.name,
                             snippet = "TERMINAL · ${term.note ?: "LPTRP Verified Terminal"}",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
+                            icon = markerOrange,
                             zIndex = 9f,
                             onClick = {
                                 selectedMarker = MapMarker(
@@ -1946,7 +2030,7 @@ fun MapScreen(
                             state = rememberMarkerState(key = "spec_loading_${stop.id}", position = LatLng(stop.lat, stop.lng)),
                             title = stop.name,
                             snippet = "LOADING POINT · ${stop.note ?: "Boarding Point"}",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
+                            icon = markerGreen,
                             zIndex = 9f,
                             onClick = {
                                 selectedMarker = MapMarker(
@@ -1969,7 +2053,7 @@ fun MapScreen(
                             state = rememberMarkerState(key = "spec_unloading_${stop.id}", position = LatLng(stop.lat, stop.lng)),
                             title = stop.name,
                             snippet = "UNLOADING POINT · ${stop.note ?: "Drop-off Point"}",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ROSE),
+                            icon = markerRose,
                             zIndex = 9f,
                             onClick = {
                                 selectedMarker = MapMarker(
@@ -1992,7 +2076,7 @@ fun MapScreen(
                             state = rememberMarkerState(key = "spec_transfer_${tr.id}", position = LatLng(tr.lat, tr.lng)),
                             title = tr.name,
                             snippet = "TRANSFER POINT · ${tr.note ?: "Transfer Connection"}",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW),
+                            icon = markerYellow,
                             zIndex = 9f,
                             onClick = {
                                 selectedMarker = MapMarker(
@@ -2015,27 +2099,19 @@ fun MapScreen(
                 // Route polylines/stops are HIDDEN by default (showJeepneyRoutes = false).
                 // They only appear when the user explicitly enables the layer toggle.
                 // ========================================================
-                if (showJeepneyRoutes && dbRoutes.isNotEmpty()) {
-                    dbRoutes.forEach { route ->
-                        val pts = parseGeometries(route)
-                        if (pts.size >= 2) {
-                            val color = try {
-                                Color(android.graphics.Color.parseColor(route.color))
-                            } catch (_: Exception) {
-                                Color(0xFF1471B0)
+                if (showJeepneyRoutes && parsedAllRoutes.isNotEmpty()) {
+                    parsedAllRoutes.forEach { (route, pts, color) ->
+                        val isHighlighted = selectedRouteId == route.id
+                        Polyline(
+                            points = pts,
+                            color = if (isHighlighted) Color(0xFFFF9800) else color,
+                            width = if (isHighlighted) 14f else 10f,
+                            clickable = true,
+                            onClick = {
+                                selectedRouteId = route.id
+                                viewModel.selectRouteForGuidance(route.id, "Inbound", userLocation)
                             }
-                            val isHighlighted = selectedRouteId == route.id
-                            Polyline(
-                                points = pts,
-                                color = if (isHighlighted) Color(0xFFFF9800) else color,
-                                width = if (isHighlighted) 14f else 10f,
-                                clickable = true,
-                                onClick = {
-                                    selectedRouteId = route.id
-                                    viewModel.selectRouteForGuidance(route.id, "Inbound", userLocation)
-                                }
-                            )
-                        }
+                        )
                     }
                 }
                 // No fallback polyline — clean map by default.
@@ -2051,12 +2127,12 @@ fun MapScreen(
                             else -> showLandmarks
                         }
                         if (shouldShow) {
-                            val markerHue = when (stop.kind) {
-                                "terminal" -> BitmapDescriptorFactory.HUE_AZURE
-                                "loading" -> BitmapDescriptorFactory.HUE_GREEN
-                                "unloading" -> BitmapDescriptorFactory.HUE_ROSE
-                                "transfer" -> BitmapDescriptorFactory.HUE_ORANGE
-                                else -> BitmapDescriptorFactory.HUE_RED
+                            val markerIcon = when (stop.kind) {
+                                "terminal" -> markerAzure
+                                "loading" -> markerGreen
+                                "unloading" -> markerRose
+                                "transfer" -> markerOrange
+                                else -> markerRed
                             }
                             Marker(
                                 state = rememberMarkerState(
@@ -2065,7 +2141,7 @@ fun MapScreen(
                                 ),
                                 title = stop.name,
                                 snippet = "${stop.kind.uppercase()}${if (stop.routes.isNotBlank()) " · Routes: ${stop.routes}" else ""}",
-                                icon = BitmapDescriptorFactory.defaultMarker(markerHue),
+                                icon = markerIcon,
                                 onClick = {
                                     selectedMarker = MapMarker(
                                         id = stop.id,
@@ -2122,14 +2198,14 @@ fun MapScreen(
                         state = rememberMarkerState(key = "dir_origin_walk", position = LatLng(mapDir.originLat, mapDir.originLng)),
                         title = mapDir.originName,
                         snippet = "Trip Origin",
-                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
+                        icon = markerAzure,
                         zIndex = 12f
                     )
                     Marker(
                         state = rememberMarkerState(key = "dir_dest_walk", position = LatLng(mapDir.destinationLat, mapDir.destinationLng)),
                         title = mapDir.destinationName,
                         snippet = "Walking Destination",
-                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
+                        icon = markerRed,
                         zIndex = 12f
                     )
                 } else if (mapDir.selectedTrip != null) {
@@ -2196,7 +2272,7 @@ fun MapScreen(
                         state = rememberMarkerState(key = "dir_origin_${mapDir.originLat}_${mapDir.originLng}", position = LatLng(mapDir.originLat, mapDir.originLng)),
                         title = mapDir.originName,
                         snippet = "Trip Origin",
-                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
+                        icon = markerAzure,
                         zIndex = 13f
                     )
 
@@ -2206,7 +2282,7 @@ fun MapScreen(
                             state = rememberMarkerState(key = "dir_board_${trip.boardingLat}_${trip.boardingLng}", position = LatLng(trip.boardingLat, trip.boardingLng)),
                             title = "Board: ${trip.boardingName ?: "Loading Point"}",
                             snippet = "Board Route ${trip.segments.firstOrNull()?.code ?: ""}",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
+                            icon = markerGreen,
                             zIndex = 13f
                         )
                     }
@@ -2217,7 +2293,7 @@ fun MapScreen(
                             state = rememberMarkerState(key = "dir_drop_${trip.dropoffLat}_${trip.dropoffLng}", position = LatLng(trip.dropoffLat, trip.dropoffLng)),
                             title = "Alight: ${trip.dropoffName ?: "Drop-off Point"}",
                             snippet = "Alight here ('Lugar lang')",
-                            icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
+                            icon = markerOrange,
                             zIndex = 13f
                         )
                     }
@@ -2227,7 +2303,7 @@ fun MapScreen(
                         state = rememberMarkerState(key = "dir_dest_${mapDir.destinationLat}_${mapDir.destinationLng}", position = LatLng(mapDir.destinationLat, mapDir.destinationLng)),
                         title = mapDir.destinationName,
                         snippet = "Trip Destination",
-                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
+                        icon = markerRed,
                         zIndex = 13f
                     )
                 }
@@ -2248,13 +2324,13 @@ fun MapScreen(
                         state = rememberMarkerState(key = "dir_guide_origin_${guide.originLat}_${guide.originLng}", position = LatLng(guide.originLat, guide.originLng)),
                         title = "Starting Point (${guide.originName})",
                         snippet = "GPS Current Location",
-                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                        icon = markerAzure
                     )
                     Marker(
                         state = rememberMarkerState(key = "dir_guide_dest_${guide.destinationLat}_${guide.destinationLng}", position = LatLng(guide.destinationLat, guide.destinationLng)),
                         title = guide.destinationName,
                         snippet = "Selected Destination",
-                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
+                        icon = markerRed
                     )
                 }
             }
@@ -2265,19 +2341,19 @@ fun MapScreen(
                     state = userMarkerState,
                     title = "Your Location",
                     snippet = "Current GPS position",
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                    icon = markerAzure
                 )
             }
 
             // Selected place marker (from search or tapped marker)
             if (mapDir == null && selectedMarker != null && selectedMarker?.lat != null && selectedMarker?.lng != null) {
                 val sm = selectedMarker!!
-                val markerHue = when (sm.kind) {
-                    "terminal" -> BitmapDescriptorFactory.HUE_AZURE
-                    "loading" -> BitmapDescriptorFactory.HUE_GREEN
-                    "unloading" -> BitmapDescriptorFactory.HUE_ROSE
-                    "transfer" -> BitmapDescriptorFactory.HUE_ORANGE
-                    else -> BitmapDescriptorFactory.HUE_RED
+                val markerIcon = when (sm.kind) {
+                    "terminal" -> markerAzure
+                    "loading" -> markerGreen
+                    "unloading" -> markerRose
+                    "transfer" -> markerOrange
+                    else -> markerRed
                 }
                 Marker(
                     state = rememberMarkerState(
@@ -2286,7 +2362,7 @@ fun MapScreen(
                     ),
                     title = sm.name,
                     snippet = sm.area ?: "Selected Location",
-                    icon = BitmapDescriptorFactory.defaultMarker(markerHue),
+                    icon = markerIcon,
                     zIndex = 20f
                 )
             }
@@ -3533,69 +3609,128 @@ fun MapScreen(
                 val m = selectedMarker!!
                 val isLandmark = m.kind !in listOf("terminal", "loading", "unloading", "transfer")
 
-                // Selected Landmark / Place Card (Matches reference screenshot)
+                // Selected Landmark / Place Card (Modern, polished, compact, production-ready)
                 Surface(
                     color = Color.White,
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(18.dp),
                     shadowElevation = 8.dp,
-                    modifier = Modifier.fillMaxWidth()
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 500.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                    ) {
+                        // 1. Header: Landmark Badge + 44x44dp Touch Target Close Button
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val badgeBg = when (m.kind) {
+                                "terminal" -> Brand50
+                                "loading" -> Ok50
+                                "unloading" -> Bad50
+                                "transfer" -> Warn50
+                                else -> Color(0xFFFFF7ED) // subtle warm orange tint
+                            }
                             val badgeColor = when (m.kind) {
-                                "terminal" -> Brand600
+                                "terminal" -> Brand700
                                 "loading" -> Ok600
                                 "unloading" -> Bad600
                                 "transfer" -> Warn600
-                                else -> Color(0xFFE65100) // Amber/Orange as in reference screenshot
+                                else -> Color(0xFFC2410C) // refined warm orange accent
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(badgeColor))
-                                Text(
-                                    text = when (m.kind) {
-                                        "terminal" -> "TERMINAL"
-                                        "loading" -> "LOADING POINT"
-                                        "unloading" -> "UNLOADING POINT"
-                                        "transfer" -> "TRANSFER POINT"
-                                        "school" -> "SCHOOL / UNIVERSITY"
-                                        "mall" -> "SHOPPING MALL"
-                                        "government" -> "GOVERNMENT BUILDING"
-                                        "hospital" -> "HOSPITAL"
-                                        else -> "LANDMARK"
-                                    },
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = badgeColor
-                                )
+                            val badgeBorder = when (m.kind) {
+                                "terminal" -> Brand600.copy(alpha = 0.25f)
+                                "loading" -> Ok600.copy(alpha = 0.25f)
+                                "unloading" -> Bad600.copy(alpha = 0.25f)
+                                "transfer" -> Warn600.copy(alpha = 0.25f)
+                                else -> Color(0xFFFDBA74).copy(alpha = 0.5f)
                             }
 
-                            IconButton(
-                                onClick = {
-                                    selectedMarker = null
-                                    viewModel.clearDirections()
-                                },
-                                modifier = Modifier.size(24.dp)
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = badgeBg,
+                                border = BorderStroke(1.dp, badgeBorder)
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Close", tint = InkMuted)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Place,
+                                        contentDescription = null,
+                                        tint = badgeColor,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Text(
+                                        text = when (m.kind) {
+                                            "terminal" -> "TERMINAL"
+                                            "loading" -> "LOADING POINT"
+                                            "unloading" -> "UNLOADING POINT"
+                                            "transfer" -> "TRANSFER POINT"
+                                            "school" -> "SCHOOL / UNIVERSITY"
+                                            "mall" -> "SHOPPING MALL"
+                                            "government" -> "GOVERNMENT BUILDING"
+                                            "hospital" -> "HOSPITAL"
+                                            else -> "LANDMARK"
+                                        },
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp,
+                                        color = badgeColor
+                                    )
+                                }
+                            }
+
+                            // Close button with comfortable touch target (>= 44x44px)
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clickable(
+                                        onClick = {
+                                            selectedMarker = null
+                                            viewModel.clearDirections()
+                                        }
+                                    ),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFF1F5F9)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Close landmark details",
+                                        tint = Color(0xFF64748B),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
+                        // 2. Landmark Name (Bold dark navy typography, adapts to width, wraps naturally)
                         Text(
                             text = m.name,
-                            fontSize = 18.sp,
+                            fontSize = 19.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Ink,
-                            lineHeight = 22.sp
+                            color = Color(0xFF0F172A),
+                            lineHeight = 23.sp
                         )
 
                         Spacer(modifier = Modifier.height(2.dp))
 
+                        // Location / City
                         val rawArea = m.area?.trim().orEmpty()
                         val addressText = when {
                             rawArea.isEmpty() -> "Cagayan de Oro City"
@@ -3604,14 +3739,21 @@ fun MapScreen(
                         }
                         Text(
                             text = addressText,
-                            fontSize = 13.sp,
-                            color = InkMuted
+                            fontSize = 12.5.sp,
+                            color = Color(0xFF64748B)
                         )
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Interactive Nearby Passing Jeepneys Section
-                        if (nearbyRoutesForSelectedMarker.isNotEmpty()) {
+                        // 3. Nearby Jeepneys Section
+                        val routeCount = nearbyRoutesForSelectedMarker.size
+                        val routeCountText = if (routeCount == 1) "1 route" else "$routeCount routes"
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -3623,24 +3765,50 @@ fun MapScreen(
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Text(
-                                    text = "Nearby Jeepneys (${nearbyRoutesForSelectedMarker.size} routes):",
-                                    fontSize = 12.sp,
+                                    text = "Nearby Jeepneys",
+                                    fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Ink
+                                    color = Color(0xFF0F172A)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(6.dp))
+                            if (routeCount > 0) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFFEFF6FF),
+                                    border = BorderStroke(1.dp, Color(0xFFBFDBFE))
+                                ) {
+                                    Text(
+                                        text = routeCountText,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Brand700,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
 
-                            // Horizontal scrollable Route Badges
-                            Row(
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        if (routeCount > 0) {
+                            // Vertically scrollable area with max height for all available routes
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    .heightIn(max = 148.dp)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 nearbyRoutesForSelectedMarker.forEach { r ->
                                     val isHighlighted = selectedRouteId == r.id
+                                    // Clean route title: avoid duplicating code if already present in name
+                                    val cleanRouteName = if (r.name.contains(r.code, ignoreCase = true)) {
+                                        r.name.trim()
+                                    } else {
+                                        "${r.name.trim()} (${r.code.trim()})"
+                                    }
+
                                     Surface(
                                         onClick = {
                                             if (selectedRouteId == r.id) {
@@ -3650,29 +3818,39 @@ fun MapScreen(
                                             }
                                         },
                                         shape = RoundedCornerShape(10.dp),
-                                        color = if (isHighlighted) Brand50 else Color(0xFFF7F9F8),
-                                        border = androidx.compose.foundation.BorderStroke(
+                                        color = if (isHighlighted) Color(0xFFF0F9FF) else Color(0xFFF8FAFC),
+                                        border = BorderStroke(
                                             1.dp,
-                                            if (isHighlighted) Brand600 else Line
+                                            if (isHighlighted) Brand600 else Color(0xFFE2E8F0)
                                         )
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 10.dp, vertical = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             RouteBadge(code = r.code, colorHex = r.color, size = BadgeSize.Sm)
-                                            Column {
+                                            Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "${r.name} (${r.code})",
-                                                    fontSize = 12.sp,
+                                                    text = cleanRouteName,
+                                                    fontSize = 12.5.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Ink
+                                                    color = Color(0xFF0F172A),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
+                                                val routeSubtext = when {
+                                                    isHighlighted -> "Highlighted on map · Tap for info"
+                                                    r.origin.isNotBlank() && r.destination.isNotBlank() -> "${r.origin} · ${r.destination}"
+                                                    r.destination.isNotBlank() -> r.destination
+                                                    else -> "Agora Market City and Terminal"
+                                                }
                                                 Text(
-                                                    text = if (isHighlighted) "Highlighted on map · Tap for info" else "${r.origin} → ${r.destination}",
-                                                    fontSize = 10.sp,
-                                                    color = if (isHighlighted) Brand600 else InkMuted,
+                                                    text = routeSubtext,
+                                                    fontSize = 11.sp,
+                                                    color = if (isHighlighted) Brand600 else Color(0xFF64748B),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -3682,41 +3860,31 @@ fun MapScreen(
                                 }
                             }
                         } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFFF8FAFC),
+                                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.DirectionsBus,
-                                    contentDescription = null,
-                                    tint = InkMuted,
-                                    modifier = Modifier.size(15.dp)
-                                )
                                 Text(
-                                    text = "Nearby Jeepneys:",
+                                    text = "No verified jeepney routes directly serve this location.",
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Ink
+                                    color = Color(0xFF64748B),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "No verified jeepney routes directly serve this location.",
-                                fontSize = 12.sp,
-                                color = InkMuted
-                            )
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                        // Interactive Action Buttons
+                        // 4. Action Buttons (Equal height, aligned edges, comfortable 44-48dp touch target)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // [Get Directions] Button
-                            OroButton(
-                                text = "Get Directions",
+                            // Primary Action: [Get Directions]
+                            Surface(
                                 onClick = {
                                     val destLat = m.lat ?: cdoCenter.latitude
                                     val destLng = m.lng ?: cdoCenter.longitude
@@ -3734,12 +3902,38 @@ fun MapScreen(
                                         showManualOriginDialog = true
                                     }
                                 },
-                                variant = ButtonVariant.Primary,
-                                size = ButtonSize.Sm,
-                                modifier = Modifier.weight(1f)
-                            )
+                                shape = RoundedCornerShape(12.dp),
+                                color = Brand600,
+                                shadowElevation = 2.dp,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(46.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Directions,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Get Directions",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
 
-                            // [View Jeepney Routes] Button (Soft mint styling matching reference)
+                            // Secondary Action: [View Jeepney Routes]
                             Surface(
                                 onClick = {
                                     val rawAreaForTarget = m.area?.trim().orEmpty()
@@ -3759,18 +3953,33 @@ fun MapScreen(
                                         viewModel.loadRoutes()
                                     }
                                 },
-                                shape = RoundedCornerShape(10.dp),
-                                color = Brand50,
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFFE0F2FE), // Soft light blue
+                                border = BorderStroke(1.dp, Color(0xFFBAE6FD)),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(36.dp)
+                                    .height(46.dp)
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AltRoute,
+                                        contentDescription = null,
+                                        tint = Brand700,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "View Jeepney Routes",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Brand700
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Brand700,
+                                        maxLines = 1
                                     )
                                 }
                             }

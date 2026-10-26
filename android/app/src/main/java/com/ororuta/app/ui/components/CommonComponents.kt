@@ -194,7 +194,7 @@ fun RouteBadge(
 @Composable
 fun StatusPill(status: String, modifier: Modifier = Modifier) {
     val (bgColor, textColor) = when (status) {
-        "Active" -> Pair(Ok50, Ok600)
+        "Active", "Published" -> Pair(Ok50, Ok600)
         "Rerouted" -> Pair(Warn50, Warn600)
         "Updated" -> Pair(Brand50, Brand600)
         "Temporary" -> Pair(Oro100, Oro700)

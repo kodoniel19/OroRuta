@@ -19,7 +19,7 @@ async function migrate() {
 
   await pool.query(`
     INSERT IGNORE INTO admin_users (id, username, email, password, name, role, phone)
-    VALUES ('u-01', 'admin', 'admin@ororuta.ph', 'OroRuta@2026', 'Maria Santos', 'Super Admin', '+63 917 555 0142');
+    VALUES ('u-01', 'deko74415', 'deko74415@liceo.edu.ph', 'Ororuta2026', 'Doniel Eunson Ko', 'Super Admin', '+63 917 555 0142');
   `);
 
   // 2. Admin Activity

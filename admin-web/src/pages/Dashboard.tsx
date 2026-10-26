@@ -128,8 +128,7 @@ export function Dashboard() {
       <div className="grid gap-6 xl:grid-cols-3">
         {/* Search trend chart */}
         <Panel title="Search activity (14 days)" description="Route searches from the OroRuta Android app"
-          className="xl:col-span-2"
-          actions={<Link to="/analytics" className="flex items-center gap-1 text-xs text-primary-600 hover:underline">View analytics <ArrowRightIcon className="h-3.5 w-3.5" /></Link>}>
+          className="xl:col-span-2">
           <div className="h-56 px-2 pb-4 pt-5">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>

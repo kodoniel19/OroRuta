@@ -6,6 +6,40 @@ const { calculateTraditionalFare, getDynamicFareConfig } = require("../services/
 // In-memory cache for dynamic trip options
 const dynamicOptionsCache = new Map();
 
+// In-memory cache for static transit metadata (routes, geometries, terminals)
+let cachedTransitData = null;
+let lastTransitCacheTime = 0;
+const TRANSIT_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
+async function getCachedTransitData() {
+  const now = Date.now();
+  if (cachedTransitData && (now - lastTransitCacheTime < TRANSIT_CACHE_TTL)) {
+    return cachedTransitData;
+  }
+  const [allRoutes] = await db.execute(
+    "SELECT * FROM routes WHERE status != 'Inactive' AND (jeepney_type = 'Traditional' OR jeepney_type IS NULL OR jeepney_type = '')"
+  );
+  const [allGeos] = await db.execute("SELECT route_id, direction, geometry FROM route_geometry");
+  const [allDirs] = await db.execute("SELECT route_id, direction, distance_km, street_sequence FROM route_directions");
+  const [allTerminals] = await db.execute("SELECT id, name, lat, lng FROM terminals WHERE lat != 0 AND lng != 0");
+  const [allRouteTerminals] = await db.execute(
+    "SELECT rt.route_id, rt.terminal_id, rt.seq, t.name, t.lat, t.lng FROM route_terminals rt JOIN terminals t ON rt.terminal_id = t.id WHERE t.lat != 0 AND t.lng != 0 ORDER BY rt.seq"
+  );
+  const [allLoadingPoints] = await db.execute(
+    "SELECT id, route_id, name, note, point_type, lat, lng FROM loading_points WHERE lat != 0 AND lng != 0"
+  );
+
+  cachedTransitData = {
+    allRoutes, allGeos, allDirs, allTerminals, allRouteTerminals, allLoadingPoints
+  };
+  lastTransitCacheTime = now;
+  return cachedTransitData;
+}
+
+// In-memory query cache for trip searches (30-second TTL)
+const tripSearchMemoryCache = new Map();
+const SEARCH_CACHE_TTL = 30000;
+
 /**
  * Calculates polyline length in meters from [[lng, lat], ...]
  */
@@ -25,7 +59,9 @@ const CDO_ALIASES = [
   { keywords: ["gumamela", "gumamela ext", "gumamela extension"], name: "Gumamela Extension, Carmen", area: "Carmen", kind: "landmark", lat: 8.4908, lng: 124.6338 },
   { keywords: ["centrio", "ayala centrio", "centrio mall"], name: "Centrio Mall", area: "Poblacion", kind: "mall", lat: 8.4877, lng: 124.6517 },
   { keywords: ["limketkai", "ketkai", "limkdtkai"], name: "Limketkai Center", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6568 },
-  { keywords: ["gaisano", "gaisano city"], name: "Gaisano City Mall", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6515 },
+  { keywords: ["gaisano puerto", "gaisano mall puerto", "puerto gaisano", "gaisano puerto mall"], name: "Gaisano Puerto Mall", area: "Puerto", kind: "mall", lat: 8.500564, lng: 124.751757 },
+  { keywords: ["cobsat", "bugo school of arts", "cobsat bugo", "cagayan de oro bugo school of arts and trades", "school of arts and trades", "cobsat bugo school"], name: "Cagayan de Oro (Bugo) School of Arts and Trades (COBSAT)", area: "Bugo", kind: "school", lat: 8.506718, lng: 124.761533 },
+  { keywords: ["gaisano city", "gaisano city mall", "gaisano lapasan", "gaisano main", "gaisano mall", "gaisano"], name: "Gaisano City Mall", area: "Lapasan", kind: "mall", lat: 8.4842, lng: 124.6515 },
   { keywords: ["cogon", "cogon market", "cogon public market"], name: "Cogon Market", area: "Cogon", kind: "market", lat: 8.477160, lng: 124.651208 },
   { keywords: ["carmen market", "carmen public market", "carmen"], name: "Carmen Public Market", area: "Carmen", kind: "market", lat: 8.479498, lng: 124.636820 },
   { keywords: ["agora", "agora terminal", "agora market"], name: "Agora Terminal", area: "Lapasan", kind: "terminal", lat: 8.4857, lng: 124.6589 },
@@ -256,22 +292,71 @@ async function findDirectJeepneyRoutes(
       const depTerm = rTerms.find(t => t.seq === (isOutbound ? 2 : 1)) || rTerms[0];
       const arrTerm = rTerms.find(t => t.seq === (isOutbound ? 1 : 2)) || rTerms[rTerms.length - 1];
 
-      // 1. Find optimal drop-off point along geometry near destination
-      let bestDestIdx = -1;
-      let minDestDist = Infinity;
+      const directOrigDestDist = haversineMeters(origLat, origLng, destLat, destLng);
+
+      // Collect all candidate dropoff points along geometry within maxWalkDest
+      const destCandidates = [];
       for (let i = 0; i < coords.length; i++) {
         const d = haversineMeters(destLat, destLng, coords[i][1], coords[i][0]);
-        if (d < minDestDist) {
-          minDestDist = d;
-          bestDestIdx = i;
+        if (d <= maxWalkDest) {
+          destCandidates.push({ idx: i, dist: d });
         }
       }
 
       // Check distance to arrival terminal
       const arrTermDist = arrTerm ? haversineMeters(destLat, destLng, arrTerm.lat, arrTerm.lng) : Infinity;
+      if (arrTerm && arrTermDist <= maxWalkDest && destCandidates.length === 0) {
+        destCandidates.push({ idx: coords.length - 1, dist: arrTermDist, isArrTerm: true });
+      }
 
-      // Must be within maxWalkDest of destination
-      if (minDestDist > maxWalkDest && arrTermDist > maxWalkDest) continue;
+      if (destCandidates.length === 0) continue;
+
+      // Collect candidate boarding points along geometry within maxWalkOrig
+      const origCandidates = [];
+      for (let i = 0; i < coords.length; i++) {
+        const d = haversineMeters(origLat, origLng, coords[i][1], coords[i][0]);
+        if (d <= maxWalkOrig) {
+          origCandidates.push({ idx: i, dist: d });
+        }
+      }
+
+      // Check distance to departure terminal
+      const depTermDist = depTerm ? haversineMeters(origLat, origLng, depTerm.lat, depTerm.lng) : Infinity;
+      if (depTerm && depTermDist <= maxWalkOrig && origCandidates.length === 0) {
+        origCandidates.push({ idx: 0, dist: depTermDist, isDepTerm: true });
+      }
+
+      if (origCandidates.length === 0) continue;
+
+      // Find optimal boarding and drop-off pair with bIdx < dIdx
+      let bestOrigIdx = -1;
+      let bestDestIdx = -1;
+      let minPairCost = Infinity;
+      let minOrigDist = Infinity;
+      let minDestDist = Infinity;
+
+      for (const o of origCandidates) {
+        for (const d of destCandidates) {
+          if (o.idx >= d.idx) continue;
+          if (directOrigDestDist > 500 && (d.idx - o.idx) < 2) continue;
+
+          const cost = (o.dist * 1.2) + (d.dist * 2.2);
+          if (cost < minPairCost) {
+            minPairCost = cost;
+            bestOrigIdx = o.idx;
+            bestDestIdx = d.idx;
+            minOrigDist = o.dist;
+            minDestDist = d.dist;
+          }
+        }
+      }
+
+      if (bestOrigIdx === -1 || bestDestIdx === -1) continue;
+
+      // Ride distance along route geometry
+      const rideCoords = coords.slice(bestOrigIdx, bestDestIdx + 1);
+      const rideDistMeters = calculatePolylineMeters(rideCoords);
+      if (rideDistMeters < 50) continue;
 
       let dropoffCoord = [coords[bestDestIdx][0], coords[bestDestIdx][1]];
       let walkFromDropM = Math.round(minDestDist);
@@ -279,11 +364,11 @@ async function findDirectJeepneyRoutes(
       let destMatchType = "Nearby Drop-off";
 
       // If arrival terminal is within 250m of destination and route terminates near it
-      if (arrTerm && arrTermDist <= 250) {
+      if (arrTerm && arrTermDist <= 250 && bestDestIdx >= coords.length - 4) {
         dropoffCoord = [arrTerm.lng, arrTerm.lat];
         walkFromDropM = Math.round(arrTermDist);
         dropoffName = arrTerm.name;
-        if (walkFromDropM <= 120) destMatchType = "Direct Route";
+        if (walkFromDropM <= 150) destMatchType = "Direct Route";
       } else {
         // Check closest verified loading point
         let closestLp = null, closestLpDist = Infinity;
@@ -298,34 +383,14 @@ async function findDirectJeepneyRoutes(
         } else {
           dropoffName = findStopLabel(coords[bestDestIdx][1], coords[bestDestIdx][0], "Drop-off stop", destName, allTerminals, rLps);
         }
-        if (walkFromDropM <= 120) destMatchType = "Direct Route";
+        if (walkFromDropM <= 150) destMatchType = "Direct Route";
       }
-
-      // 2. Find optimal boarding point that occurs BEFORE bestDestIdx along the route
-      let bestOrigIdx = -1;
-      let minOrigDist = Infinity;
-      for (let i = 0; i < bestDestIdx; i++) {
-        const d = haversineMeters(origLat, origLng, coords[i][1], coords[i][0]);
-        if (d < minOrigDist) {
-          minOrigDist = d;
-          bestOrigIdx = i;
-        }
-      }
-
-      // Must be within maxWalkOrig of origin
-      if (bestOrigIdx === -1 || minOrigDist > maxWalkOrig) continue;
-
-      // Ride distance along route geometry
-      const rideCoords = coords.slice(bestOrigIdx, bestDestIdx + 1);
-      const rideDistMeters = calculatePolylineMeters(rideCoords);
-      if (rideDistMeters < 300) continue;
 
       let boardingCoord = [coords[bestOrigIdx][0], coords[bestOrigIdx][1]];
       let walkToBoardM = Math.round(minOrigDist);
       let boardingName = "";
 
       // Check if departure terminal is within 250m and boarding is near start of route
-      const depTermDist = depTerm ? haversineMeters(origLat, origLng, depTerm.lat, depTerm.lng) : Infinity;
       if (depTerm && depTermDist <= 250 && bestOrigIdx <= 3) {
         boardingCoord = [depTerm.lng, depTerm.lat];
         walkToBoardM = Math.round(depTermDist);
@@ -511,6 +576,12 @@ async function search(req, res, next) {
       return res.status(400).json({ error: { code: "BAD_REQUEST", message: "to destination is required" } });
     }
 
+    const cacheKey = `${from}_${to}_${fromLat || ''}_${fromLng || ''}_${toLat || ''}_${toLng || ''}_${sort}`;
+    const cachedHit = tripSearchMemoryCache.get(cacheKey);
+    if (cachedHit && (Date.now() - cachedHit.timestamp < SEARCH_CACHE_TTL)) {
+      return res.json(cachedHit.results);
+    }
+
     const originPlace = await resolvePlace(from, fromLat, fromLng, true);
     let destPlace = await resolvePlace(to, toLat, toLng, false);
 
@@ -523,19 +594,10 @@ async function search(req, res, next) {
     const dLat = toLat ? parseFloat(toLat) : destPlace.lat;
     const dLng = toLng ? parseFloat(toLng) : destPlace.lng;
 
-    // Load active traditional routes & geometries
-    const [allRoutes] = await db.execute(
-      "SELECT * FROM routes WHERE status != 'Inactive' AND (jeepney_type = 'Traditional' OR jeepney_type IS NULL OR jeepney_type = '')"
-    );
-    const [allGeos] = await db.execute("SELECT route_id, direction, geometry FROM route_geometry");
-    const [allDirs] = await db.execute("SELECT route_id, direction, distance_km, street_sequence FROM route_directions");
-    const [allTerminals] = await db.execute("SELECT id, name, lat, lng FROM terminals WHERE lat != 0 AND lng != 0");
-    const [allRouteTerminals] = await db.execute(
-      "SELECT rt.route_id, rt.terminal_id, rt.seq, t.name, t.lat, t.lng FROM route_terminals rt JOIN terminals t ON rt.terminal_id = t.id WHERE t.lat != 0 AND t.lng != 0 ORDER BY rt.seq"
-    );
-    const [allLoadingPoints] = await db.execute(
-      "SELECT id, route_id, name, note, point_type, lat, lng FROM loading_points WHERE lat != 0 AND lng != 0"
-    );
+    // Load active traditional routes & geometries from fast in-memory cache
+    const {
+      allRoutes, allGeos, allDirs, allTerminals, allRouteTerminals, allLoadingPoints
+    } = await getCachedTransitData();
 
     // 1. Direct candidates
     const directCandidates = await findDirectJeepneyRoutes(
@@ -617,28 +679,14 @@ async function search(req, res, next) {
       if (c.type === "direct") {
         const r = c.route;
 
-        let walkToBoardCoords = [
+        const walkToBoardCoords = [
           [oLng, oLat],
           [c.boardingCoord[0], c.boardingCoord[1]]
         ];
-        try {
-          const osrmWalk1 = await getWalkingRoute([oLng, oLat], [c.boardingCoord[0], c.boardingCoord[1]]);
-          if (osrmWalk1 && osrmWalk1.coordinates && osrmWalk1.coordinates.length >= 2) {
-            walkToBoardCoords = osrmWalk1.coordinates;
-          }
-        } catch (_) {}
-
-        let walkFromDropCoords = [
+        const walkFromDropCoords = [
           [c.dropoffCoord[0], c.dropoffCoord[1]],
           [dLng, dLat]
         ];
-        try {
-          const osrmWalk2 = await getWalkingRoute([c.dropoffCoord[0], c.dropoffCoord[1]], [dLng, dLat]);
-          if (osrmWalk2 && osrmWalk2.coordinates && osrmWalk2.coordinates.length >= 2) {
-            walkFromDropCoords = osrmWalk2.coordinates;
-          }
-        } catch (_) {}
-
         const fullGeometryCoords = [
           ...walkToBoardCoords,
           ...c.rideCoords,
@@ -775,33 +823,18 @@ async function search(req, res, next) {
         const hub = c.hub;
         const optId = `transfer-${l1.route.code.toLowerCase()}-${l2.route.code.toLowerCase()}-${hub.id}-${originPlace.id}-${destPlace.id}`;
 
-        let walkToBoardCoords = [
+        const walkToBoardCoords = [
           [oLng, oLat],
           [l1.boardingCoord[0], l1.boardingCoord[1]]
         ];
-        try {
-          const w1 = await getWalkingRoute([oLng, oLat], [l1.boardingCoord[0], l1.boardingCoord[1]]);
-          if (w1 && w1.coordinates && w1.coordinates.length >= 2) walkToBoardCoords = w1.coordinates;
-        } catch (_) {}
-
-        let transferWalkCoords = [
+        const transferWalkCoords = [
           [l1.dropoffCoord[0], l1.dropoffCoord[1]],
           [l2.boardingCoord[0], l2.boardingCoord[1]]
         ];
-        try {
-          const wt = await getWalkingRoute([l1.dropoffCoord[0], l1.dropoffCoord[1]], [l2.boardingCoord[0], l2.boardingCoord[1]]);
-          if (wt && wt.coordinates && wt.coordinates.length >= 2) transferWalkCoords = wt.coordinates;
-        } catch (_) {}
-
-        let walkFromDropCoords = [
+        const walkFromDropCoords = [
           [l2.dropoffCoord[0], l2.dropoffCoord[1]],
           [dLng, dLat]
         ];
-        try {
-          const w2 = await getWalkingRoute([l2.dropoffCoord[0], l2.dropoffCoord[1]], [dLng, dLat]);
-          if (w2 && w2.coordinates && w2.coordinates.length >= 2) walkFromDropCoords = w2.coordinates;
-        } catch (_) {}
-
         const fullGeometryCoords = [
           ...walkToBoardCoords,
           ...l1.rideCoords,
@@ -1005,6 +1038,7 @@ async function search(req, res, next) {
       }
     }
 
+    tripSearchMemoryCache.set(cacheKey, { results, timestamp: Date.now() });
     res.json(results);
   } catch (err) { next(err); }
 }

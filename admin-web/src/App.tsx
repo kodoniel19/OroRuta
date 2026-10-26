@@ -18,8 +18,6 @@ import { RouteMaps } from './pages/RouteMaps';
 import { Fares } from './pages/Fares';
 import { Announcements } from './pages/Announcements';
 import { Reports } from './pages/Reports';
-import { SearchAnalytics } from './pages/SearchAnalytics';
-import { OfflineData } from './pages/OfflineData';
 import { Settings } from './pages/Settings';
 import { Account } from './pages/Account';
 
@@ -46,8 +44,6 @@ export function App() {
                 <Route path="/fares" element={<Fares />} />
                 <Route path="/announcements" element={<Announcements />} />
                 <Route path="/reports" element={<Reports />} />
-                <Route path="/analytics" element={<SearchAnalytics />} />
-                <Route path="/offline-data" element={<OfflineData />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/account" element={<Account />} />
               </Route>

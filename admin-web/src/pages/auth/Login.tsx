@@ -99,7 +99,7 @@ export function Login() {
               autoComplete="username"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="admin@ororuta.ph"
+              placeholder="deko74415@liceo.edu.ph"
               disabled={loading || locked}
               aria-invalid={!!errors.identifier}
               aria-describedby={errors.identifier ? 'identifier-error' : undefined}

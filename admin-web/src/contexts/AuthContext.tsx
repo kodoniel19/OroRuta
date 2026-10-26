@@ -26,14 +26,14 @@ const STORAGE_KEY = 'ororuta_admin_session';
 const MAX_ATTEMPTS = 5;
 
 export const DEMO_CREDENTIALS = {
-  email: 'admin@ororuta.ph',
-  username: 'admin',
-  password: 'OroRuta@2026',
+  email: 'deko74415@liceo.edu.ph',
+  username: 'deko74415',
+  password: 'Ororuta2026',
 };
 
 const DEFAULT_ADMIN: AdminUser = {
-  name: 'Maria Santos',
-  email: 'admin@ororuta.ph',
+  name: 'Doniel Eunson Ko',
+  email: 'deko74415@liceo.edu.ph',
   role: 'Super Admin',
   phone: '+63 917 555 0142',
 };

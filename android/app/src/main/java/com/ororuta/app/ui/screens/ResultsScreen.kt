@@ -19,11 +19,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ororuta.app.domain.CdoServiceArea
 import com.ororuta.app.domain.models.Resource
 import com.ororuta.app.domain.models.TripOption
 import com.ororuta.app.ui.components.*
 import com.ororuta.app.ui.theme.*
 import com.ororuta.app.ui.viewmodels.ResultsViewModel
+
+/** Delegates to shared [CdoServiceArea.isOutsideServiceArea]. */
+private fun isOutsideCdoServiceArea(destinationName: String?, lat: Double?, lng: Double?): Boolean =
+    CdoServiceArea.isOutsideServiceArea(destinationName, lat, lng)
 
 @Composable
 fun ResultsScreen(
@@ -170,20 +175,20 @@ fun ResultsScreen(
                     if (state.isOffline) {
                         EmptyState(
                             icon = Icons.Default.CloudOff,
-                            title = "Can't search while offline",
-                            message = "Search requires an internet connection. You can still access your downloaded routes.",
+                            title = "Connection Error",
+                            message = "Unable to connect to transit server. Please check your internet connection and try again.",
                             tone = EmptyTone.Warn,
                             action = {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     OroButton(
-                                        text = "View Offline Routes",
-                                        onClick = onNavigateOffline,
+                                        text = "Retry",
+                                        onClick = { viewModel.searchTrips(from, to, viewModel.currentSort) },
                                         variant = ButtonVariant.Primary,
                                         size = ButtonSize.Md
                                     )
                                     OroButton(
-                                        text = "Retry Connection",
-                                        onClick = { viewModel.searchTrips(from, to, viewModel.currentSort) },
+                                        text = "View Offline Routes",
+                                        onClick = onNavigateOffline,
                                         variant = ButtonVariant.Ghost,
                                         size = ButtonSize.Md
                                     )
@@ -211,42 +216,78 @@ fun ResultsScreen(
                 is Resource.Success -> {
                     val trips = state.data
                     if (trips.isEmpty()) {
-                        // 30. No Jeepney Route Found screen
-                        EmptyState(
-                            icon = Icons.Default.DirectionsBusFilled,
-                            title = "No verified jeepney route found for this destination",
-                            message = "We couldn't find a direct verified jeepney route matching your journey. Boarding or destination alighting exceeds reasonable walking distance (maximum 1.0 km). Note that OroRuta only covers verified traditional jeepney routes within Cagayan de Oro City.",
-                            tone = EmptyTone.Warn,
-                            action = {
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    OroButton(
-                                        text = "Change Destination",
-                                        onClick = onEditSearch,
-                                        variant = ButtonVariant.Primary,
-                                        size = ButtonSize.Md,
-                                        fullWidth = true
-                                    )
-                                    OroButton(
-                                        text = "View Nearby Routes",
-                                        onClick = onNavigateNearby,
-                                        variant = ButtonVariant.Secondary,
-                                        size = ButtonSize.Md,
-                                        fullWidth = true
-                                    )
-                                    OroButton(
-                                        text = "Browse All Routes",
-                                        onClick = onNavigateRoutes,
-                                        variant = ButtonVariant.Ghost,
-                                        size = ButtonSize.Md,
-                                        fullWidth = true
-                                    )
-                                }
-                            },
-                            modifier = Modifier.padding(top = 32.dp)
-                        )
+                        // Check if destination is outside CDO service area
+                        val isOutsideArea = remember(to, toLat, toLng) {
+                            isOutsideCdoServiceArea(to, toLat, toLng)
+                        }
+
+                        if (isOutsideArea) {
+                            EmptyState(
+                                icon = Icons.Default.LocationOff,
+                                title = "Destination Outside Service Area",
+                                message = "This destination is outside OroRuta\u2019s current jeepney route coverage in Cagayan de Oro City. Please choose a destination within the supported service area to find available jeepney routes.",
+                                tone = EmptyTone.Neutral,
+                                action = {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        OroButton(
+                                            text = "Choose Another Destination",
+                                            onClick = onEditSearch,
+                                            variant = ButtonVariant.Primary,
+                                            size = ButtonSize.Md,
+                                            fullWidth = true
+                                        )
+                                        OroButton(
+                                            text = "Browse All Routes",
+                                            onClick = onNavigateRoutes,
+                                            variant = ButtonVariant.Ghost,
+                                            size = ButtonSize.Md,
+                                            fullWidth = true
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.padding(top = 32.dp)
+                            )
+                        } else {
+                            // Inside CDO but no matching route
+                            EmptyState(
+                                icon = Icons.Default.DirectionsBusFilled,
+                                title = "No Suitable Route Found",
+                                message = "No verified jeepney route connects your origin to this destination within walking distance (maximum 1.0 km). You may need to transfer at Agora, Carmen, or Bulua terminals.",
+                                tone = EmptyTone.Neutral,
+                                action = {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        OroButton(
+                                            text = "Change Destination",
+                                            onClick = onEditSearch,
+                                            variant = ButtonVariant.Primary,
+                                            size = ButtonSize.Md,
+                                            fullWidth = true
+                                        )
+                                        OroButton(
+                                            text = "View Nearby Routes",
+                                            onClick = onNavigateNearby,
+                                            variant = ButtonVariant.Secondary,
+                                            size = ButtonSize.Md,
+                                            fullWidth = true
+                                        )
+                                        OroButton(
+                                            text = "Browse All Routes",
+                                            onClick = onNavigateRoutes,
+                                            variant = ButtonVariant.Ghost,
+                                            size = ButtonSize.Md,
+                                            fullWidth = true
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.padding(top = 32.dp)
+                            )
+                        }
                     } else {
                         val criterionName = when (viewModel.currentSort) {
                             "fare" -> "lowest fare"

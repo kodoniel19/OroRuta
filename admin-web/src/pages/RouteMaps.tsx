@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
-import { MapPinIcon, XIcon } from 'lucide-react';
+import { MapPinIcon, XIcon, ArrowLeftRightIcon } from 'lucide-react';
 import { RouteChip } from '../components/ui/RouteChip';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { TransitMap } from '../components/map/TransitMap';
@@ -8,13 +8,50 @@ import { useData } from '../contexts/DataContext';
 import { locationKinds } from '../data/locationKinds';
 import { peso } from '../utils/format';
 import { api } from '../services/api';
-import type { LatLng, LocationKind, TransitLocation } from '../types/transit';
+import type { LatLng, LocationKind, TransitLocation, JeepneyRoute } from '../types/transit';
 
 export function RouteMaps() {
   const { routes, locations, setLocations, logActivity } = useData();
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [routeDirections, setRouteDirections] = useState<Record<string, 'Inbound' | 'Outbound'>>({});
   const [showStops, setShowStops] = useState(true);
   const [selectedKind, setSelectedKind] = useState<string>('all');
+
+  const getDirection = useCallback((routeId: string): 'Inbound' | 'Outbound' => {
+    return routeDirections[routeId] ?? 'Inbound';
+  }, [routeDirections]);
+
+  const setDirection = useCallback((routeId: string, dir: 'Inbound' | 'Outbound', e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setRouteDirections((prev) => ({
+      ...prev,
+      [routeId]: dir,
+    }));
+  }, []);
+
+  const getRouteGeometry = useCallback((route: JeepneyRoute, direction: 'Inbound' | 'Outbound'): { path: LatLng[]; distanceKm: number | null } => {
+    if (route.geometries && route.geometries.length > 0) {
+      const match = route.geometries.find((g: any) => g.direction?.toLowerCase() === direction.toLowerCase());
+      if (match?.geometry?.coordinates && Array.isArray(match.geometry.coordinates) && match.geometry.coordinates.length > 0) {
+        const coords: LatLng[] = match.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]]);
+        return { path: coords, distanceKm: match.distance_km ? parseFloat(match.distance_km) : null };
+      }
+    }
+    const dist = direction === 'Inbound' ? route.inboundDistanceKm : route.outboundDistanceKm;
+    return { path: route.path, distanceKm: dist ?? null };
+  }, []);
+
+  const displayedRoutes = useMemo(() => {
+    return routes.map((r) => {
+      const dir = routeDirections[r.id] ?? 'Inbound';
+      const { path } = getRouteGeometry(r, dir);
+      return {
+        ...r,
+        direction: dir,
+        path,
+      };
+    });
+  }, [routes, routeDirections, getRouteGeometry]);
 
   // Landmark pin placement state
   const [pinMode, setPinMode] = useState(false);
@@ -26,7 +63,7 @@ export function RouteMaps() {
   }>({ name: '', kind: 'loading', address: '' });
   const [savingPin, setSavingPin] = useState(false);
 
-  const selectedRoute = routes.find((r) => r.id === selectedRouteId) ?? null;
+  const selectedRoute = displayedRoutes.find((r) => r.id === selectedRouteId) ?? null;
 
   const visibleLocations = locations.filter((l) => {
     if (!showStops) return false;
@@ -153,6 +190,33 @@ export function RouteMaps() {
               {pinMode ? 'Pin Mode ON' : 'Place Pin'}
             </button>
 
+            {selectedRoute && (
+              <div className="flex items-center rounded-lg border border-line bg-canvas p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setDirection(selectedRoute.id, 'Inbound')}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                    getDirection(selectedRoute.id) === 'Inbound'
+                      ? 'bg-primary-600 text-white shadow-xs'
+                      : 'text-fg-muted hover:text-fg'
+                  }`}
+                >
+                  Inbound
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDirection(selectedRoute.id, 'Outbound')}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                    getDirection(selectedRoute.id) === 'Outbound'
+                      ? 'bg-primary-600 text-white shadow-xs'
+                      : 'text-fg-muted hover:text-fg'
+                  }`}
+                >
+                  Outbound
+                </button>
+              </div>
+            )}
+
             {selectedRouteId && (
               <button
                 type="button"
@@ -176,60 +240,71 @@ export function RouteMaps() {
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-line">
-            {routes.map((r) => {
+            {displayedRoutes.map((r) => {
               const active = selectedRouteId === r.id;
+              const dir = getDirection(r.id);
+              const geom = getRouteGeometry(r, dir);
               return (
-                <button
+                <div
                   key={r.id}
-                  type="button"
                   onClick={() => setSelectedRouteId(active ? null : r.id)}
-                  className={`w-full p-3 text-left transition-colors duration-150 ${
+                  className={`w-full p-3 text-left transition-colors duration-150 cursor-pointer ${
                     active ? 'bg-primary-50/70 border-l-4 border-l-primary-600' : 'hover:bg-canvas'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <RouteChip id={r.code || r.id} color={r.color} />
-                      <span className="font-medium text-sm text-fg">{r.name}</span>
+                      <span className="font-medium text-sm text-fg truncate max-w-[180px]">{r.name}</span>
                     </div>
                   </div>
-                  <p className="mt-1 text-xs text-fg-muted">
-                    {r.origin} &rarr; {r.destination}
+                  <p className="mt-1 text-xs text-fg-muted truncate">
+                    {dir === 'Inbound' ? `${r.origin} → ${r.destination}` : `${r.destination} → ${r.origin}`}
                   </p>
                   <div className="mt-2 flex items-center justify-between text-[11px] text-fg-subtle">
-                    <span>{r.direction || 'Inbound'}</span>
+                    <span>{dir}</span>
                     <span>{peso(r.fare)} · {r.travelTime}m</span>
-                    <span className="font-mono">{r.path.length} pts</span>
+                    <span className="font-mono">{geom.path.length} pts</span>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
 
-          {selectedRoute && (
-            <div className="border-t border-line bg-canvas p-4 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-fg">{selectedRoute.name}</span>
-                <StatusBadge status={selectedRoute.status} />
+          {selectedRoute && (() => {
+            const selectedDir = getDirection(selectedRoute.id);
+            const geom = getRouteGeometry(selectedRoute, selectedDir);
+            const distance = selectedDir === 'Inbound' ? selectedRoute.inboundDistanceKm : selectedRoute.outboundDistanceKm;
+
+            return (
+              <div className="border-t border-line bg-canvas p-4 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-fg">{selectedRoute.name}</span>
+                  <StatusBadge status={selectedRoute.status} />
+                </div>
+                <div className="mt-1.5 flex items-center justify-between text-fg-muted">
+                  <span className="font-medium">{selectedDir} Alignment</span>
+                  <span className="font-mono text-[11px]">{geom.path.length} pts {distance ? `· ${distance} km` : ''}</span>
+                </div>
+                <p className="mt-2 text-fg-muted">{selectedRoute.description}</p>
+                <div className="mt-2 text-fg-subtle">
+                  Major corridors: {selectedRoute.majorRoads.join(', ')}
+                </div>
               </div>
-              <p className="mt-1 text-fg-muted">{selectedRoute.description}</p>
-              <div className="mt-2 text-fg-subtle">
-                Major corridors: {selectedRoute.majorRoads.join(', ')}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </aside>
 
         {/* Main Map Canvas */}
         <main className="relative flex-1">
           <TransitMap
-            routes={routes}
+            routes={displayedRoutes}
             locations={visibleLocations}
             selectedRouteId={selectedRouteId}
             onRouteClick={(id) => setSelectedRouteId(id === selectedRouteId ? null : id)}
             onMapClick={pinMode ? handleMapClick : undefined}
             pin={pendingPin}
-            fitKey={selectedRouteId ?? 'all-routes'}
+            fitKey={`${selectedRouteId ?? 'all-routes'}-${routeDirections[selectedRouteId ?? ''] ?? 'Inbound'}`}
             className="h-full w-full"
           />
 

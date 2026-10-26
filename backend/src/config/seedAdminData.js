@@ -90,7 +90,7 @@ async function seedAdminData() {
       );
       if (r.note) {
         await pool.query(
-          `INSERT INTO report_notes (report_id, author, text) VALUES (?, 'Maria Santos', ?)`,
+          `INSERT INTO report_notes (report_id, author, text) VALUES (?, 'Doniel Eunson Ko', ?)`,
           [r.id, r.note]
         );
       }
@@ -102,9 +102,9 @@ async function seedAdminData() {
   const [[actCount]] = await pool.query('SELECT COUNT(*) as cnt FROM admin_activity');
   if (actCount.cnt === 0) {
     const activities = [
-      { id: 'ACT-1', route_id: 'R3', action: 'Rerouted', detail: 'Path updated via map editor (22 points)', admin_by: 'Maria Santos' },
-      { id: 'ACT-2', route_id: 'R5', action: 'Fare updated', detail: 'Regular fare updated to ₱15.00', admin_by: 'Maria Santos' },
-      { id: 'ACT-3', route_id: 'R7', action: 'Activated', detail: 'Route activated after review', admin_by: 'Maria Santos' },
+      { id: 'ACT-1', route_id: 'R3', action: 'Rerouted', detail: 'Path updated via map editor (22 points)', admin_by: 'Doniel Eunson Ko' },
+      { id: 'ACT-2', route_id: 'R5', action: 'Fare updated', detail: 'Regular fare updated to ₱15.00', admin_by: 'Doniel Eunson Ko' },
+      { id: 'ACT-3', route_id: 'R7', action: 'Activated', detail: 'Route activated after review', admin_by: 'Doniel Eunson Ko' },
     ];
     for (const a of activities) {
       await pool.query(

@@ -271,9 +271,250 @@ fun HomeScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 4. TRANSPORTATION UPDATES & OFFICIAL ADVISORIES (Prominently featured under shortcuts)
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Brand50),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Campaign,
+                                contentDescription = null,
+                                tint = Brand600,
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+                        Text(
+                            text = "Transit Updates",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Ink
+                        )
+                        val activeCount = uiState.announcements.count { it.status != "Expired" }
+                        if (activeCount > 0) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Oro100
+                            ) {
+                                Text(
+                                    text = "$activeCount Active",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Oro700,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    TextButton(
+                        onClick = onNavigateAnnouncements,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (uiState.announcements.isNotEmpty()) "See all" else "View notices",
+                            color = Brand600,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                val activeList = uiState.announcements.filter { it.status != "Expired" }
+                if (activeList.isNotEmpty()) {
+                    val featured = activeList.first()
+
+                    // Prominent Featured Announcement Card
+                    Surface(
+                        onClick = { onNavigateAnnouncementDetail(featured.id) },
+                        color = Color.White,
+                        shape = RoundedCornerShape(16.dp),
+                        shadowElevation = 2.dp,
+                        border = BorderStroke(1.dp, Line),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = Brand50
+                                    ) {
+                                        Text(
+                                            text = featured.category.ifBlank { "Notice" }.uppercase(),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Brand700,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                    StatusPill(status = featured.status)
+                                }
+
+                                Text(
+                                    text = featured.date,
+                                    fontSize = 11.sp,
+                                    color = InkMuted
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = featured.title,
+                                fontSize = 14.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Ink,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            if (!featured.description.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = featured.description,
+                                    fontSize = 12.sp,
+                                    color = InkSoft,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    lineHeight = 16.sp
+                                )
+                            }
+
+                            if (featured.routes.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("Affects: ", fontSize = 11.sp, color = InkMuted)
+                                    featured.routes.take(4).forEach { r ->
+                                        RouteBadge(code = r.code, colorHex = r.color, size = BadgeSize.Sm)
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            HorizontalDivider(color = Line.copy(alpha = 0.6f), thickness = 1.dp)
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Read advisory & details",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Brand600
+                                )
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = null,
+                                    tint = Brand600,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Carousel for additional active advisories if more than 1
+                    if (activeList.size > 1) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(activeList.drop(1), key = { it.id }) { ann ->
+                                AnnouncementCard(
+                                    announcement = ann,
+                                    compact = true,
+                                    onClick = { onNavigateAnnouncementDetail(ann.id) }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // Reassuring normal operations banner
+                    Surface(
+                        onClick = onNavigateAnnouncements,
+                        color = Color.White,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, Line),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Ok50),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Ok600,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "All Jeepney Routes Normal",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Ink
+                                )
+                                Text(
+                                    text = "No active rerouting or service disruptions reported.",
+                                    fontSize = 11.sp,
+                                    color = InkMuted
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                tint = InkMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 4. POPULAR CDO ROUTES CAROUSEL
+            // 5. POPULAR CDO ROUTES CAROUSEL
             Column {
                 Row(
                     modifier = Modifier
@@ -480,49 +721,6 @@ fun HomeScreen(
                                     HorizontalDivider(color = Line.copy(alpha = 0.8f), thickness = 1.dp)
                                 }
                             }
-                        }
-                    }
-                }
-            }
-
-            // 6. TRANSPORTATION UPDATES CAROUSEL
-            if (uiState.announcements.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Column {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Transportation Updates",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Ink
-                        )
-                        TextButton(
-                            onClick = onNavigateAnnouncements,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text("See all", color = Brand600, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(uiState.announcements.filter { it.status != "Expired" }, key = { it.id }) { ann ->
-                            AnnouncementCard(
-                                announcement = ann,
-                                compact = true,
-                                onClick = { onNavigateAnnouncementDetail(ann.id) }
-                            )
                         }
                     }
                 }

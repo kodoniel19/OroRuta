@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
@@ -170,29 +171,32 @@ fun RouteInfoScreen(
                 Surface(
                     color = Color.White,
                     shadowElevation = 8.dp,
+                    border = BorderStroke(1.dp, Line),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Bookmark button
-                        IconButton(
+                        Surface(
                             onClick = { viewModel.toggleSave(route) },
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (viewModel.isSaved) Brand50 else Canvas)
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (viewModel.isSaved) Brand50 else Canvas,
+                            border = BorderStroke(1.dp, if (viewModel.isSaved) Brand100 else Line),
+                            modifier = Modifier.size(44.dp)
                         ) {
-                            Icon(
-                                imageVector = if (viewModel.isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = "Save route",
-                                tint = if (viewModel.isSaved) Brand600 else InkSoft
-                            )
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = if (viewModel.isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    contentDescription = "Save route",
+                                    tint = if (viewModel.isSaved) Brand600 else InkSoft
+                                )
+                            }
                         }
 
                         // Previous Step button
@@ -223,7 +227,7 @@ fun RouteInfoScreen(
                             variant = ButtonVariant.Primary,
                             size = ButtonSize.Md,
                             icon = if (currentStep < 5) Icons.AutoMirrored.Filled.ArrowForward else Icons.Default.Check,
-                            modifier = Modifier.weight(1.2f)
+                            modifier = Modifier.weight(1.3f)
                         )
                     }
                 }
@@ -629,111 +633,345 @@ fun RouteInfoScreen(
                     val signboardDestination = if (selectedDirection.equals("Outbound", true)) route.origin else route.destination
 
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        // Interactive Supporting Map with Step-by-Step Visualization
-                        StepGuidanceMap(
-                            route = route,
-                            selectedDirection = selectedDirection,
-                            currentStep = currentStep,
-                            userLocation = userLocation,
-                            boardingStop = nearestBoardingStop,
-                            dropoffStop = dropoffStop,
-                            destinationCoords = targetDestCoords,
-                            destinationTitle = targetDestination,
-                            walkToBoardCoords = walkToBoardCoords,
-                            walkFromDropCoords = walkFromDropCoords,
-                            isDestinationReachable = isDestinationReachable,
-                            onDirectionChange = {
-                                selectedDirection = it
-                            },
-                            onViewOnMap = {
-                                onViewOnMap(route.id, selectedDirection)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        // Direction Segmented Control (Inbound / Outbound)
-                        val directions = remember(route.directions) {
-                            if (route.directions.isNotEmpty()) {
-                                route.directions.map { it.direction }
-                            } else {
-                                listOf("Inbound", "Outbound")
-                            }
-                        }
-                        Surface(color = Color.White, modifier = Modifier.fillMaxWidth()) {
-                            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                                OroSegmentedControl(
-                                    items = directions,
-                                    selectedItem = selectedDirection,
-                                    onItemSelected = { selectedDirection = it },
-                                    itemLabel = { dir ->
-                                        val dirObj = route.directions.find { it.direction.equals(dir, ignoreCase = true) }
-                                        val distStr = if (dirObj != null && dirObj.distanceKm > 0) " (${dirObj.distanceKm} km)" else ""
-                                        "$dir$distStr"
-                                    },
-                                    itemIcon = { Icons.Default.AltRoute }
-                                )
-                            }
+                        // Interactive Supporting Map with Step-by-Step Visualization (NOT inside verticalScroll!)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1.05f)
+                        ) {
+                            StepGuidanceMap(
+                                route = route,
+                                selectedDirection = selectedDirection,
+                                currentStep = currentStep,
+                                userLocation = userLocation,
+                                boardingStop = nearestBoardingStop,
+                                dropoffStop = dropoffStop,
+                                destinationCoords = targetDestCoords,
+                                destinationTitle = targetDestination,
+                                walkToBoardCoords = walkToBoardCoords,
+                                walkFromDropCoords = walkFromDropCoords,
+                                isDestinationReachable = isDestinationReachable,
+                                onDirectionChange = {
+                                    selectedDirection = it
+                                },
+                                onViewOnMap = {
+                                    onViewOnMap(route.id, selectedDirection)
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
 
-                        // Route Header Card
-                        Surface(color = Color.White, modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                                Row(
+                        // Guidance and Details Sheet with independent scroll
+                        Surface(
+                            color = Canvas,
+                            shadowElevation = 4.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1.35f)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(bottom = 16.dp)
+                            ) {
+                                // Direction Segmented Control (Inbound / Outbound)
+                                val directions = remember(route.directions) {
+                                    if (route.directions.isNotEmpty()) {
+                                        route.directions.map { it.direction }
+                                    } else {
+                                        listOf("Inbound", "Outbound")
+                                    }
+                                }
+                                Surface(
+                                    color = Color.White,
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    border = BorderStroke(0.5.dp, Line)
                                 ) {
                                     Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        RouteBadge(code = route.code, colorHex = route.color, size = BadgeSize.Md)
-                                        Column {
-                                            Text(
-                                                text = route.name,
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = Ink,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Text(
-                                                text = if (!isDestinationReachable && !initialDestination.isNullOrBlank()) {
-                                                    "Traditional Jeepney • Ends at ${dropoffStop.name}"
-                                                } else {
-                                                    "Traditional Jeepney • Serving $targetDestination"
-                                                },
-                                                fontSize = 12.sp,
-                                                color = InkMuted
-                                            )
+                                        directions.forEach { dir ->
+                                            val isSelected = selectedDirection.equals(dir, ignoreCase = true)
+                                            val dirObj = route.directions.find { it.direction.equals(dir, ignoreCase = true) }
+                                            val distStr = if (dirObj != null && dirObj.distanceKm > 0) " (${dirObj.distanceKm} km)" else ""
+                                            Surface(
+                                                onClick = { selectedDirection = dir },
+                                                shape = RoundedCornerShape(20.dp),
+                                                color = if (isSelected) Brand600 else Canvas,
+                                                border = BorderStroke(1.dp, if (isSelected) Brand600 else Line),
+                                                shadowElevation = if (isSelected) 1.dp else 0.dp,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(36.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.AutoMirrored.Filled.AltRoute,
+                                                        contentDescription = null,
+                                                        tint = if (isSelected) Color.White else InkMuted,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = "$dir$distStr",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                        color = if (isSelected) Color.White else Ink,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
-                                    StatusPill(status = route.status)
                                 }
 
-                                if (!isDestinationReachable && !initialDestination.isNullOrBlank()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Surface(
-                                        color = Warn50,
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, Oro600.copy(alpha = 0.5f)),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
+                                // Route Header Card
+                                Surface(
+                                    color = Color.White,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    border = BorderStroke(0.5.dp, Line)
+                                ) {
+                                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                                         Row(
-                                            modifier = Modifier.padding(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(Icons.Default.Warning, contentDescription = null, tint = Warn600, modifier = Modifier.size(16.dp))
-                                            Text(
-                                                text = "Notice: Route terminates at ${dropoffStop.name} (~${dropoffDistanceToDestM}m away). A connecting route is needed for $targetDestination.",
-                                                fontSize = 11.sp,
-                                                color = Oro700,
-                                                lineHeight = 15.sp
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                RouteBadge(code = route.code, colorHex = route.color, size = BadgeSize.Md)
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = route.name,
+                                                        fontSize = 15.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = Ink,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = if (!isDestinationReachable && !initialDestination.isNullOrBlank()) {
+                                                            "Traditional Jeepney • Ends at ${dropoffStop.name}"
+                                                        } else {
+                                                            "Traditional Jeepney • Serving $targetDestination"
+                                                        },
+                                                        fontSize = 11.sp,
+                                                        color = InkMuted,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            StatusPill(status = route.status)
+                                        }
+
+                                        if (!isDestinationReachable && !initialDestination.isNullOrBlank()) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Surface(
+                                                color = Warn50,
+                                                shape = RoundedCornerShape(8.dp),
+                                                border = BorderStroke(1.dp, Oro600.copy(alpha = 0.4f)),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Warning, contentDescription = null, tint = Warn600, modifier = Modifier.size(14.dp))
+                                                    Text(
+                                                        text = "Notice: Route terminates at ${dropoffStop.name} (~${dropoffDistanceToDestM}m away). A connecting route is needed for $targetDestination.",
+                                                        fontSize = 11.sp,
+                                                        color = Oro700,
+                                                        lineHeight = 14.sp
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Quick stats
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (fareResult != null && fareResult.isAvailable) {
+                                                Surface(
+                                                    color = Brand50,
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    border = BorderStroke(0.5.dp, Brand100)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "₱${"%.2f".format(fareResult.selectedCategoryFare)}",
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            color = Brand700
+                                                        )
+                                                        Text(
+                                                            text = if (selectedCategory.isDiscounted) "(${selectedCategory.displayName})" else "(₱${"%.2f".format(fareResult.discountedFare)} disc)",
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = Brand600
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                Surface(
+                                                    color = Canvas,
+                                                    shape = RoundedCornerShape(6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "Fare unavailable",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = InkMuted,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            Surface(
+                                                color = Canvas,
+                                                shape = RoundedCornerShape(6.dp),
+                                                border = BorderStroke(0.5.dp, Line)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Schedule, contentDescription = null, tint = InkMuted, modifier = Modifier.size(12.dp))
+                                                    Text(
+                                                        text = "~$totalJourneyMinutes min",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Ink
+                                                    )
+                                                    if (onboardDistanceKm != null && onboardDistanceKm > 0) {
+                                                        Text("•", color = Line, fontSize = 10.sp)
+                                                        Text(
+                                                            text = "${"%.1f".format(onboardDistanceKm)} km aboard",
+                                                            fontSize = 11.sp,
+                                                            color = InkSoft
+                                                        )
+                                                    } else if (route.lengthKm > 0) {
+                                                        Text("•", color = Line, fontSize = 10.sp)
+                                                        Text(
+                                                            text = "${"%.1f".format(route.lengthKm)} km route",
+                                                            fontSize = 11.sp,
+                                                            color = InkSoft
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                // Step Indicator (Horizontal clickable tabs 1..5)
+                                StepIndicatorTabs(
+                                    currentStep = currentStep,
+                                    onSelectStep = { currentStep = it }
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Active Step Detailed Card
+                                Surface(
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, Line),
+                                    shadowElevation = 1.dp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        when (currentStep) {
+                                            1 -> Step1WalkCard(
+                                                userLocation = userLocation,
+                                                boardingStop = nearestBoardingStop,
+                                                walkMeters = walkToBoardDistanceM,
+                                                walkMinutes = walkToBoardMinutes,
+                                                hasLocationPermission = hasLocationPermission,
+                                                isDetectingLocation = isDetectingLocation,
+                                                onRequestPermission = {
+                                                    permissionLauncher.launch(LocationPermissions.runtimePermissions)
+                                                },
+                                                onRefreshLocation = {
+                                                    coroutineScope.launch {
+                                                        isDetectingLocation = true
+                                                        try {
+                                                            val loc = obtainBestDeviceLocation(context)
+                                                            if (loc != null) {
+                                                                userLocation = LatLng(loc.latitude, loc.longitude)
+                                                            }
+                                                        } finally {
+                                                            isDetectingLocation = false
+                                                        }
+                                                    }
+                                                }
+                                            )
+
+                                            2 -> Step2WaitCard(
+                                                route = route,
+                                                boardingStop = nearestBoardingStop,
+                                                dropoffStop = dropoffStop,
+                                                signboardDestination = signboardDestination,
+                                                selectedDirection = selectedDirection,
+                                                fareResult = fareResult,
+                                                selectedCategory = selectedCategory,
+                                                onSelectCategory = { selectedCategory = it }
+                                            )
+
+                                            3 -> Step3RideCard(
+                                                route = route,
+                                                boardingStop = nearestBoardingStop,
+                                                dropoffStop = dropoffStop,
+                                                selectedDirection = selectedDirection,
+                                                onboardDistanceKm = onboardDistanceKm,
+                                                fareResult = fareResult,
+                                                selectedCategory = selectedCategory,
+                                                onSelectCategory = { selectedCategory = it }
+                                            )
+
+                                            4 -> Step4AlightCard(
+                                                dropoffStop = dropoffStop,
+                                                targetDestination = targetDestination,
+                                                remainingWalkMeters = walkFromDropDistanceM,
+                                                isDestinationReachable = isDestinationReachable
+                                            )
+
+                                            5 -> Step5DestinationCard(
+                                                dropoffStop = dropoffStop,
+                                                targetDestination = targetDestination,
+                                                walkMeters = walkFromDropDistanceM,
+                                                walkMinutes = walkFromDropMinutes,
+                                                isDestinationReachable = isDestinationReachable
                                             )
                                         }
                                     }
@@ -741,246 +979,110 @@ fun RouteInfoScreen(
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                // Quick stats
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    if (fareResult != null && fareResult.isAvailable) {
-                                        Text(
-                                            text = "₱${"%.2f".format(fareResult.selectedCategoryFare)}",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = Brand700
-                                        )
-                                        Text(
-                                            text = if (selectedCategory.isDiscounted) "(${selectedCategory.displayName})" else "(₱${"%.2f".format(fareResult.discountedFare)} disc)",
-                                            fontSize = 11.sp,
-                                            color = InkMuted
-                                        )
-                                    } else {
-                                        Text(
-                                            text = "Fare unavailable",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = InkMuted
-                                        )
-                                    }
-                                    Text("·", color = InkMuted, fontWeight = FontWeight.Bold)
-                                    Text(
-                                        text = "~$totalJourneyMinutes mins",
-                                        fontSize = 12.sp,
-                                        color = InkSoft
-                                    )
-                                    if (onboardDistanceKm != null && onboardDistanceKm > 0) {
-                                        Text("·", color = InkMuted, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            text = "${"%.1f".format(onboardDistanceKm)} km aboard",
-                                            fontSize = 12.sp,
-                                            color = InkMuted
-                                        )
-                                    } else if (route.lengthKm > 0) {
-                                        Text("·", color = InkMuted, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            text = "${"%.1f".format(route.lengthKm)} km route",
-                                            fontSize = 12.sp,
-                                            color = InkMuted
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Step Indicator (Horizontal clickable tabs 1..5)
-                        StepIndicatorTabs(
-                            currentStep = currentStep,
-                            onSelectStep = { currentStep = it }
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Active Step Detailed Card
-                        Surface(
-                            color = Color.White,
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, Line),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                when (currentStep) {
-                                    1 -> Step1WalkCard(
-                                        userLocation = userLocation,
-                                        boardingStop = nearestBoardingStop,
-                                        walkMeters = walkToBoardDistanceM,
-                                        walkMinutes = walkToBoardMinutes,
-                                        hasLocationPermission = hasLocationPermission,
-                                        isDetectingLocation = isDetectingLocation,
-                                        onRequestPermission = {
-                                            permissionLauncher.launch(LocationPermissions.runtimePermissions)
-                                        },
-                                        onRefreshLocation = {
-                                            coroutineScope.launch {
-                                                isDetectingLocation = true
-                                                try {
-                                                    val loc = obtainBestDeviceLocation(context)
-                                                    if (loc != null) {
-                                                        userLocation = LatLng(loc.latitude, loc.longitude)
-                                                    }
-                                                } finally {
-                                                    isDetectingLocation = false
-                                                }
-                                            }
-                                        }
-                                    )
-
-                                    2 -> Step2WaitCard(
-                                        route = route,
-                                        boardingStop = nearestBoardingStop,
-                                        dropoffStop = dropoffStop,
-                                        signboardDestination = signboardDestination,
-                                        selectedDirection = selectedDirection,
-                                        fareResult = fareResult,
-                                        selectedCategory = selectedCategory,
-                                        onSelectCategory = { selectedCategory = it }
-                                    )
-
-                                    3 -> Step3RideCard(
-                                        route = route,
-                                        boardingStop = nearestBoardingStop,
-                                        dropoffStop = dropoffStop,
-                                        selectedDirection = selectedDirection,
-                                        onboardDistanceKm = onboardDistanceKm,
-                                        fareResult = fareResult,
-                                        selectedCategory = selectedCategory,
-                                        onSelectCategory = { selectedCategory = it }
-                                    )
-
-                                    4 -> Step4AlightCard(
-                                        dropoffStop = dropoffStop,
-                                        targetDestination = targetDestination,
-                                        remainingWalkMeters = walkFromDropDistanceM,
-                                        isDestinationReachable = isDestinationReachable
-                                    )
-
-                                    5 -> Step5DestinationCard(
-                                        dropoffStop = dropoffStop,
-                                        targetDestination = targetDestination,
-                                        walkMeters = walkFromDropDistanceM,
-                                        walkMinutes = walkFromDropMinutes,
-                                        isDestinationReachable = isDestinationReachable
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Accordion: Full Route Stops & Terminal Catalog (Preserves original route info)
-                        Surface(
-                            color = Color.White,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
+                                // Accordion: Full Route Stops & Terminal Catalog (Preserves original route info)
+                                Surface(
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, Line),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { stopsAccordionExpanded = !stopsAccordionExpanded },
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .padding(horizontal = 14.dp)
                                 ) {
-                                    Column {
-                                        Text(
-                                            text = "Route Details & Verified Stop Catalog",
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Ink
-                                        )
-                                        Text(
-                                            text = "Terminals, verified stops, road sequence, announcements",
-                                            fontSize = 11.sp,
-                                            color = InkMuted
-                                        )
-                                    }
-                                    Icon(
-                                        imageVector = if (stopsAccordionExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                        contentDescription = null,
-                                        tint = InkMuted
-                                    )
-                                }
-
-                                AnimatedVisibility(visible = stopsAccordionExpanded) {
-                                    Column(
-                                        modifier = Modifier.padding(top = 12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        if (!route.description.isNullOrBlank()) {
-                                            Text(
-                                                text = route.description,
-                                                fontSize = 13.sp,
-                                                color = InkSoft,
-                                                lineHeight = 18.sp
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { stopsAccordionExpanded = !stopsAccordionExpanded },
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = "Route Details & Verified Stop Catalog",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Ink
+                                                )
+                                                Text(
+                                                    text = "Terminals, verified stops, road sequence",
+                                                    fontSize = 11.sp,
+                                                    color = InkMuted
+                                                )
+                                            }
+                                            Icon(
+                                                imageVector = if (stopsAccordionExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                contentDescription = null,
+                                                tint = InkMuted
                                             )
-                                            HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 4.dp))
                                         }
 
-                                        if (route.roads.isNotEmpty()) {
-                                            Text("Verified Road Sequence:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = InkMuted)
-                                            Row(
-                                                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        AnimatedVisibility(visible = stopsAccordionExpanded) {
+                                            Column(
+                                                modifier = Modifier.padding(top = 10.dp),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                route.roads.forEach { rd ->
-                                                    Surface(
-                                                        shape = RoundedCornerShape(6.dp),
-                                                        color = Canvas,
-                                                        modifier = Modifier.padding(vertical = 2.dp)
+                                                if (!route.description.isNullOrBlank()) {
+                                                    Text(
+                                                        text = route.description,
+                                                        fontSize = 12.sp,
+                                                        color = InkSoft,
+                                                        lineHeight = 16.sp
+                                                    )
+                                                    HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 4.dp))
+                                                }
+
+                                                if (route.roads.isNotEmpty()) {
+                                                    Text("Verified Road Sequence:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = InkMuted)
+                                                    Row(
+                                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                                     ) {
-                                                        Text(
-                                                            text = rd.name,
-                                                            fontSize = 11.sp,
-                                                            color = InkSoft,
-                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                                        )
+                                                        route.roads.forEach { rd ->
+                                                            Surface(
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                color = Canvas,
+                                                                modifier = Modifier.padding(vertical = 2.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = rd.name,
+                                                                    fontSize = 11.sp,
+                                                                    color = InkSoft,
+                                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                                )
+                                                            }
+                                                        }
                                                     }
+                                                    HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 4.dp))
+                                                }
+
+                                                Text("All Verified Stops & Terminals:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = InkMuted)
+                                                route.terminals.forEach { t ->
+                                                    StopListItem(
+                                                        kind = StopKind.Terminal,
+                                                        name = t.name,
+                                                        note = if (t.lat != 0.0) t.note ?: "LPTRP Verified Terminal" else "Coordinates pending ground verification",
+                                                        isSelected = false,
+                                                        onClick = {}
+                                                    )
+                                                }
+                                                route.stops.forEach { s ->
+                                                    val isUnloading = s.pointType.equals("unloading", ignoreCase = true)
+                                                    StopListItem(
+                                                        kind = if (isUnloading) StopKind.Unloading else StopKind.Loading,
+                                                        name = s.name,
+                                                        note = if (s.lat != 0.0) s.note ?: if (isUnloading) "Drop-off Point" else "Loading Point" else "Coordinates pending ground verification",
+                                                        isSelected = false,
+                                                        onClick = {}
+                                                    )
                                                 }
                                             }
-                                            HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 4.dp))
-                                        }
-
-                                        Text("All Verified Stops & Terminals:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = InkMuted)
-                                        route.terminals.forEach { t ->
-                                            StopListItem(
-                                                kind = StopKind.Terminal,
-                                                name = t.name,
-                                                note = if (t.lat != 0.0) t.note ?: "LPTRP Verified Terminal" else "Coordinates pending ground verification",
-                                                isSelected = false,
-                                                onClick = {}
-                                            )
-                                        }
-                                        route.stops.forEach { s ->
-                                            val isUnloading = s.pointType.equals("unloading", ignoreCase = true)
-                                            StopListItem(
-                                                kind = if (isUnloading) StopKind.Unloading else StopKind.Loading,
-                                                name = s.name,
-                                                note = if (s.lat != 0.0) s.note ?: if (isUnloading) "Drop-off Point" else "Loading Point" else "Coordinates pending ground verification",
-                                                isSelected = false,
-                                                onClick = {}
-                                            )
                                         }
                                     }
                                 }
+
+                                Spacer(modifier = Modifier.height(16.dp))
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(28.dp))
                     }
                 }
             }
@@ -1810,13 +1912,14 @@ private fun StepIndicatorTabs(
     Surface(
         color = Color.White,
         shadowElevation = 1.dp,
+        border = BorderStroke(0.5.dp, Line),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             steps.forEach { (num, label, icon) ->
                 val isActive = currentStep == num
@@ -1834,13 +1937,13 @@ private fun StepIndicatorTabs(
                     targetValue = when {
                         isActive -> Color.White
                         isDone -> Ok700
-                        else -> InkMuted
+                        else -> InkSoft
                     },
                     label = "stepColor"
                 )
 
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
                     color = animatedBg,
                     border = BorderStroke(
                         1.dp,
@@ -1852,10 +1955,13 @@ private fun StepIndicatorTabs(
                     ),
                     modifier = Modifier
                         .weight(1f)
+                        .height(38.dp)
                         .clickable { onSelectStep(num) }
                 ) {
                     Column(
-                        modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 2.dp, vertical = 2.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
@@ -1867,20 +1973,19 @@ private fun StepIndicatorTabs(
                                 imageVector = if (isDone) Icons.Default.Check else icon,
                                 contentDescription = null,
                                 tint = animatedColor,
-                                modifier = Modifier.size(13.dp)
+                                modifier = Modifier.size(11.dp)
                             )
                             Text(
                                 text = "$num",
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = animatedColor
                             )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = label,
-                            fontSize = 11.sp,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 10.sp,
+                            fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
                             color = animatedColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -2067,27 +2172,27 @@ private fun StepGuidanceMap(
         }
     }
 
+    val mapScope = rememberCoroutineScope()
+
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(230.dp)
+        modifier = modifier.fillMaxSize()
     ) {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
             uiSettings = MapUiSettings(
                 zoomControlsEnabled = false,
-                compassEnabled = false,
+                compassEnabled = true,
                 myLocationButtonEnabled = false,
                 mapToolbarEnabled = false,
                 scrollGesturesEnabled = true,
                 zoomGesturesEnabled = true,
-                tiltGesturesEnabled = false,
-                rotationGesturesEnabled = false
+                tiltGesturesEnabled = true,
+                rotationGesturesEnabled = true,
+                scrollGesturesEnabledDuringRotateOrZoom = true
             )
         ) {
             // 1. Complete Verified Jeepney Route Polyline (High-contrast casing + clear contextual route color)
-            // Always fully rendered so the entire road-following path is clear above map tiles
             if (pts.size >= 2) {
                 Polyline(
                     points = pts,
@@ -2214,11 +2319,161 @@ private fun StepGuidanceMap(
             }
         }
 
-        // Map Legend Overlay
+        // Top Step Badge overlay (translucent navy pill)
+        Surface(
+            color = Color(0xCC172B4D),
+            shape = RoundedCornerShape(16.dp),
+            shadowElevation = 3.dp,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(10.dp)
+        ) {
+            val stepLabel = when (currentStep) {
+                1 -> "Step 1 • Walk to Boarding"
+                2 -> "Step 2 • Board Jeepney"
+                3 -> "Step 3 • Riding Route"
+                4 -> "Step 4 • Drop-off"
+                else -> "Step 5 • Destination"
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(Brand500)
+                )
+                Text(
+                    text = stepLabel,
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Top-End Floating Controls Column: Recenter + Zoom Buttons
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            // Recenter Button
+            Surface(
+                color = Color.White,
+                shape = CircleShape,
+                shadowElevation = 3.dp,
+                border = BorderStroke(1.dp, Line),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .clickable {
+                        mapScope.launch {
+                            try {
+                                when (currentStep) {
+                                    1 -> {
+                                        val builder = LatLngBounds.builder()
+                                        var count = 0
+                                        userLocation?.let { builder.include(it); count++ }
+                                        boardingStop?.let { builder.include(LatLng(it.lat, it.lng)); count++ }
+                                        walkToBoardCoords.forEach { builder.include(it); count++ }
+                                        if (count >= 2) {
+                                            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(builder.build(), 70), 400)
+                                        } else if (boardingStop != null) {
+                                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(boardingStop.lat, boardingStop.lng), 16f), 400)
+                                        }
+                                    }
+                                    2 -> {
+                                        if (boardingStop != null) {
+                                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(boardingStop.lat, boardingStop.lng), 16.5f), 400)
+                                        }
+                                    }
+                                    3 -> {
+                                        if (rideSegmentPts.size >= 2) {
+                                            val builder = LatLngBounds.builder()
+                                            rideSegmentPts.forEach { builder.include(it) }
+                                            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(builder.build(), 60), 400)
+                                        } else if (pts.size >= 2) {
+                                            val builder = LatLngBounds.builder()
+                                            pts.forEach { builder.include(it) }
+                                            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(builder.build(), 60), 400)
+                                        }
+                                    }
+                                    4 -> {
+                                        if (dropoffStop != null) {
+                                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(dropoffStop.lat, dropoffStop.lng), 16.5f), 400)
+                                        }
+                                    }
+                                    5 -> {
+                                        val builder = LatLngBounds.builder()
+                                        var count = 0
+                                        dropoffStop?.let { builder.include(LatLng(it.lat, it.lng)); count++ }
+                                        destinationCoords?.let { builder.include(it); count++ }
+                                        walkFromDropCoords.forEach { builder.include(it); count++ }
+                                        if (count >= 2) {
+                                            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(builder.build(), 70), 400)
+                                        } else if (destinationCoords != null) {
+                                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(destinationCoords, 16f), 400)
+                                        }
+                                    }
+                                    else -> {
+                                        if (pts.size >= 2) {
+                                            val builder = LatLngBounds.builder()
+                                            pts.forEach { builder.include(it) }
+                                            cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(builder.build(), 60), 400)
+                                        }
+                                    }
+                                }
+                            } catch (_: Exception) {}
+                        }
+                    }
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.MyLocation,
+                        contentDescription = "Recenter",
+                        tint = Brand600,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // Compact Zoom In / Zoom Out Controls
+            Surface(
+                color = Color.White,
+                shape = RoundedCornerShape(10.dp),
+                shadowElevation = 3.dp,
+                border = BorderStroke(1.dp, Line)
+            ) {
+                Column {
+                    IconButton(
+                        onClick = { mapScope.launch { cameraPositionState.animate(CameraUpdateFactory.zoomIn(), 300) } },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Zoom In", tint = Ink, modifier = Modifier.size(18.dp))
+                    }
+                    HorizontalDivider(color = Line, modifier = Modifier.width(34.dp))
+                    IconButton(
+                        onClick = { mapScope.launch { cameraPositionState.animate(CameraUpdateFactory.zoomOut(), 300) } },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(Icons.Default.Remove, contentDescription = "Zoom Out", tint = Ink, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+        }
+
+        // Map Legend Overlay (Bottom-Start)
         Surface(
             color = Color.White.copy(alpha = 0.94f),
             shape = RoundedCornerShape(8.dp),
-            shadowElevation = 3.dp,
+            shadowElevation = 2.dp,
+            border = BorderStroke(0.5.dp, Line),
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(8.dp)
@@ -2247,34 +2502,11 @@ private fun StepGuidanceMap(
             }
         }
 
-        // Top Step Badge overlay
+        // View on Map Floating Button (Bottom-End)
         Surface(
-            color = Color.Black.copy(alpha = 0.65f),
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(10.dp)
-        ) {
-            val stepLabel = when (currentStep) {
-                1 -> "Step 1 • Walk to Boarding"
-                2 -> "Step 2 • Board Jeepney"
-                3 -> "Step 3 • Riding Route"
-                4 -> "Step 4 • Drop-off"
-                else -> "Step 5 • Destination"
-            }
-            Text(
-                text = stepLabel,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-        }
-
-        // Expand Map button
-        Surface(
-            color = Color.Black.copy(alpha = 0.60f),
-            shape = RoundedCornerShape(20.dp),
+            color = Color(0xCC172B4D),
+            shape = RoundedCornerShape(16.dp),
+            shadowElevation = 2.dp,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(8.dp)
@@ -2283,10 +2515,10 @@ private fun StepGuidanceMap(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
             ) {
                 Icon(Icons.Default.Fullscreen, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                Text("View on Map", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text("View on Map", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

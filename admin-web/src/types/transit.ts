@@ -40,6 +40,7 @@ export interface JeepneyRoute {
   stops?: any[];
   terminals?: any[];
   geometries?: any[];
+  directions?: any[];
 }
 
 export type LocationKind = 'terminal' | 'loading' | 'unloading' | 'transfer' | 'landmark' | 'verified_stop';
@@ -60,7 +61,7 @@ export interface TransitLocation {
 }
 
 export type PassengerCategory = 'Regular' | 'Student' | 'Senior Citizen' | 'PWD';
-export type VehicleType = 'Traditional Jeepney' | 'Modern Jeepney';
+export type VehicleType = 'Traditional Jeepney';
 export type FareStatus = 'Current' | 'Scheduled' | 'Archived';
 
 export interface FareRule {

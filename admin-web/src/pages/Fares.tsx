@@ -20,7 +20,7 @@ import { formatDate, nowIso, peso } from '../utils/format';
 import { delay, nextId } from '../utils/async';
 import { cn } from '../utils/cn';
 
-const VEHICLES: VehicleType[] = ['Traditional Jeepney', 'Modern Jeepney'];
+const VEHICLES: VehicleType[] = ['Traditional Jeepney'];
 const CATEGORIES: PassengerCategory[] = ['Regular', 'Student', 'Senior Citizen', 'PWD'];
 const STATUSES: FareStatus[] = ['Current', 'Scheduled', 'Archived'];
 
@@ -145,9 +145,13 @@ export function Fares() {
   const [editing, setEditing] = useState<FareRule | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<FareRule | null>(null);
 
+  const traditionalFares = useMemo(() =>
+    fares.filter(f => (f.vehicle as string) !== 'Modern Jeepney'),
+    [fares]);
+
   const filtered = useMemo(() =>
-    statusFilter === 'All' ? fares : fares.filter(f => f.status === statusFilter),
-    [fares, statusFilter]);
+    statusFilter === 'All' ? traditionalFares : traditionalFares.filter(f => f.status === statusFilter),
+    [traditionalFares, statusFilter]);
 
   const handleSave = (fare: FareRule) => {
     if (editing) {
@@ -171,23 +175,23 @@ export function Fares() {
     <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
       <PageHeader
         title="Fare Information"
-        description={`${fares.filter(f => f.status === 'Current').length} current fare rules · ${fares.filter(f => f.status === 'Scheduled').length} scheduled`}
+        description={`${traditionalFares.filter(f => f.status === 'Current').length} current fare rules · ${traditionalFares.filter(f => f.status === 'Scheduled').length} scheduled`}
         actions={<Button icon={<PlusIcon className="h-4 w-4" />} onClick={() => { setEditing(null); setFormOpen(true); }}>Add fare rule</Button>}
       />
 
       <div className="overflow-hidden rounded-xl border border-line bg-white shadow-card">
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
           <SegmentedControl label="Filter by status" value={statusFilter} onChange={(v) => setStatusFilter(v as any)} options={[
-            { value: 'All', label: 'All', count: fares.length },
-            { value: 'Current', label: 'Current', count: fares.filter(f => f.status === 'Current').length },
-            { value: 'Scheduled', label: 'Scheduled', count: fares.filter(f => f.status === 'Scheduled').length },
-            { value: 'Archived', label: 'Archived', count: fares.filter(f => f.status === 'Archived').length },
+            { value: 'All', label: 'All', count: traditionalFares.length },
+            { value: 'Current', label: 'Current', count: traditionalFares.filter(f => f.status === 'Current').length },
+            { value: 'Scheduled', label: 'Scheduled', count: traditionalFares.filter(f => f.status === 'Scheduled').length },
+            { value: 'Archived', label: 'Archived', count: traditionalFares.filter(f => f.status === 'Archived').length },
           ]} />
-          <p className="ml-auto text-[13px] text-fg-muted">Showing {filtered.length} of {fares.length}</p>
+          <p className="ml-auto text-[13px] text-fg-muted">Showing {filtered.length} of {traditionalFares.length}</p>
         </div>
 
-        {loading ? <TableSkeleton rows={6} cols={7} /> : fares.length === 0 ? (
-          <EmptyState icon={<BanknoteIcon className="h-5 w-5" />} title="No fare rules yet" description="Add LTFRB-approved fare rules for traditional and modern jeepneys." action={<Button icon={<PlusIcon className="h-4 w-4" />} onClick={() => { setEditing(null); setFormOpen(true); }}>Add fare rule</Button>} />
+        {loading ? <TableSkeleton rows={6} cols={7} /> : traditionalFares.length === 0 ? (
+          <EmptyState icon={<BanknoteIcon className="h-5 w-5" />} title="No fare rules yet" description="Add LTFRB-approved fare rules for traditional jeepneys." action={<Button icon={<PlusIcon className="h-4 w-4" />} onClick={() => { setEditing(null); setFormOpen(true); }}>Add fare rule</Button>} />
         ) : filtered.length === 0 ? (
           <EmptyState icon={<SearchXIcon className="h-5 w-5" />} title="No fares match" description="Try a different status filter." action={<Button variant="secondary" onClick={() => setStatusFilter('All')}>Clear filter</Button>} />
         ) : (

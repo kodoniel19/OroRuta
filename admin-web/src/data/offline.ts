@@ -10,7 +10,7 @@ export interface DatasetEntry {
 export const offlineDatasets: DatasetEntry[] = [
   { id: 'routes', name: 'Route Geometries', description: 'GeoJSON polylines for all active jeepney routes', size: '1.8 MB', included: true, required: true },
   { id: 'stops', name: 'Bus Stops & Terminals', description: 'Named stop locations with coordinates', size: '0.6 MB', included: true, required: true },
-  { id: 'fares', name: 'Fare Matrix', description: 'Current LTFRB-approved fares for all vehicle types', size: '0.1 MB', included: true, required: true },
+  { id: 'fares', name: 'Fare Matrix', description: 'Current LTFRB-approved fares for traditional jeepneys', size: '0.1 MB', included: true, required: true },
   { id: 'announcements', name: 'Active Announcements', description: 'Published announcements at time of bundle creation', size: '0.3 MB', included: true, required: false },
   { id: 'pois', name: 'Points of Interest', description: 'Landmarks and key destinations along routes', size: '1.2 MB', included: true, required: false },
   { id: 'tiles', name: 'Offline Map Tiles', description: 'CDO city tile cache for offline map display', size: '11.4 MB', included: false, required: false },

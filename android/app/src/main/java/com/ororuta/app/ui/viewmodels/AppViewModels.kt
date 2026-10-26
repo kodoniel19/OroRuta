@@ -74,12 +74,21 @@ class HomeViewModel @Inject constructor(
         observeStreams()
     }
 
+    fun refresh() {
+        loadData()
+    }
+
     private fun loadData() {
         viewModelScope.launch {
-            // Load announcements
-            announcementRepo.getAnnouncements("Active").collect { res ->
+            // Load announcements (include Active, Published, Updated, Temporary)
+            announcementRepo.getAnnouncements(null).collect { res ->
                 if (res is Resource.Success) {
-                    _uiState.update { it.copy(announcements = res.data) }
+                    val activeOrPublished = res.data.filter { a ->
+                        !a.status.equals("Expired", ignoreCase = true) &&
+                        !a.status.equals("Inactive", ignoreCase = true) &&
+                        !a.status.equals("Draft", ignoreCase = true)
+                    }
+                    _uiState.update { it.copy(announcements = activeOrPublished) }
                 }
             }
         }
@@ -753,7 +762,7 @@ class MapViewModel @Inject constructor(
     ) {
         nearbySheetSearchJob?.cancel()
         nearbySheetTripsState = Resource.Loading
-        nearbySheetSearchJob = viewModelScope.launch {
+        nearbySheetSearchJob = viewModelScope.launch(Dispatchers.Default) {
             val res = tripRepo.searchTrips(
                 from = fromName,
                 to = toName,
@@ -762,7 +771,9 @@ class MapViewModel @Inject constructor(
                 toLat = toLat,
                 toLng = toLng
             )
-            nearbySheetTripsState = res
+            withContext(Dispatchers.Main) {
+                nearbySheetTripsState = res
+            }
         }
     }
 
@@ -936,15 +947,13 @@ class MapViewModel @Inject constructor(
         destLat: Double,
         destLng: Double
     ): Triple<List<com.google.android.gms.maps.model.LatLng>, List<com.google.android.gms.maps.model.LatLng>, List<com.google.android.gms.maps.model.LatLng>> {
-        // 1. Walking to boarding stop (real road routing via OSRM)
+        // 1. Walking to boarding stop (instant coordinate mapping)
         val walkToBoard = if (trip.walkToBoardCoordinates.size >= 2) {
             trip.walkToBoardCoordinates.map { com.google.android.gms.maps.model.LatLng(it[1], it[0]) }
         } else {
             val bLat = trip.boardingLat ?: originLat
             val bLng = trip.boardingLng ?: originLng
-            withContext(Dispatchers.IO) {
-                fetchOsrmRoute(originLng, originLat, bLng, bLat)?.first ?: emptyList()
-            }
+            listOf(com.google.android.gms.maps.model.LatLng(originLat, originLng), com.google.android.gms.maps.model.LatLng(bLat, bLng))
         }
 
         // 2. Jeepney ride polyline using verified route geometry
@@ -984,15 +993,13 @@ class MapViewModel @Inject constructor(
             } else emptyList()
         }
 
-        // 3. Walking from dropoff stop to destination (real road routing via OSRM)
+        // 3. Walking from dropoff stop to destination (instant coordinate mapping)
         val walkFromDrop = if (trip.walkFromDropCoordinates.size >= 2) {
             trip.walkFromDropCoordinates.map { com.google.android.gms.maps.model.LatLng(it[1], it[0]) }
         } else {
             val dLat = trip.dropoffLat ?: destLat
             val dLng = trip.dropoffLng ?: destLng
-            withContext(Dispatchers.IO) {
-                fetchOsrmRoute(dLng, dLat, destLng, destLat)?.first ?: emptyList()
-            }
+            listOf(com.google.android.gms.maps.model.LatLng(dLat, dLng), com.google.android.gms.maps.model.LatLng(destLat, destLng))
         }
 
         return Triple(walkToBoard, jeepney, walkFromDrop)
@@ -1124,6 +1131,15 @@ class MapViewModel @Inject constructor(
      * Returns a Pair of (polyline points, distance in meters) or null on failure.
      * OSRM uses OpenStreetMap road network data and returns encoded polyline geometry.
      */
+    companion object {
+        private val osrmHttpClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .readTimeout(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .build()
+        }
+    }
+
     private fun fetchOsrmRoute(
         fromLng: Double, fromLat: Double,
         toLng: Double, toLat: Double
@@ -1132,9 +1148,8 @@ class MapViewModel @Inject constructor(
             val url = "https://router.project-osrm.org/route/v1/foot/" +
                 "$fromLng,$fromLat;$toLng,$toLat" +
                 "?overview=full&geometries=geojson&steps=false"
-            val client = OkHttpClient()
             val request = Request.Builder().url(url).build()
-            val response = client.newCall(request).execute()
+            val response = osrmHttpClient.newCall(request).execute()
             if (!response.isSuccessful) return null
             val body = response.body?.string() ?: return null
             val json = JSONObject(body)
@@ -1497,6 +1512,10 @@ class AnnouncementsViewModel @Inject constructor(
         if (announcementsState is Resource.Loading && allAnnouncements.isEmpty()) return
         val filtered = if (selectedFilter.equals("All", ignoreCase = true)) {
             allAnnouncements
+        } else if (selectedFilter.equals("Active", ignoreCase = true)) {
+            allAnnouncements.filter {
+                it.status.equals("Active", ignoreCase = true) || it.status.equals("Published", ignoreCase = true)
+            }
         } else {
             allAnnouncements.filter { it.status.equals(selectedFilter, ignoreCase = true) }
         }

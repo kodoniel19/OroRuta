@@ -1,4 +1,5 @@
 import React from 'react';
+import appIcon from '../../assets/app-icon.png';
 import { cn } from '../../utils/cn';
 
 interface LogoProps {
@@ -11,12 +12,14 @@ interface LogoProps {
 export function Logo({ size = 36, showText = true, tone = 'dark', subtitle = 'Admin Portal' }: LogoProps) {
   return (
     <div className="flex items-center gap-2.5">
-      <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden>
-        <rect width="40" height="40" rx="10" fill="#0B6E4F" />
-        <path d="M10 29c3.5-7 7.5-3 11-9s6-8 9-8" stroke="#E9A21B" strokeWidth="3.2" fill="none" strokeLinecap="round" />
-        <circle cx="10" cy="29" r="3.2" fill="#fff" />
-        <circle cx="30" cy="12" r="3.2" fill="#fff" />
-      </svg>
+      <img
+        src={appIcon}
+        alt="OroRuta Logo"
+        width={size}
+        height={size}
+        className="rounded-lg object-contain shrink-0"
+        style={{ width: `${size}px`, height: `${size}px` }}
+      />
       {showText && (
         <div className="leading-tight">
           <p className={cn('text-[15px] font-semibold tracking-tight', tone === 'light' ? 'text-white' : 'text-fg')}>OroRuta</p>
@@ -26,4 +29,3 @@ export function Logo({ size = 36, showText = true, tone = 'dark', subtitle = 'Ad
     </div>
   );
 }
-

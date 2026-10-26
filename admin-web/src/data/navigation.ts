@@ -8,8 +8,6 @@ import {
   BanknoteIcon,
   MegaphoneIcon,
   MessageSquareWarningIcon,
-  TrendingUpIcon,
-  DatabaseIcon,
   SettingsIcon,
 } from 'lucide-react';
 
@@ -39,10 +37,7 @@ export const navigation = [
   {
     group: 'System',
     items: [
-      { label: 'Search Analytics', to: '/analytics', icon: TrendingUpIcon },
-      { label: 'Offline Data', to: '/offline-data', icon: DatabaseIcon },
       { label: 'Settings', to: '/settings', icon: SettingsIcon },
     ],
   },
 ];
-

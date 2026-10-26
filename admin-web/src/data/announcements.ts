@@ -1,12 +1,16 @@
 import type { Announcement } from '../types/transit';
 
 export const announcements: Announcement[] = [
-  { id: 'AN-208', title: 'Lumbia – Cogon (R11) rerouted via Upper Balulang', type: 'Rerouting', body: 'Due to road widening along Lumbia–Pagatpat Road, R11 jeepneys will pass through Upper Balulang and Hayes St until October 15. Expect 10–15 minutes of additional travel time.', affectedRoutes: ['R11', 'R08'], status: 'Published', startDate: '2026-09-24', endDate: '2026-10-15', updatedAt: '2026-09-24T17:50:00', author: 'Maria Santos' },
-  { id: 'AN-207', title: 'Corrales Ave closed Sept 28, 6 AM – 12 NN', type: 'Road Closure', body: 'Corrales Ave between Hayes St and J.R. Borja St will be closed for drainage repairs. R01 and R03 units will detour via Tiano Brothers St.', affectedRoutes: ['R01', 'R03'], status: 'Published', startDate: '2026-09-28', endDate: '2026-09-28', updatedAt: '2026-09-26T10:05:00', author: 'Jomar Dela Cruz' },
-  { id: 'AN-206', title: 'Bugo-bound jeepneys now load at Agora Bay 4', type: 'Terminal Change', body: 'Starting September 21, all Bugo – Agora (R04) units load at Bay 4 of the Agora Integrated Terminal instead of Bay 2.', affectedRoutes: ['R04'], status: 'Published', startDate: '2026-09-21', endDate: '', updatedAt: '2026-09-20T15:40:00', author: 'Maria Santos' },
-  { id: 'AN-205', title: 'New unloading zone at Gaisano City, Lapasan', type: 'Loading/Unloading Change', body: 'A designated unloading zone is now open in front of Gaisano City along C.M. Recto Ave. Jeepneys may no longer drop passengers at the pedestrian overpass.', affectedRoutes: ['R02', 'R03'], status: 'Published', startDate: '2026-09-20', endDate: '', updatedAt: '2026-09-19T11:20:00', author: 'Ana Villanueva' },
-  { id: 'AN-204', title: 'Updated fare matrix takes effect October 15', type: 'General Update', body: 'The minimum fare for traditional jeepneys will increase to ₱14.00 for the first 4 km, following the latest LTFRB advisory. Discounted fares remain at 20% off.', affectedRoutes: [], status: 'Draft', startDate: '2026-10-15', endDate: '', updatedAt: '2026-09-20T14:35:00', author: 'Maria Santos' },
-  { id: 'AN-203', title: 'Kauswagan flyover works — southbound lane closed', type: 'Road Closure', body: 'One southbound lane of Kauswagan Road near the flyover site will be closed nightly from 9 PM to 5 AM. Expect slower trips on R06.', affectedRoutes: ['R06'], status: 'Draft', startDate: '2026-10-01', endDate: '2026-11-30', updatedAt: '2026-09-23T09:15:00', author: 'Jomar Dela Cruz' },
-  { id: 'AN-198', title: 'Divisoria night market reroute (Fri–Sun, 5 PM onwards)', type: 'Rerouting', body: 'During the night market, R06 and R12 units use Burgos St instead of Tiano Brothers St after 5 PM on weekends.', affectedRoutes: ['R06', 'R12'], status: 'Inactive', startDate: '2026-08-01', endDate: '2026-08-31', updatedAt: '2026-09-01T08:00:00', author: 'Ana Villanueva' },
+  {
+    id: 'AN-001',
+    title: 'CDO LPTRP Jeepney Network Live Operations',
+    type: 'General Update',
+    body: 'The Cagayan de Oro Local Public Transport Route Plan (LPTRP) jeepney alignments and passenger loading points are active. Administrators can publish real-time traffic notices, rerouting advisories, and terminal updates here.',
+    affectedRoutes: [],
+    status: 'Published',
+    startDate: '2026-10-27',
+    endDate: '',
+    updatedAt: '2026-10-27T06:00:00',
+    author: 'Doniel Eunson Ko',
+  },
 ];
-

@@ -95,6 +95,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               : []
           ),
           geometries: r.geometries ?? [],
+          directions: r.directions ?? [],
           stops: r.stops ?? [],
           terminals: r.terminals ?? [],
         } as JeepneyRoute)));
@@ -103,7 +104,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         setLocations(lData.value);
       }
       if (fData.status === 'fulfilled' && Array.isArray(fData.value) && fData.value.length > 0) {
-        setFares(fData.value);
+        setFares(fData.value.filter((f: any) => f.vehicle !== 'Modern Jeepney'));
       }
       if (aData.status === 'fulfilled' && Array.isArray(aData.value) && aData.value.length > 0) {
         setAnnouncements(aData.value);
