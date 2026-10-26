@@ -1,0 +1,1564 @@
+[
+  {
+    "id": "c2-patag-gaisano-limketkai-cogon",
+    "code": "C2",
+    "name": "C2 - Patag- Gaisano - Limketkai - Cogon",
+    "mid": "1hrIfl6wuWD2_JkawDAIYRcDlyarNsaQ",
+    "dbOrigin": "Patag Camp Evangelista",
+    "dbDest": "Cogon Public Market",
+    "inStart": [
+      124.6257832,
+      8.4877259
+    ],
+    "inEnd": [
+      124.6512844,
+      8.4769859
+    ],
+    "outStart": [
+      124.6512844,
+      8.4769859
+    ],
+    "outEnd": [
+      124.6257832,
+      8.4877259
+    ],
+    "inPts": 53,
+    "outPts": 43,
+    "kmlPoints": [
+      {
+        "name": "Gaisano City Mall",
+        "desc": "",
+        "coord": [
+          124.649879,
+          8.486359
+        ]
+      },
+      {
+        "name": "Camp Evangelista, 4th Infantry Division, Philippine Army",
+        "desc": "",
+        "coord": [
+          124.625511,
+          8.487614
+        ]
+      },
+      {
+        "name": "Limketkai Center",
+        "desc": "",
+        "coord": [
+          124.65606,
+          8.481583
+        ]
+      },
+      {
+        "name": "Cogon Public Market",
+        "desc": "",
+        "coord": [
+          124.65141,
+          8.477367
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Line 5",
+        "pts": 22,
+        "start": [
+          124.625783,
+          8.487726
+        ],
+        "end": [
+          124.640621,
+          8.488681
+        ]
+      },
+      {
+        "name": "Line 6",
+        "pts": 7,
+        "start": [
+          124.640621,
+          8.488681
+        ],
+        "end": [
+          124.655086,
+          8.484966
+        ]
+      },
+      {
+        "name": "Line 7",
+        "pts": 13,
+        "start": [
+          124.655086,
+          8.484966
+        ],
+        "end": [
+          124.65752,
+          8.48068
+        ]
+      },
+      {
+        "name": "Line 8",
+        "pts": 19,
+        "start": [
+          124.65752,
+          8.48068
+        ],
+        "end": [
+          124.646505,
+          8.478474
+        ]
+      },
+      {
+        "name": "Line 9",
+        "pts": 11,
+        "start": [
+          124.646505,
+          8.478474
+        ],
+        "end": [
+          124.637863,
+          8.4766
+        ]
+      },
+      {
+        "name": "Line 11",
+        "pts": 10,
+        "start": [
+          124.637863,
+          8.4766
+        ],
+        "end": [
+          124.637518,
+          8.482471
+        ]
+      },
+      {
+        "name": "Line 12",
+        "pts": 6,
+        "start": [
+          124.637518,
+          8.482471
+        ],
+        "end": [
+          124.637763,
+          8.485027
+        ]
+      }
+    ]
+  },
+  {
+    "id": "la-lapasan-cogon-agora-divisoria",
+    "code": "LA",
+    "name": "LA — Lapasan–Cogon–Agora–Divisoria Loop",
+    "mid": "1ZfAOkDpR1OVVBU8zp9EiQNVGLZup2BQ",
+    "dbOrigin": "Lapasan (Gaabucayan St)",
+    "dbDest": "Cogon Public Market",
+    "inStart": [
+      124.6581,
+      8.48941
+    ],
+    "inEnd": [
+      124.65223,
+      8.47705
+    ],
+    "outStart": [
+      124.65223,
+      8.47706
+    ],
+    "outEnd": [
+      124.65806,
+      8.48942
+    ],
+    "inPts": 217,
+    "outPts": 93,
+    "kmlPoints": [
+      {
+        "name": "526 Gaabucayan St, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.658098,
+          8.489412
+        ]
+      },
+      {
+        "name": "667 Osmena St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.652229,
+          8.477046
+        ]
+      },
+      {
+        "name": "667 Osmena St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.65223,
+          8.477055
+        ]
+      },
+      {
+        "name": "526 Gaabucayan St, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.658064,
+          8.489424
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Lapasan (R3) – Cogon Public Market INBOUND",
+        "pts": 217,
+        "start": [
+          124.6581,
+          8.48941
+        ],
+        "end": [
+          124.65223,
+          8.47705
+        ]
+      },
+      {
+        "name": "Lapasan (R3) – Cogon Public Market OUTBOUND",
+        "pts": 93,
+        "start": [
+          124.65223,
+          8.47706
+        ],
+        "end": [
+          124.65806,
+          8.48942
+        ]
+      }
+    ]
+  },
+  {
+    "id": "lb-lapasan-agora-loop",
+    "code": "LB",
+    "name": "LB — Lapasan–Agora Loop",
+    "mid": "1jhRbShCWclO5eCExvzaVB5CUtsGjkvs",
+    "dbOrigin": "Lapasan (Agora Bus Terminal)",
+    "dbDest": "Cogon Public Market",
+    "inStart": [
+      124.65765,
+      8.48957
+    ],
+    "inEnd": [
+      124.65229,
+      8.4776
+    ],
+    "outStart": [
+      124.65224,
+      8.4772
+    ],
+    "outEnd": [
+      124.65784,
+      8.4895
+    ],
+    "inPts": 132,
+    "outPts": 86,
+    "kmlPoints": [
+      {
+        "name": "Agora Bus Terminal, Gaabucayan St, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.657653,
+          8.48957
+        ]
+      },
+      {
+        "name": "FMH2+3X3, Osmena St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.652285,
+          8.477599
+        ]
+      },
+      {
+        "name": "667 Osmena St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.652244,
+          8.477201
+        ]
+      },
+      {
+        "name": "522 Gaabucayan St, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.65784,
+          8.4895
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Lapasan (R2) – Cogon Public Market INBOUND",
+        "pts": 132,
+        "start": [
+          124.65765,
+          8.48957
+        ],
+        "end": [
+          124.65229,
+          8.4776
+        ]
+      },
+      {
+        "name": "Lapasan (R2) – Cogon Public Market OUTBOUND",
+        "pts": 86,
+        "start": [
+          124.65224,
+          8.4772
+        ],
+        "end": [
+          124.65784,
+          8.4895
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bayabas-carmen-loop-line",
+    "code": "R-BAY-CAR",
+    "name": "Bayabas–Carmen Loop Line",
+    "mid": "1ycyKmc9oAVeCuIwMduyOid9mGTwGUHg",
+    "dbOrigin": "Bayabas Barangay Hall",
+    "dbDest": "Carmen Public Market",
+    "inStart": [
+      124.6389,
+      8.51375
+    ],
+    "inEnd": [
+      124.6371,
+      8.47996
+    ],
+    "outStart": [
+      124.63712,
+      8.48005
+    ],
+    "outEnd": [
+      124.6389,
+      8.51375
+    ],
+    "inPts": 302,
+    "outPts": 231,
+    "kmlPoints": [
+      {
+        "name": "Bayabas Barangay Hall, Cagayan de Oro, Misamis Oriental",
+        "desc": "",
+        "coord": [
+          124.638901,
+          8.513745
+        ]
+      },
+      {
+        "name": "FJHP+VVW, Ipil St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.637103,
+          8.479957
+        ]
+      },
+      {
+        "name": "Carmen Public Market, V. Neri Street, Cagayan de Oro City, Misamis Oriental, FJJP+3Q4, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.637116,
+          8.480051
+        ]
+      },
+      {
+        "name": "Bayabas Barangay Hall, Cagayan de Oro, Misamis Oriental",
+        "desc": "",
+        "coord": [
+          124.638901,
+          8.513745
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Directions from Bayabas Barangay Hall, Cagayan de Oro, Misamis Oriental to FJHP+VVW, Ipil St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "pts": 302,
+        "start": [
+          124.6389,
+          8.51375
+        ],
+        "end": [
+          124.6371,
+          8.47996
+        ]
+      },
+      {
+        "name": "Directions from Carmen Public Market, V. Neri Street, Cagayan de Oro City, Misamis Oriental, FJJP+3Q4, Cagayan de Oro, Misamis Oriental, Philippines to Bayabas Barangay Hall, Cagayan de Oro, Misamis Oriental",
+        "pts": 231,
+        "start": [
+          124.63712,
+          8.48005
+        ],
+        "end": [
+          124.6389,
+          8.51375
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bugo-cogon-line",
+    "code": "R-BUG-COG",
+    "name": "Bugo–Cogon Line",
+    "mid": "1BWMXAQmuc1Zcg9TeqiRjdPg7gPz70Wg",
+    "dbOrigin": "Bugo (Villa Trinitas)",
+    "dbDest": "Cogon Public Market",
+    "inStart": [
+      124.7721,
+      8.51025
+    ],
+    "inEnd": [
+      124.65226,
+      8.47734
+    ],
+    "outStart": [
+      124.65227,
+      8.47742
+    ],
+    "outEnd": [
+      124.7721,
+      8.51025
+    ],
+    "inPts": 587,
+    "outPts": 558,
+    "kmlPoints": [
+      {
+        "name": "Basketball Court, Phase 2, Villa Trinitas, Cagayan de Oro, Misamis Oriental",
+        "desc": "",
+        "coord": [
+          124.772104,
+          8.510253
+        ]
+      },
+      {
+        "name": "667 Osmena St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.652258,
+          8.477336
+        ]
+      },
+      {
+        "name": "667 Osmena St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.652267,
+          8.47742
+        ]
+      },
+      {
+        "name": "Basketball Court, Phase 2, Villa Trinitas, Cagayan de Oro, Misamis Oriental",
+        "desc": "",
+        "coord": [
+          124.772104,
+          8.510253
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Directions from Basketball Court, Phase 2, Villa Trinitas, Cagayan de Oro, Misamis Oriental to 667 Osmena St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "pts": 587,
+        "start": [
+          124.7721,
+          8.51025
+        ],
+        "end": [
+          124.65226,
+          8.47734
+        ]
+      },
+      {
+        "name": "Directions from 667 Osmena St, Cagayan de Oro, 9000 Misamis Oriental, Philippines to Basketball Court, Phase 2, Villa Trinitas, Cagayan de Oro, Misamis Oriental",
+        "pts": 558,
+        "start": [
+          124.65227,
+          8.47742
+        ],
+        "end": [
+          124.7721,
+          8.51025
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bulua-cogon-line-highway",
+    "code": "R-BUL-COG",
+    "name": "Bulua (R3) – Carmen Public Market",
+    "mid": "1n_3ZExYSgHmpFYKIKuQLAK-Ril_fShU",
+    "dbOrigin": "Bulua (Saarenas Ave)",
+    "dbDest": "Carmen Public Market",
+    "inStart": [
+      124.62423,
+      8.51224
+    ],
+    "inEnd": [
+      124.6365,
+      8.47933
+    ],
+    "outStart": [
+      124.63664,
+      8.47931
+    ],
+    "outEnd": [
+      124.62423,
+      8.51225
+    ],
+    "inPts": 228,
+    "outPts": 170,
+    "kmlPoints": [
+      {
+        "name": "9 Saarenas Ave, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.624234,
+          8.512239
+        ]
+      },
+      {
+        "name": "376 V. Neri St, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.636498,
+          8.479327
+        ]
+      },
+      {
+        "name": "FJHP+MM3, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.636639,
+          8.479313
+        ]
+      },
+      {
+        "name": "7 Saarenas Ave, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.624233,
+          8.512246
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Directions from 9 Saarenas Ave, Cagayan de Oro, Misamis Oriental, Philippines to 376 V. Neri St, Cagayan de Oro, Misamis Oriental, Philippines",
+        "pts": 228,
+        "start": [
+          124.62423,
+          8.51224
+        ],
+        "end": [
+          124.6365,
+          8.47933
+        ]
+      },
+      {
+        "name": "Directions from FJHP+MM3, Cagayan de Oro, 9000 Misamis Oriental, Philippines to 7 Saarenas Ave, Cagayan de Oro, Misamis Oriental, Philippines",
+        "pts": 170,
+        "start": [
+          124.63664,
+          8.47931
+        ],
+        "end": [
+          124.62423,
+          8.51225
+        ]
+      }
+    ]
+  },
+  {
+    "id": "indahag-r1-cogon-line",
+    "code": "R-IND-COG",
+    "name": "Indahag (R1)–Cogon Line",
+    "mid": "1h-iKtiI5doxfXnng42FUtUxOi00mtvU",
+    "dbOrigin": "Indahag Barangay Hall",
+    "dbDest": "Cogon Public Market",
+    "inStart": [
+      124.66701,
+      8.42149
+    ],
+    "inEnd": [
+      124.65286,
+      8.47664
+    ],
+    "outStart": [
+      124.65287,
+      8.47668
+    ],
+    "outEnd": [
+      124.66701,
+      8.42149
+    ],
+    "inPts": 390,
+    "outPts": 392,
+    "kmlPoints": [
+      {
+        "name": "Indahag Barangay Hall, Cagayan de Oro, Misamis Oriental",
+        "desc": "",
+        "coord": [
+          124.667009,
+          8.421486
+        ]
+      },
+      {
+        "name": "FMG3+M5G, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.652862,
+          8.476636
+        ]
+      },
+      {
+        "name": "FMG3+M5G, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.652866,
+          8.476681
+        ]
+      },
+      {
+        "name": "Indahag Barangay Hall, Cagayan de Oro, Misamis Oriental",
+        "desc": "",
+        "coord": [
+          124.667009,
+          8.421486
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Directions from Indahag Barangay Hall, Cagayan de Oro, Misamis Oriental to FMG3+M5G, Cagayan de Oro, Misamis Oriental, Philippines",
+        "pts": 390,
+        "start": [
+          124.66701,
+          8.42149
+        ],
+        "end": [
+          124.65286,
+          8.47664
+        ]
+      },
+      {
+        "name": "Directions from FMG3+M5G, Cagayan de Oro, Misamis Oriental, Philippines to Indahag Barangay Hall, Cagayan de Oro, Misamis Oriental",
+        "pts": 392,
+        "start": [
+          124.65287,
+          8.47668
+        ],
+        "end": [
+          124.66701,
+          8.42149
+        ]
+      }
+    ]
+  },
+  {
+    "id": "iponan-bulua-cogon-line",
+    "code": "R-IPO-BUL-COG",
+    "name": "Iponan–Bulua–Cogon Line",
+    "mid": "1T6Jg7nbbnNeCTG6g595jFq7UDO384no",
+    "dbOrigin": "Iponan (Bulao)",
+    "dbDest": "Cogon Public Market",
+    "inStart": [
+      124.59108,
+      8.4814
+    ],
+    "inEnd": [
+      124.65,
+      8.47726
+    ],
+    "outStart": [
+      124.65,
+      8.47726
+    ],
+    "outEnd": [
+      124.59108,
+      8.4814
+    ],
+    "inPts": 421,
+    "outPts": 422,
+    "kmlPoints": [
+      {
+        "name": "FHJR+68R, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.591078,
+          8.481403
+        ]
+      },
+      {
+        "name": "Velez Building, J.R. Borja Street, Sotero Daumar St, Cagayan de Oro, 9000 Lalawigan ng Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.649999,
+          8.47726
+        ]
+      },
+      {
+        "name": "Velez Building, J.R. Borja Street, Sotero Daumar St, Cagayan de Oro, 9000 Lalawigan ng Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.649999,
+          8.47726
+        ]
+      },
+      {
+        "name": "FHJR+68R, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.591078,
+          8.481403
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Directions from FHJR+68R, Cagayan de Oro, Misamis Oriental, Philippines to Velez Building, J.R. Borja Street, Sotero Daumar St, Cagayan de Oro, 9000 Lalawigan ng Misamis Oriental, Philippines",
+        "pts": 421,
+        "start": [
+          124.59108,
+          8.4814
+        ],
+        "end": [
+          124.65,
+          8.47726
+        ]
+      },
+      {
+        "name": "Directions from Velez Building, J.R. Borja Street, Sotero Daumar St, Cagayan de Oro, 9000 Lalawigan ng Misamis Oriental, Philippines to FHJR+68R, Cagayan de Oro, Misamis Oriental, Philippines",
+        "pts": 422,
+        "start": [
+          124.65,
+          8.47726
+        ],
+        "end": [
+          124.59108,
+          8.4814
+        ]
+      }
+    ]
+  },
+  {
+    "id": "lumbia-carmen-line",
+    "code": "R-LUM-CAR",
+    "name": "Lumbia–Carmen Line",
+    "mid": "1P9XvheMsObLlAh9rFL96IAmJSPs5Hgk",
+    "dbOrigin": "Lumbia Market",
+    "dbDest": "Carmen Public Market",
+    "inStart": [
+      124.59495,
+      8.40247
+    ],
+    "inEnd": [
+      124.63646,
+      8.47977
+    ],
+    "outStart": [
+      124.63675,
+      8.4793
+    ],
+    "outEnd": [
+      124.59495,
+      8.40247
+    ],
+    "inPts": 534,
+    "outPts": 559,
+    "kmlPoints": [
+      {
+        "name": "Lumbia Market, Cagayan de Oro, Misamis Oriental",
+        "desc": "",
+        "coord": [
+          124.594953,
+          8.402471
+        ]
+      },
+      {
+        "name": "376 V. Neri St, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.636457,
+          8.479773
+        ]
+      },
+      {
+        "name": "FJHP+MM3, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.636754,
+          8.479302
+        ]
+      },
+      {
+        "name": "Lumbia Market, Cagayan de Oro, Misamis Oriental",
+        "desc": "",
+        "coord": [
+          124.594953,
+          8.402471
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Lumbia (R2) – Carmen Public Market INBOUND",
+        "pts": 534,
+        "start": [
+          124.59495,
+          8.40247
+        ],
+        "end": [
+          124.63646,
+          8.47977
+        ]
+      },
+      {
+        "name": "Directions from FJHP+MM3, Cagayan de Oro, 9000 Misamis Oriental, Philippines to Lumbia Market, Cagayan de Oro, Misamis Oriental",
+        "pts": 559,
+        "start": [
+          124.63675,
+          8.4793
+        ],
+        "end": [
+          124.59495,
+          8.40247
+        ]
+      }
+    ]
+  },
+  {
+    "id": "macasandig-cogon-line",
+    "code": "R-MAC-COG",
+    "name": "Macasandig–Cogon Line",
+    "mid": "1ARLVkDhyTXObhT3V9nidkBL7xdD7Wnc",
+    "dbOrigin": "Macasandig (Buena Oro)",
+    "dbDest": "Cogon Public Market",
+    "inStart": [
+      124.6462,
+      8.44911
+    ],
+    "inEnd": [
+      124.65125,
+      8.47785
+    ],
+    "outStart": [
+      124.65102,
+      8.47787
+    ],
+    "outEnd": [
+      124.64621,
+      8.44919
+    ],
+    "inPts": 210,
+    "outPts": 197,
+    "kmlPoints": [
+      {
+        "name": "Buena Oro Covered Court, 2 Pelican St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.646201,
+          8.449105
+        ]
+      },
+      {
+        "name": "858 Yacapin St, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.651253,
+          8.477851
+        ]
+      },
+      {
+        "name": "Cogon Market, Cagayan de Oro City, Misamis Oriental, FMH2+499, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.65102,
+          8.47787
+        ]
+      },
+      {
+        "name": "Buena Oro Covered Court, 2 Pelican St, Cagayan de Oro, 9000 Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.646209,
+          8.44919
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Macasandig (Centro Buena Oro) – Cogon Public Market INBOUND",
+        "pts": 210,
+        "start": [
+          124.6462,
+          8.44911
+        ],
+        "end": [
+          124.65125,
+          8.47785
+        ]
+      },
+      {
+        "name": "Macasandig (Centro Buena Oro) – Cogon Public Market  OUTBOUND",
+        "pts": 197,
+        "start": [
+          124.65102,
+          8.47787
+        ],
+        "end": [
+          124.64621,
+          8.44919
+        ]
+      }
+    ]
+  },
+  {
+    "id": "puerto-cogon-divisoria-line",
+    "code": "R-PUE-COG",
+    "name": "Puerto (R1) Puerto Public Market – Agora Terminal",
+    "mid": "1jGIxcVV3srk4kC1pi18CTOKqQUuNACA",
+    "dbOrigin": "Puerto Public Market",
+    "dbDest": "Agora Terminal",
+    "inStart": [
+      124.7505,
+      8.4996
+    ],
+    "inEnd": [
+      124.65773,
+      8.48821
+    ],
+    "outStart": [
+      124.658,
+      8.48813
+    ],
+    "outEnd": [
+      124.75047,
+      8.49958
+    ],
+    "inPts": 387,
+    "outPts": 347,
+    "kmlPoints": [
+      {
+        "name": "FQX2+R5R, Puerto Market Rd, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.750499,
+          8.499604
+        ]
+      },
+      {
+        "name": "Canoy Building, Agora, Cagayan de Oro, 9000 Lalawigan ng Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.657734,
+          8.488213
+        ]
+      },
+      {
+        "name": "Canoy Building, Agora, Cagayan de Oro, 9000 Lalawigan ng Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.657996,
+          8.488128
+        ]
+      },
+      {
+        "name": "Puerto Public Market, Puerto, Cagayan de Oro City, Misamis Oriental, FQX2+Q6V, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.750474,
+          8.499577
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Puerto (R1) Puerto Public Market – Agora Terminal INBOUND",
+        "pts": 387,
+        "start": [
+          124.7505,
+          8.4996
+        ],
+        "end": [
+          124.65773,
+          8.48821
+        ]
+      },
+      {
+        "name": "Puerto (R1) Puerto Public Market – Agora Terminal OUTBOUND",
+        "pts": 347,
+        "start": [
+          124.658,
+          8.48813
+        ],
+        "end": [
+          124.75047,
+          8.49958
+        ]
+      }
+    ]
+  },
+  {
+    "id": "uptown-gran-europa-sm-cogon",
+    "code": "R-UPT-COG",
+    "name": "Uptown — Gran Europa/SM Uptown–Cogon Line",
+    "mid": "1RDNOfmbPlI9lPImz-sLKS70s79HSxSk",
+    "dbOrigin": "Gran Europa / SM Uptown",
+    "dbDest": "Cogon Public Market",
+    "inStart": [
+      124.60563,
+      8.42409
+    ],
+    "inEnd": [
+      124.65008,
+      8.47711
+    ],
+    "outStart": [
+      124.65009,
+      8.47711
+    ],
+    "outEnd": [
+      124.60791,
+      8.42316
+    ],
+    "inPts": 724,
+    "outPts": 680,
+    "kmlPoints": [
+      {
+        "name": "CJF4+H66, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.605625,
+          8.424093
+        ]
+      },
+      {
+        "name": "FMG2+R36, Sotero Daumar St, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.650084,
+          8.477107
+        ]
+      },
+      {
+        "name": "FMG2+R36, Sotero Daumar St, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.650086,
+          8.477107
+        ]
+      },
+      {
+        "name": "Unnamed Road, Cagayan de Oro, Misamis Oriental, Philippines",
+        "desc": "",
+        "coord": [
+          124.607909,
+          8.423158
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Lumbia (R4) Gran Europa – Cogon Public Market INBOUND",
+        "pts": 724,
+        "start": [
+          124.60563,
+          8.42409
+        ],
+        "end": [
+          124.65008,
+          8.47711
+        ]
+      },
+      {
+        "name": "Directions from FMG2+R36, Sotero Daumar St, Cagayan de Oro, Misamis Oriental, Philippines to Unnamed Road, Cagayan de Oro, Misamis Oriental, Philippines",
+        "pts": 680,
+        "start": [
+          124.65009,
+          8.47711
+        ],
+        "end": [
+          124.60791,
+          8.42316
+        ]
+      }
+    ]
+  },
+  {
+    "id": "r1-gaisano-carmen-loop",
+    "code": "R1",
+    "name": "R1 — Gaisano–Carmen Loop Line",
+    "mid": "1ojQekfQsB6BOnGdWuUfUT__jJYUzEjg",
+    "dbOrigin": "NMMC / Gaisano City Mall",
+    "dbDest": "Carmen Public Market",
+    "inStart": [
+      124.6501294,
+      8.4846919
+    ],
+    "inEnd": [
+      124.6365542,
+      8.480641
+    ],
+    "outStart": [
+      124.6365568,
+      8.4806244
+    ],
+    "outEnd": [
+      124.6501294,
+      8.4846919
+    ],
+    "inPts": 211,
+    "outPts": 201,
+    "kmlPoints": [
+      {
+        "name": "Gaisano City Mall",
+        "desc": "Elevation: 290 feet",
+        "coord": [
+          124.649722,
+          8.485897
+        ]
+      },
+      {
+        "name": "Carmen Market",
+        "desc": "",
+        "coord": [
+          124.636452,
+          8.480681
+        ]
+      },
+      {
+        "name": "Gaisano Carmen",
+        "desc": "",
+        "coord": [
+          124.636349,
+          8.479601
+        ]
+      },
+      {
+        "name": "Xavier University - Ateneo de Cagayan",
+        "desc": "",
+        "coord": [
+          124.645926,
+          8.476792
+        ]
+      },
+      {
+        "name": "Cogon Public Market",
+        "desc": "",
+        "coord": [
+          124.651557,
+          8.477343
+        ]
+      },
+      {
+        "name": "Magnum Express Terminal",
+        "desc": "",
+        "coord": [
+          124.657208,
+          8.481614
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "r1 carmen to gaisano",
+        "pts": 201,
+        "start": [
+          124.636557,
+          8.480624
+        ],
+        "end": [
+          124.650129,
+          8.484692
+        ]
+      },
+      {
+        "name": "r1 gaisano to carmen market",
+        "pts": 211,
+        "start": [
+          124.650129,
+          8.484692
+        ],
+        "end": [
+          124.636554,
+          8.480641
+        ]
+      },
+      {
+        "name": "Line 9",
+        "pts": 26,
+        "start": [
+          124.646408,
+          8.478473
+        ],
+        "end": [
+          124.650518,
+          8.486002
+        ]
+      }
+    ]
+  },
+  {
+    "id": "r2-gaisano-agora-cogon-carmen",
+    "code": "R2",
+    "name": "R2 — Gaisano–Agora–Cogon–Carmen Loop Line",
+    "mid": "1U4dw1Ug7ZuoCVirC46KCdtqJGvZ_cSM",
+    "dbOrigin": "Carmen Public Market",
+    "dbDest": "Plaza Divisoria / Cogon",
+    "inStart": [
+      124.6373042,
+      8.4817033
+    ],
+    "inEnd": [
+      124.6537395,
+      8.4855558
+    ],
+    "outStart": [
+      124.6537395,
+      8.4855558
+    ],
+    "outEnd": [
+      124.6372278,
+      8.481642
+    ],
+    "inPts": 185,
+    "outPts": 453,
+    "kmlPoints": [
+      {
+        "name": "Limketkai",
+        "desc": "Elevation: 57 m<br>Time from start: 00:13:12<br>Distance from start: 2.23 km",
+        "coord": [
+          124.657451,
+          8.481384
+        ]
+      },
+      {
+        "name": "Agora Bus Terninal",
+        "desc": "",
+        "coord": [
+          124.657852,
+          8.488868
+        ]
+      },
+      {
+        "name": "SM CDO Downtown Premier",
+        "desc": "",
+        "coord": [
+          124.653889,
+          8.484445
+        ]
+      },
+      {
+        "name": "Centrio Mall",
+        "desc": "",
+        "coord": [
+          124.651395,
+          8.485259
+        ]
+      },
+      {
+        "name": "Gaisano City Mall",
+        "desc": "",
+        "coord": [
+          124.649811,
+          8.486259
+        ]
+      },
+      {
+        "name": "Carmen Public Market",
+        "desc": "",
+        "coord": [
+          124.636856,
+          8.479722
+        ]
+      },
+      {
+        "name": "Cogon Public Market",
+        "desc": "",
+        "coord": [
+          124.651557,
+          8.477343
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "R2 Gaisano - Agora - Cogon - Carmen",
+        "pts": 453,
+        "start": [
+          124.65374,
+          8.485556
+        ],
+        "end": [
+          124.637228,
+          8.481642
+        ]
+      },
+      {
+        "name": "R2 Gaisano - Agora - Cogon - Carmen",
+        "pts": 185,
+        "start": [
+          124.637304,
+          8.481703
+        ],
+        "end": [
+          124.65374,
+          8.485556
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ra-pier-cogon-line",
+    "code": "RA",
+    "name": "RA — Pier–Cogon Line",
+    "mid": "1BGud4fdlzvEn8EY0IG_6InM6QIhK4WM",
+    "dbOrigin": "CDO Port Terminal (Macabalan)",
+    "dbDest": "Cogon Public Market (Ororama)",
+    "inStart": [
+      124.6624042,
+      8.4990158
+    ],
+    "inEnd": [
+      124.6508373,
+      8.4865693
+    ],
+    "outStart": [
+      124.6508373,
+      8.4865693
+    ],
+    "outEnd": [
+      124.6624935,
+      8.4989961
+    ],
+    "inPts": 671,
+    "outPts": 156,
+    "kmlPoints": [
+      {
+        "name": "Gaisano City Mall",
+        "desc": "Elevation: 284 feet",
+        "coord": [
+          124.650837,
+          8.486569
+        ]
+      },
+      {
+        "name": "End",
+        "desc": "Elevation: 266 feet",
+        "coord": [
+          124.649315,
+          8.483044
+        ]
+      },
+      {
+        "name": "Cagayan de Oro Port Terminal Building",
+        "desc": "",
+        "coord": [
+          124.663357,
+          8.498858
+        ]
+      },
+      {
+        "name": "Cogon Public Market",
+        "desc": "",
+        "coord": [
+          124.651697,
+          8.477831
+        ]
+      },
+      {
+        "name": "Centrio Mall",
+        "desc": "",
+        "coord": [
+          124.650397,
+          8.485387
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Route",
+        "pts": 156,
+        "start": [
+          124.650837,
+          8.486569
+        ],
+        "end": [
+          124.662493,
+          8.498996
+        ]
+      },
+      {
+        "name": "Route",
+        "pts": 671,
+        "start": [
+          124.662404,
+          8.499016
+        ],
+        "end": [
+          124.650837,
+          8.486569
+        ]
+      }
+    ]
+  },
+  {
+    "id": "rbc-pier-macabalan-agora-limketkai",
+    "code": "RBC",
+    "name": "RBC — Pier–Macabalan–Agora–Limketkai–Cogon–Velez Line",
+    "mid": "1Kuy7St1QrGwu2YrABNw4UFj8zPhWwg0",
+    "dbOrigin": "CDO Port Terminal (Macabalan)",
+    "dbDest": "Provincial Capitol / Velez",
+    "inStart": [
+      124.6631879,
+      8.4992744
+    ],
+    "inEnd": [
+      124.6518933,
+      8.4768902
+    ],
+    "outStart": [
+      124.6518933,
+      8.4768902
+    ],
+    "outEnd": [
+      124.6631879,
+      8.4992744
+    ],
+    "inPts": 533,
+    "outPts": 236,
+    "kmlPoints": [
+      {
+        "name": "Misamis Oriental Provincial Capitol",
+        "desc": "Elevation: 102 m<br>Time from start: 00:06:06<br>Distance from start: 0.71 km",
+        "coord": [
+          124.648018,
+          8.485986
+        ]
+      },
+      {
+        "name": "Limketkai",
+        "desc": "Elevation: 64 m<br>Time from start: 00:40:26<br>Distance from start: 8.42 km",
+        "coord": [
+          124.657584,
+          8.481426
+        ]
+      },
+      {
+        "name": "Yacapin cor velez st",
+        "desc": "Elevation: 296 feet",
+        "coord": [
+          124.644983,
+          8.480399
+        ]
+      },
+      {
+        "name": "Cogon Market",
+        "desc": "Elevation: 302 feet",
+        "coord": [
+          124.652092,
+          8.47692
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "Rbc - pier macabalan agora lkks cogon velez",
+        "pts": 768,
+        "start": [
+          124.651893,
+          8.47689
+        ],
+        "end": [
+          124.651893,
+          8.47689
+        ]
+      }
+    ]
+  },
+  {
+    "id": "rd-gusa-cugman-limketkai-cogon",
+    "code": "RC",
+    "name": "RC - Cugman – Gusa – Cogon",
+    "mid": "1zIcpiNUjxnJ-kJ_kt5VD9miIU2NI47Y",
+    "dbOrigin": "Cugman Centro",
+    "dbDest": "Cogon Public Market / Centrio",
+    "inStart": [
+      124.70552447,
+      8.46899906
+    ],
+    "inEnd": [
+      124.6513298,
+      8.4857123
+    ],
+    "outStart": [
+      124.65137325,
+      8.48572736
+    ],
+    "outEnd": [
+      124.70552447,
+      8.46899906
+    ],
+    "inPts": 753,
+    "outPts": 580,
+    "kmlPoints": [
+      {
+        "name": "Stop for ~2 min",
+        "desc": "Elevation: 83 m<br>Time from start: 01:00:02<br>Distance from start: 14.48 km",
+        "coord": [
+          124.648598,
+          8.486488
+        ]
+      },
+      {
+        "name": "Ayala Centiro Mall",
+        "desc": "Elevation: 284 feet",
+        "coord": [
+          124.651373,
+          8.485727
+        ]
+      },
+      {
+        "name": "Yacapin Street",
+        "desc": "Elevation: 273 feet",
+        "coord": [
+          124.64502,
+          8.4801
+        ]
+      }
+    ],
+    "kmlLines": [
+      {
+        "name": "rc gusa cugman",
+        "pts": 1327,
+        "start": [
+          124.651373,
+          8.485727
+        ],
+        "end": [
+          124.64502,
+          8.4801
+        ]
+      },
+      {
+        "name": "Line 5",
+        "pts": 6,
+        "start": [
+          124.64502,
+          8.4801
+        ],
+        "end": [
+          124.65133,
+          8.485712
+        ]
+      }
+    ]
+  }
+]

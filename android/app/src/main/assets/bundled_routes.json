@@ -516,12 +516,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [
@@ -587,23 +587,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#4338CA",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
-    "terminal_count": 1,
-    "stop_count": 0,
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
+    "terminal_count": 2,
+    "stop_count": 4,
     "directions": [
       {
         "id": "d-la-lapasan-cogon-agora-di-in",
         "route_id": "la-lapasan-cogon-agora-divisoria",
         "direction": "Inbound",
         "distance_km": 7.09,
-        "street_sequence": "Brgy. Lapasan Centro → Agora Bus Terminal → Cogon Public Market → Plaza Divisoria"
+        "street_sequence": "Lapasan (Gaabucayan St) → Agora Terminal → CM Recto Ave → Limketkai Center → JR Borja St → Cogon Public Market"
       },
       {
         "id": "d-la-lapasan-cogon-agora-di-out",
         "route_id": "la-lapasan-cogon-agora-divisoria",
         "direction": "Outbound",
         "distance_km": 2.29,
-        "street_sequence": "Plaza Divisoria → Cogon Public Market → Agora Bus Terminal → Brgy. Lapasan Centro"
+        "street_sequence": "Cogon Public Market → RN Abejuela St → Plaza Divisoria → Corrales Ave → Gaabucayan St → Lapasan"
       }
     ],
     "geometries": [
@@ -2367,16 +2367,70 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-la-la-lapas",
-        "name": "Brgy. Lapasan Centro Terminal",
-        "note": "Verified terminus for LA — Lapasan–Cogon–Agora–Divisoria Loop",
+        "id": "t-lapasan-gaabucayan",
+        "name": "Lapasan (Gaabucayan St)",
+        "note": "Gaabucayan St / Agora Junction",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.483007,
-        "lng": 124.664563
+        "lat": 8.48941,
+        "lng": 124.6581
+      },
+      {
+        "id": "t-cogon",
+        "name": "Cogon Public Market Terminal",
+        "note": "Cogon Public Market Terminal",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-la-agora",
+        "route_id": "la-lapasan-cogon-agora-divisoria",
+        "name": "Agora Integrated Bus Terminal",
+        "note": "Agora Bus Terminal Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48813,
+        "lng": 124.658
+      },
+      {
+        "id": "lp-la-cogon",
+        "route_id": "la-lapasan-cogon-agora-divisoria",
+        "name": "Cogon Public Market",
+        "note": "Cogon Market Boarding Area",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47706,
+        "lng": 124.65223
+      },
+      {
+        "id": "lp-la-lapasan",
+        "route_id": "la-lapasan-cogon-agora-divisoria",
+        "name": "Lapasan (Gaabucayan St)",
+        "note": "Gaabucayan St / Agora Junction",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48941,
+        "lng": 124.6581
+      },
+      {
+        "id": "lp-la-divisoria",
+        "route_id": "la-lapasan-cogon-agora-divisoria",
+        "name": "Plaza Divisoria",
+        "note": "RN Abejuela St / Divisoria",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4777,
+        "lng": 124.6452
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -2384,7 +2438,7 @@
     "id": "lb-lapasan-agora-loop",
     "code": "LB",
     "name": "LB — Lapasan–Agora Loop",
-    "origin": "Lapasan (Agora Bus Terminal)",
+    "origin": "Agora Bus Terminal (Lapasan)",
     "destination": "Cogon Public Market",
     "jeepney_type": "Traditional",
     "description": "Puregold Lapasan → Limketkai Drive → Gaabucayan St → Agora Bus Terminal → San Lazaro St → C.M. Recto Hwy.",
@@ -2394,23 +2448,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#3730A3",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
-    "terminal_count": 1,
-    "stop_count": 0,
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
+    "terminal_count": 2,
+    "stop_count": 3,
     "directions": [
       {
         "id": "d-lb-lapasan-agora-loop-in",
         "route_id": "lb-lapasan-agora-loop",
         "direction": "Inbound",
         "distance_km": 4.3,
-        "street_sequence": "Puregold Lapasan → Limketkai Center → Agora Bus Terminal"
+        "street_sequence": "Agora Bus Terminal → Gaabucayan St → Lapasan Highway → Limketkai Center → Cogon Public Market"
       },
       {
         "id": "d-lb-lapasan-agora-loop-out",
         "route_id": "lb-lapasan-agora-loop",
         "direction": "Outbound",
         "distance_km": 3.88,
-        "street_sequence": "Agora Bus Terminal → Limketkai Center → Puregold Lapasan"
+        "street_sequence": "Cogon Public Market → Osmeña St → CM Recto Ave → Agora Bus Terminal (Lapasan)"
       }
     ],
     "geometries": [
@@ -3494,16 +3548,59 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-lb-lb-lapas",
-        "name": "Puregold Lapasan Terminal",
-        "note": "Verified terminus for LB — Lapasan–Agora Loop",
+        "id": "t-agora-lapasan",
+        "name": "Agora Bus Terminal (Lapasan)",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.483374,
-        "lng": 124.658575
+        "lat": 8.48957,
+        "lng": 124.65765
+      },
+      {
+        "id": "t-cogon",
+        "name": "Cogon Public Market Terminal",
+        "note": "Cogon Public Market Terminal",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-lb-agora",
+        "route_id": "lb-lapasan-agora-loop",
+        "name": "Agora Bus Terminal (Lapasan)",
+        "note": "Agora Bus Terminal Main Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48957,
+        "lng": 124.65765
+      },
+      {
+        "id": "lp-lb-cogon",
+        "route_id": "lb-lapasan-agora-loop",
+        "name": "Cogon Public Market",
+        "note": "Cogon Market Boarding Area",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4772,
+        "lng": 124.65224
+      },
+      {
+        "id": "lp-lb-puregold",
+        "route_id": "lb-lapasan-agora-loop",
+        "name": "Puregold Lapasan",
+        "note": "Lapasan Highway Commercial Point",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48337,
+        "lng": 124.65858
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -9751,12 +9848,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -12499,12 +12596,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -12537,23 +12634,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#047857",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
-    "terminal_count": 1,
-    "stop_count": 0,
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
+    "terminal_count": 2,
+    "stop_count": 4,
     "directions": [
       {
         "id": "d-bayabas-carmen-loop-line-in",
         "route_id": "bayabas-carmen-loop-line",
         "direction": "Inbound",
         "distance_km": 10.6,
-        "street_sequence": "Brgy. Bayabas Centro → Westbound Terminal (Bulua) → Brgy. Kauswagan → Carmen Public Market"
+        "street_sequence": "Bayabas Barangay Hall → Kauswagan Rd → National Highway → Bulua → Carmen Public Market"
       },
       {
         "id": "d-bayabas-carmen-loop-line-out",
         "route_id": "bayabas-carmen-loop-line",
         "direction": "Outbound",
         "distance_km": 7.37,
-        "street_sequence": "Carmen Public Market → Brgy. Kauswagan → Westbound Terminal (Bulua) → Brgy. Bayabas Centro"
+        "street_sequence": "Carmen Public Market → Vamenta Blvd → Kauswagan Highway → Bayabas Road → Bayabas Barangay Hall"
       }
     ],
     "geometries": [
@@ -14997,16 +15094,70 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-r-bay-car-bayabas-",
-        "name": "Brgy. Bayabas Centro Terminal",
-        "note": "Verified terminus for Bayabas–Carmen Loop Line",
+        "id": "t-bayabas",
+        "name": "Bayabas Barangay Hall Terminal",
+        "note": "Bayabas Centro Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.513764,
-        "lng": 124.638894
+        "lat": 8.51375,
+        "lng": 124.6389
+      },
+      {
+        "id": "t-carmen",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-bay-bayabas",
+        "route_id": "bayabas-carmen-loop-line",
+        "name": "Bayabas Barangay Hall",
+        "note": "Bayabas Barangay Hall Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.51375,
+        "lng": 124.6389
+      },
+      {
+        "id": "lp-bay-carmen",
+        "route_id": "bayabas-carmen-loop-line",
+        "name": "Carmen Public Market",
+        "note": "Carmen Public Market Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48005,
+        "lng": 124.63712
+      },
+      {
+        "id": "lp-bay-kauswagan",
+        "route_id": "bayabas-carmen-loop-line",
+        "name": "Kauswagan Junction",
+        "note": "Kauswagan National Highway",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4975,
+        "lng": 124.6335
+      },
+      {
+        "id": "lp-bay-westbound",
+        "route_id": "bayabas-carmen-loop-line",
+        "name": "Westbound Terminal (Bulua)",
+        "note": "Bulua Westbound Bus Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.5123,
+        "lng": 124.62348
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -16711,23 +16862,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#2563EB",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 5,
     "directions": [
       {
         "id": "d-bugo-cogon-line-in",
         "route_id": "bugo-cogon-line",
         "direction": "Inbound",
         "distance_km": 16.19,
-        "street_sequence": "Bugo Centro → Puerto Public Market → Brgy. Tablon → Brgy. Cugman → Brgy. Gusa → USTP Main Campus / Science Complex → Cogon Public Market"
+        "street_sequence": "Bugo (Villa Trinitas) → Sayre Highway → Puerto → Tablon → Cugman → Gusa → CM Recto Ave → Cogon Public Market"
       },
       {
         "id": "d-bugo-cogon-line-out",
         "route_id": "bugo-cogon-line",
         "direction": "Outbound",
         "distance_km": 16.13,
-        "street_sequence": "Cogon Public Market → USTP Main Campus / Science Complex → Brgy. Gusa → Brgy. Cugman → Brgy. Tablon → Puerto Public Market → Bugo Centro"
+        "street_sequence": "Cogon Public Market → Osmeña St → Lapasan Highway → Gusa → Cugman → Tablon → Puerto → Bugo (Villa Trinitas)"
       }
     ],
     "geometries": [
@@ -21452,24 +21603,80 @@
     "terminals": [
       {
         "id": "t-bugo",
-        "name": "Bugo Terminal",
-        "note": "Far eastern terminus in Bugo",
+        "name": "Bugo Terminal (Villa Trinitas)",
+        "note": "Villa Trinitas Terminal Gate",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.507,
-        "lng": 124.756
+        "lat": 8.51025,
+        "lng": 124.7721
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-bug-bugo",
+        "route_id": "bugo-cogon-line",
+        "name": "Bugo (Villa Trinitas)",
+        "note": "Villa Trinitas Terminal Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.51025,
+        "lng": 124.7721
+      },
+      {
+        "id": "lp-bug-cogon",
+        "route_id": "bugo-cogon-line",
+        "name": "Cogon Public Market",
+        "note": "Cogon Market Loading Zone",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47742,
+        "lng": 124.65227
+      },
+      {
+        "id": "lp-bug-gusa",
+        "route_id": "bugo-cogon-line",
+        "name": "Gusa Highway",
+        "note": "Gusa National Highway",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.478,
+        "lng": 124.685
+      },
+      {
+        "id": "lp-bug-puerto",
+        "route_id": "bugo-cogon-line",
+        "name": "Puerto Public Market",
+        "note": "Puerto National Highway",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4996,
+        "lng": 124.7505
+      },
+      {
+        "id": "lp-bug-tablon",
+        "route_id": "bugo-cogon-line",
+        "name": "Tablon Junction",
+        "note": "Tablon Industrial Area",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.492,
+        "lng": 124.722
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -21487,23 +21694,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#059669",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 3,
     "directions": [
       {
         "id": "d-bulua-cogon-line-highway-in",
         "route_id": "bulua-cogon-line-highway",
         "direction": "Inbound",
         "distance_km": 8.24,
-        "street_sequence": "Westbound Terminal (Bulua) → Liceo de Cagayan University → Carmen Public Market → Cogon Public Market"
+        "street_sequence": "Bulua (Saarenas Ave) → Butuan-CDO-Iligan Rd → Kauswagan → Carmen Market Terminal"
       },
       {
         "id": "d-bulua-cogon-line-highway-out",
         "route_id": "bulua-cogon-line-highway",
         "direction": "Outbound",
         "distance_km": 5.25,
-        "street_sequence": "Cogon Public Market → Carmen Public Market → Liceo de Cagayan University → Westbound Terminal (Bulua)"
+        "street_sequence": "Carmen Public Market → Vamenta Blvd → Kauswagan Rd → National Highway → Bulua (Saarenas Ave)"
       }
     ],
     "geometries": [
@@ -23355,25 +23562,59 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-r-bul-cog-bulua-co",
-        "name": "Westbound Terminal (Bulua) Terminal",
-        "note": "Verified terminus for Bulua–Cogon Line via Highway",
+        "id": "t-bulua-westbound",
+        "name": "Westbound Terminal (Bulua)",
+        "note": "Saarenas Ave / Westbound Terminal Gate",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.512304,
-        "lng": 124.623478
+        "lat": 8.51224,
+        "lng": 124.62423
       },
       {
-        "id": "t-cogon",
-        "name": "Cogon Public Market",
-        "note": "Cogon Public Market Terminal",
+        "id": "t-carmen",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-bul-bulua",
+        "route_id": "bulua-cogon-line-highway",
+        "name": "Bulua (Saarenas Ave)",
+        "note": "Westbound Terminal / Saarenas Ave Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.51224,
+        "lng": 124.62423
+      },
+      {
+        "id": "lp-bul-highway",
+        "route_id": "bulua-cogon-line-highway",
+        "name": "Bulua National Highway",
+        "note": "Bulua Highway Crossing",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.508,
+        "lng": 124.628
+      },
+      {
+        "id": "lp-bul-carmen",
+        "route_id": "bulua-cogon-line-highway",
+        "name": "Carmen Public Market",
+        "note": "Carmen Market Boarding Area",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47931,
+        "lng": 124.63664
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -25381,12 +25622,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -28829,12 +29070,12 @@
       },
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       }
     ],
     "stops": [
@@ -28867,23 +29108,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#92400E",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 3,
     "directions": [
       {
         "id": "d-indahag-r1-cogon-line-in",
         "route_id": "indahag-r1-cogon-line",
         "direction": "Inbound",
         "distance_km": 7.72,
-        "street_sequence": "Brgy. Indahag Centro → Cogon Public Market"
+        "street_sequence": "Indahag Barangay Hall → Indahag Road → Camaman-an → Hayes St → Cogon Public Market"
       },
       {
         "id": "d-indahag-r1-cogon-line-out",
         "route_id": "indahag-r1-cogon-line",
         "direction": "Outbound",
         "distance_km": 7.76,
-        "street_sequence": "Cogon Public Market → Brgy. Indahag Centro"
+        "street_sequence": "Cogon Public Market → Yacapin St → Camaman-an Road → Indahag Road → Indahag Barangay Hall"
       }
     ],
     "geometries": [
@@ -32031,25 +32272,59 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-r-ind-cog-indahag-",
-        "name": "Brgy. Indahag Centro Terminal",
-        "note": "Verified terminus for Indahag (R1)–Cogon Line",
+        "id": "t-indahag",
+        "name": "Indahag Barangay Hall Terminal",
+        "note": "Indahag Centro Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.423027,
-        "lng": 124.666982
+        "lat": 8.42149,
+        "lng": 124.66701
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-ind-camaman",
+        "route_id": "indahag-r1-cogon-line",
+        "name": "Camaman-an Junction",
+        "note": "Camaman-an Barangay Road",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.462,
+        "lng": 124.655
+      },
+      {
+        "id": "lp-ind-cogon",
+        "route_id": "indahag-r1-cogon-line",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47668,
+        "lng": 124.65287
+      },
+      {
+        "id": "lp-ind-indahag",
+        "route_id": "indahag-r1-cogon-line",
+        "name": "Indahag Barangay Hall",
+        "note": "Indahag Centro Terminal Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.42149,
+        "lng": 124.66701
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -32067,23 +32342,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#10B981",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 4,
     "directions": [
       {
         "id": "d-iponan-bulua-cogon-line-in",
         "route_id": "iponan-bulua-cogon-line",
         "direction": "Inbound",
         "distance_km": 12.27,
-        "street_sequence": "Brgy. Iponan Centro → Westbound Terminal (Bulua) → Brgy. Kauswagan → Carmen Public Market → Cogon Public Market"
+        "street_sequence": "Iponan (Bulao) → Butuan-CDO-Iligan Rd → Bulua Westbound Terminal → Carmen → Cogon Public Market"
       },
       {
         "id": "d-iponan-bulua-cogon-line-out",
         "route_id": "iponan-bulua-cogon-line",
         "direction": "Outbound",
         "distance_km": 11.67,
-        "street_sequence": "Cogon Public Market → Carmen Public Market → Brgy. Kauswagan → Westbound Terminal (Bulua) → Brgy. Iponan Centro"
+        "street_sequence": "Cogon Public Market → JR Borja St → Carmen Bridge → Bulua Highway → Iponan (Bulao)"
       }
     ],
     "geometries": [
@@ -35479,25 +35754,70 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-r-ipo-bul-cog-iponan-b",
-        "name": "Brgy. Iponan Centro Terminal",
-        "note": "Verified terminus for Iponan–Bulua–Cogon Line",
+        "id": "t-iponan",
+        "name": "Iponan Terminal (Bulao)",
+        "note": "Iponan Bulao Centro Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.503711,
-        "lng": 124.60348
+        "lat": 8.4814,
+        "lng": 124.59108
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-ipo-carmen",
+        "route_id": "iponan-bulua-cogon-line",
+        "name": "Carmen Market Crossing",
+        "note": "Carmen Commercial Junction",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48,
+        "lng": 124.637
+      },
+      {
+        "id": "lp-ipo-cogon",
+        "route_id": "iponan-bulua-cogon-line",
+        "name": "Cogon Public Market",
+        "note": "Cogon Market Loading Zone",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47726,
+        "lng": 124.65
+      },
+      {
+        "id": "lp-ipo-iponan",
+        "route_id": "iponan-bulua-cogon-line",
+        "name": "Iponan (Bulao)",
+        "note": "Iponan Bulao Centro Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4814,
+        "lng": 124.59108
+      },
+      {
+        "id": "lp-ipo-bulua",
+        "route_id": "iponan-bulua-cogon-line",
+        "name": "Westbound Terminal (Bulua)",
+        "note": "Bulua Westbound Bus Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.51224,
+        "lng": 124.62423
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -35515,23 +35835,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#78350F",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 4,
     "directions": [
       {
         "id": "d-lumbia-carmen-line-in",
         "route_id": "lumbia-carmen-line",
         "direction": "Inbound",
         "distance_km": 15.15,
-        "street_sequence": "Lumbia Airport Grounds → Gran Europa Main Gate → SM City Uptown → Carmen Public Market"
+        "street_sequence": "Lumbia Market → Airport Rd → Masterson Ave → Upper Carmen → Vamenta Blvd → Carmen Public Market"
       },
       {
         "id": "d-lumbia-carmen-line-out",
         "route_id": "lumbia-carmen-line",
         "direction": "Outbound",
         "distance_km": 16.27,
-        "street_sequence": "Carmen Public Market → SM City Uptown → Gran Europa Main Gate → Lumbia Airport Grounds"
+        "street_sequence": "Carmen Public Market → Vamenta Blvd → Masterson Ave → SM Uptown → Lumbia Airport Rd → Lumbia Market"
       }
     ],
     "geometries": [
@@ -39831,25 +40151,70 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-r-lum-car-lumbia-c",
-        "name": "Lumbia Airport Grounds Terminal",
-        "note": "Verified terminus for Lumbia–Carmen Line",
+        "id": "t-lumbia",
+        "name": "Lumbia Market Terminal",
+        "note": "Lumbia Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.408994,
-        "lng": 124.611938
+        "lat": 8.40247,
+        "lng": 124.59495
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-lum-carmen",
+        "route_id": "lumbia-carmen-line",
+        "name": "Carmen Public Market",
+        "note": "Carmen Market Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4793,
+        "lng": 124.63675
+      },
+      {
+        "id": "lp-lum-lumbia",
+        "route_id": "lumbia-carmen-line",
+        "name": "Lumbia Market",
+        "note": "Lumbia Public Market Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.40247,
+        "lng": 124.59495
+      },
+      {
+        "id": "lp-lum-airport",
+        "route_id": "lumbia-carmen-line",
+        "name": "Old Lumbia Airport Gate",
+        "note": "Lumbia Airport Road",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.415,
+        "lng": 124.611
+      },
+      {
+        "id": "lp-lum-sm",
+        "route_id": "lumbia-carmen-line",
+        "name": "SM City CDO Uptown",
+        "note": "Masterson Ave Boarding Stop",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.46,
+        "lng": 124.624
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -41601,12 +41966,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [
@@ -41639,23 +42004,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#B45309",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 3,
     "directions": [
       {
         "id": "d-macasandig-cogon-line-in",
         "route_id": "macasandig-cogon-line",
         "direction": "Inbound",
         "distance_km": 4.6,
-        "street_sequence": "Brgy. Macasandig Centro → Cogon Public Market"
+        "street_sequence": "Macasandig (Buena Oro) → Tomas Saco St → 17th St → Nazareth → Cogon Public Market"
       },
       {
         "id": "d-macasandig-cogon-line-out",
         "route_id": "macasandig-cogon-line",
         "direction": "Outbound",
         "distance_km": 4.12,
-        "street_sequence": "Cogon Public Market → Brgy. Macasandig Centro"
+        "street_sequence": "Cogon Public Market → Hayes St → 21st St → Tomas Saco St → Macasandig (Buena Oro)"
       }
     ],
     "geometries": [
@@ -43363,25 +43728,59 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-r-mac-cog-macasand",
-        "name": "Brgy. Macasandig Centro Terminal",
-        "note": "Verified terminus for Macasandig–Cogon Line",
+        "id": "t-macasandig",
+        "name": "Macasandig Terminal (Buena Oro)",
+        "note": "Buena Oro Terminal Gate",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.465768,
-        "lng": 124.644675
+        "lat": 8.44911,
+        "lng": 124.6462
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-mac-cogon",
+        "route_id": "macasandig-cogon-line",
+        "name": "Cogon Public Market",
+        "note": "Cogon Market Loading Zone",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47787,
+        "lng": 124.65102
+      },
+      {
+        "id": "lp-mac-corpus",
+        "route_id": "macasandig-cogon-line",
+        "name": "Corpus Christi School / Tomas Saco",
+        "note": "Tomas Saco St Crossing",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.465,
+        "lng": 124.644
+      },
+      {
+        "id": "lp-mac-buena",
+        "route_id": "macasandig-cogon-line",
+        "name": "Macasandig (Buena Oro)",
+        "note": "Buena Oro Terminal Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.44911,
+        "lng": 124.6462
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -44527,23 +44926,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#1D4ED8",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 4,
     "directions": [
       {
         "id": "d-puerto-cogon-divisoria-li-in",
         "route_id": "puerto-cogon-divisoria-line",
         "direction": "Inbound",
         "distance_km": 14.27,
-        "street_sequence": "Puerto Public Market → Brgy. Tin-ao → Brgy. Cugman → Limketkai Center → Cogon Public Market → Plaza Divisoria"
+        "street_sequence": "Puerto Public Market → Sayre Highway → Tablon → Cugman → Gusa Highway → Agora Terminal"
       },
       {
         "id": "d-puerto-cogon-divisoria-li-out",
         "route_id": "puerto-cogon-divisoria-line",
         "direction": "Outbound",
         "distance_km": 12.26,
-        "street_sequence": "Plaza Divisoria → Cogon Public Market → Limketkai Center → Brgy. Cugman → Brgy. Tin-ao → Puerto Public Market"
+        "street_sequence": "Agora Terminal → Gaabucayan St → National Highway → Gusa → Cugman → Tablon → Puerto Public Market"
       }
     ],
     "geometries": [
@@ -47669,23 +48068,68 @@
       {
         "id": "t-puerto",
         "name": "Puerto Public Market Terminal",
-        "note": "Eastern terminus in Puerto",
+        "note": "Puerto Public Market Terminal Gate",
         "map_x": 0,
         "map_y": 0,
         "lat": 8.4996,
         "lng": 124.7505
       },
       {
-        "id": "t-divisoria",
-        "name": "Divisoria Terminal",
-        "note": "Divisoria downtown terminal",
+        "id": "t-agora",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4777,
-        "lng": 124.6452
+        "lat": 8.48813,
+        "lng": 124.658
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-pue-agora",
+        "route_id": "puerto-cogon-divisoria-line",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48813,
+        "lng": 124.658
+      },
+      {
+        "id": "lp-pue-cugman",
+        "route_id": "puerto-cogon-divisoria-line",
+        "name": "Cugman Crossing",
+        "note": "Cugman National Highway",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.482,
+        "lng": 124.7
+      },
+      {
+        "id": "lp-pue-puerto",
+        "route_id": "puerto-cogon-divisoria-line",
+        "name": "Puerto Public Market",
+        "note": "Puerto Public Market Terminal Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4996,
+        "lng": 124.7505
+      },
+      {
+        "id": "lp-pue-tablon",
+        "route_id": "puerto-cogon-divisoria-line",
+        "name": "Tablon Junction",
+        "note": "Tablon National Highway",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.492,
+        "lng": 124.722
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -53621,12 +54065,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -60028,12 +60472,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -69369,12 +69813,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -81649,12 +82093,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -97613,12 +98057,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -97651,23 +98095,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#D97706",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 4,
     "directions": [
       {
         "id": "d-uptown-gran-europa-sm-cog-in",
         "route_id": "uptown-gran-europa-sm-cogon",
         "direction": "Inbound",
         "distance_km": 13.41,
-        "street_sequence": "Gran Europa Main Gate → SM City Uptown → Carmen Public Market → Cogon Public Market"
+        "street_sequence": "Gran Europa → Masterson Ave → SM Uptown → Carmen Bridge → Cogon Public Market"
       },
       {
         "id": "d-uptown-gran-europa-sm-cog-out",
         "route_id": "uptown-gran-europa-sm-cogon",
         "direction": "Outbound",
         "distance_km": 12.91,
-        "street_sequence": "Cogon Public Market → Carmen Public Market → SM City Uptown → Gran Europa Main Gate"
+        "street_sequence": "Cogon Public Market → Vamenta Blvd → Masterson Ave → SM Uptown → Pueblo de Oro → Gran Europa"
       }
     ],
     "geometries": [
@@ -103487,25 +103931,70 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-r-upt-cog-uptown-g",
-        "name": "Gran Europa Subdivision Terminal",
-        "note": "Verified terminus for Uptown — Gran Europa/SM Uptown–Cogon Line",
+        "id": "t-uptown-gran",
+        "name": "Gran Europa / SM Uptown Terminal",
+        "note": "Gran Europa Terminal Gate",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.430499,
-        "lng": 124.616735
+        "lat": 8.42409,
+        "lng": 124.60563
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-upt-cogon",
+        "route_id": "uptown-gran-europa-sm-cogon",
+        "name": "Cogon Public Market",
+        "note": "Cogon Market Boarding Area",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47711,
+        "lng": 124.65009
+      },
+      {
+        "id": "lp-upt-gran",
+        "route_id": "uptown-gran-europa-sm-cogon",
+        "name": "Gran Europa / SM Uptown",
+        "note": "Gran Europa Terminal Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.42409,
+        "lng": 124.60563
+      },
+      {
+        "id": "lp-upt-rotunda",
+        "route_id": "uptown-gran-europa-sm-cogon",
+        "name": "Pueblo de Oro Rotunda",
+        "note": "Pueblo de Oro Business Park",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.448,
+        "lng": 124.625
+      },
+      {
+        "id": "lp-upt-smuptown",
+        "route_id": "uptown-gran-europa-sm-cogon",
+        "name": "SM City CDO Uptown",
+        "note": "Masterson Ave Boarding Stop",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.459,
+        "lng": 124.624
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -106994,7 +107483,7 @@
       {
         "id": "t-puerto",
         "name": "Puerto Public Market Terminal",
-        "note": "Eastern terminus in Puerto",
+        "note": "Puerto Public Market Terminal Gate",
         "map_x": 0,
         "map_y": 0,
         "lat": 8.4996,
@@ -108665,12 +109154,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -112650,12 +113139,12 @@
       },
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       }
     ],
     "stops": [],
@@ -115091,12 +115580,12 @@
       },
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       }
     ],
     "stops": [
@@ -118802,12 +119291,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -121635,12 +122124,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -133251,12 +133740,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -135672,7 +136161,7 @@
       {
         "id": "t-puerto",
         "name": "Puerto Public Market Terminal",
-        "note": "Eastern terminus in Puerto",
+        "note": "Puerto Public Market Terminal Gate",
         "map_x": 0,
         "map_y": 0,
         "lat": 8.4996,
@@ -138871,12 +139360,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -142727,12 +143216,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -143918,12 +144407,12 @@
     "terminals": [
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       },
       {
         "id": "t-kauswagan",
@@ -145827,21 +146316,21 @@
     "terminals": [
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -151516,12 +152005,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -153084,12 +153573,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -160060,7 +160549,7 @@
       {
         "id": "t-puerto",
         "name": "Puerto Public Market Terminal",
-        "note": "Eastern terminus in Puerto",
+        "note": "Puerto Public Market Terminal Gate",
         "map_x": 0,
         "map_y": 0,
         "lat": 8.4996,
@@ -160068,12 +160557,12 @@
       },
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       }
     ],
     "stops": [
@@ -160106,23 +160595,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#0F6652",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
-    "terminal_count": 1,
-    "stop_count": 0,
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
+    "terminal_count": 2,
+    "stop_count": 3,
     "directions": [
       {
         "id": "d-r1-gaisano-carmen-loop-in",
         "route_id": "r1-gaisano-carmen-loop",
         "direction": "Inbound",
         "distance_km": 2.9,
-        "street_sequence": "NMMC / Capitol Compound → Ayala Malls Centrio → Gaisano City Mall → Cogon Public Market → Plaza Divisoria → Carmen Public Market"
+        "street_sequence": "NMMC / Gaisano City Mall → CM Recto Ave → Marcos Bridge → Carmen Public Market"
       },
       {
         "id": "d-r1-gaisano-carmen-loop-out",
         "route_id": "r1-gaisano-carmen-loop",
         "direction": "Outbound",
         "distance_km": 2.75,
-        "street_sequence": "Carmen Public Market → Plaza Divisoria → Cogon Public Market → Gaisano City Mall → Ayala Malls Centrio → NMMC / Capitol Compound"
+        "street_sequence": "Carmen Public Market → Vamenta Blvd → Carmen Bridge → Plaza Divisoria → NMMC / Gaisano City Mall"
       }
     ],
     "geometries": [
@@ -161838,16 +162327,59 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-r1-r1-gaisa",
+        "id": "t-gaisano-nmmc",
         "name": "NMMC / Gaisano City Mall Terminal",
-        "note": "Verified terminus for R1 — Gaisano–Carmen Loop Line",
+        "note": "CM Recto Ave / NMMC Gate",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.485993,
-        "lng": 124.650017
+        "lat": 8.48469,
+        "lng": 124.65013
+      },
+      {
+        "id": "t-carmen",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-r1-carmen",
+        "route_id": "r1-gaisano-carmen-loop",
+        "name": "Carmen Public Market",
+        "note": "Carmen Market Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48062,
+        "lng": 124.63656
+      },
+      {
+        "id": "lp-r1-gaisano",
+        "route_id": "r1-gaisano-carmen-loop",
+        "name": "NMMC / Gaisano City Mall",
+        "note": "CM Recto Ave / NMMC Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48469,
+        "lng": 124.65013
+      },
+      {
+        "id": "lp-r1-divisoria",
+        "route_id": "r1-gaisano-carmen-loop",
+        "name": "Plaza Divisoria",
+        "note": "RN Abejuela St / Divisoria",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4777,
+        "lng": 124.6452
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -165184,7 +165716,7 @@
       {
         "id": "t-puerto",
         "name": "Puerto Public Market Terminal",
-        "note": "Eastern terminus in Puerto",
+        "note": "Puerto Public Market Terminal Gate",
         "map_x": 0,
         "map_y": 0,
         "lat": 8.4996,
@@ -169263,12 +169795,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [
@@ -171875,12 +172407,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -175048,12 +175580,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -179841,12 +180373,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -182297,12 +182829,12 @@
       },
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       }
     ],
     "stops": [
@@ -186283,12 +186815,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -190027,21 +190559,21 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -195724,12 +196256,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -200940,12 +201472,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -202988,12 +203520,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -204153,12 +204685,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -208505,12 +209037,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -213961,12 +214493,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -213978,7 +214510,7 @@
     "code": "R2",
     "name": "R2 — Gaisano–Agora–Cogon–Carmen Loop Line",
     "origin": "Carmen Public Market",
-    "destination": "Plaza Divisoria / Cogon",
+    "destination": "SM CDO Downtown / Agora / Gaisano",
     "jeepney_type": "Traditional",
     "description": "Carmen Market → Liceo de Cagayan Univ → Gaisano City Mall → Ayala Malls Centrio → SM CDO Downtown → Agora Bus Terminal → Puregold Lapasan → Limketkai Center → Cogon Market → Divisoria.",
     "inbound_distance_km": 2.59,
@@ -213987,23 +214519,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#147D64",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
-    "terminal_count": 1,
-    "stop_count": 0,
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
+    "terminal_count": 2,
+    "stop_count": 4,
     "directions": [
       {
         "id": "d-r2-gaisano-agora-cogon-ca-in",
         "route_id": "r2-gaisano-agora-cogon-carmen",
         "direction": "Inbound",
         "distance_km": 2.59,
-        "street_sequence": "Carmen Public Market → Liceo de Cagayan University → Gaisano City Mall → Ayala Malls Centrio → SM CDO Downtown Premier → Agora Bus Terminal → Puregold Lapasan → Limketkai Center → Cogon Public Market → Plaza Divisoria"
+        "street_sequence": "Carmen Public Market → Marcos Bridge → CM Recto Ave → SM CDO Downtown / Agora / Gaisano"
       },
       {
         "id": "d-r2-gaisano-agora-cogon-ca-out",
         "route_id": "r2-gaisano-agora-cogon-carmen",
         "direction": "Outbound",
         "distance_km": 5.83,
-        "street_sequence": "Plaza Divisoria → Cogon Public Market → Limketkai Center → Puregold Lapasan → Agora Bus Terminal → SM CDO Downtown Premier → Ayala Malls Centrio → Gaisano City Mall → Liceo de Cagayan University → Carmen Public Market"
+        "street_sequence": "SM CDO Downtown / Agora / Gaisano → Agora Terminal → Limketkai Center → Cogon Public Market → Carmen Bridge → Carmen Public Market"
       }
     ],
     "geometries": [
@@ -215512,15 +216044,69 @@
     "terminals": [
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
+      },
+      {
+        "id": "t-agora-gaisano",
+        "name": "SM CDO Downtown / Agora / Gaisano Terminal",
+        "note": "Claro M Recto Ave / SM Downtown",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48556,
+        "lng": 124.65374
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-r2-agora",
+        "route_id": "r2-gaisano-agora-cogon-carmen",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48813,
+        "lng": 124.658
+      },
+      {
+        "id": "lp-r2-carmen",
+        "route_id": "r2-gaisano-agora-cogon-carmen",
+        "name": "Carmen Public Market",
+        "note": "Carmen Market Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4817,
+        "lng": 124.6373
+      },
+      {
+        "id": "lp-r2-cogon",
+        "route_id": "r2-gaisano-agora-cogon-carmen",
+        "name": "Cogon Public Market",
+        "note": "Cogon Market Boarding Area",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47699,
+        "lng": 124.65128
+      },
+      {
+        "id": "lp-r2-sm-downtown",
+        "route_id": "r2-gaisano-agora-cogon-carmen",
+        "name": "SM CDO Downtown / Agora / Gaisano",
+        "note": "Claro M Recto Ave / SM Downtown",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48556,
+        "lng": 124.65374
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -218512,12 +219098,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -220832,12 +221418,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -223593,12 +224179,12 @@
       },
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       }
     ],
     "stops": [
@@ -225518,12 +226104,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -229150,12 +229736,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -231790,12 +232376,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -235086,12 +235672,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -238117,12 +238703,12 @@
     "terminals": [
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       },
       {
         "id": "t-iponan-kinasanghan-iponan-r3",
@@ -240943,12 +241529,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -242768,12 +243354,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -247216,12 +247802,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -248772,12 +249358,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [
@@ -254272,12 +254858,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -256768,12 +257354,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -260398,12 +260984,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -262359,12 +262945,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -265527,12 +266113,12 @@
       },
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       }
     ],
     "stops": [
@@ -274100,12 +274686,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -275716,12 +276302,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -278468,12 +279054,12 @@
       },
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       }
     ],
     "stops": [],
@@ -282073,21 +282659,21 @@
     "terminals": [
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       },
       {
         "id": "t-agora",
-        "name": "Agora Integrated Terminal",
-        "note": "Eastern hub near Agora Market",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.4857,
-        "lng": 124.6589
+        "lat": 8.48813,
+        "lng": 124.658
       }
     ],
     "stops": [
@@ -285553,12 +286139,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [],
@@ -287545,12 +288131,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [],
@@ -292345,12 +292931,12 @@
       },
       {
         "id": "t-carmen",
-        "name": "Carmen Market Terminal",
-        "note": "Northern Carmen terminus",
+        "name": "Carmen Public Market Terminal",
+        "note": "Carmen Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.479498,
-        "lng": 124.63682
+        "lat": 8.4817,
+        "lng": 124.6373
       }
     ],
     "stops": [
@@ -294717,12 +295303,12 @@
       },
       {
         "id": "t-cogon",
-        "name": "Cogon Public Market",
+        "name": "Cogon Public Market Terminal",
         "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
     "stops": [
@@ -296114,7 +296700,7 @@
     "code": "RA",
     "name": "RA — Pier–Cogon Line",
     "origin": "CDO Port Terminal (Macabalan)",
-    "destination": "Cogon Public Market (Ororama)",
+    "destination": "Gaisano City Mall / Cogon",
     "jeepney_type": "Traditional",
     "description": "CDO Port Terminal Macabalan → Julio Pacana St → C.M. Recto Flyover → Capitol Compound → Plaza Divisoria → Xavier Univ → Cogon Market (Ororama).",
     "inbound_distance_km": 8.7,
@@ -296123,23 +296709,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#DC2626",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 4,
     "directions": [
       {
         "id": "d-ra-pier-cogon-line-in",
         "route_id": "ra-pier-cogon-line",
         "direction": "Inbound",
         "distance_km": 8.7,
-        "street_sequence": "CDO Port / Pier Terminal → Provincial Capitol Compound → Plaza Divisoria → Cogon Public Market"
+        "street_sequence": "CDO Port Terminal (Macabalan) → Julio Pacana St → CM Recto Ave → Limketkai → Cogon Market → Gaisano City Mall"
       },
       {
         "id": "d-ra-pier-cogon-line-out",
         "route_id": "ra-pier-cogon-line",
         "direction": "Outbound",
         "distance_km": 2.06,
-        "street_sequence": "Cogon Public Market → Plaza Divisoria → Provincial Capitol Compound → CDO Port / Pier Terminal"
+        "street_sequence": "Gaisano City Mall / Cogon → Corrales Ave → Julio Pacana St → CDO Port Terminal (Macabalan)"
       }
     ],
     "geometries": [
@@ -301535,25 +302121,70 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-ra-ra-pier-",
-        "name": "CDO Port Terminal (Macabalan) Terminal",
-        "note": "Verified terminus for RA — Pier–Cogon Line",
+        "id": "t-macabalan-port",
+        "name": "CDO Port Terminal (Macabalan)",
+        "note": "Macabalan Port Main Passenger Gate",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.498942,
-        "lng": 124.663128
+        "lat": 8.49927,
+        "lng": 124.66319
       },
       {
-        "id": "t-cogon",
-        "name": "Cogon Public Market",
-        "note": "Cogon Public Market Terminal",
+        "id": "t-gaisano-cogon",
+        "name": "Gaisano City Mall / Cogon Terminal",
+        "note": "CM Recto Ave / Ororama Cogon",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.476986,
-        "lng": 124.651284
+        "lat": 8.48657,
+        "lng": 124.65084
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-ra-port",
+        "route_id": "ra-pier-cogon-line",
+        "name": "CDO Port Terminal (Macabalan)",
+        "note": "Macabalan Port Main Passenger Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.49902,
+        "lng": 124.6624
+      },
+      {
+        "id": "lp-ra-corrales",
+        "route_id": "ra-pier-cogon-line",
+        "name": "Corrales Ave Commercial Strip",
+        "note": "Corrales Ave Boarding Stop",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.492,
+        "lng": 124.655
+      },
+      {
+        "id": "lp-ra-gaisano",
+        "route_id": "ra-pier-cogon-line",
+        "name": "Gaisano City Mall / Cogon",
+        "note": "CM Recto Ave / Ororama Cogon",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48657,
+        "lng": 124.65084
+      },
+      {
+        "id": "lp-ra-cogon",
+        "route_id": "ra-pier-cogon-line",
+        "name": "Ororama Cogon Market",
+        "note": "JR Borja St / Cogon",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.477,
+        "lng": 124.6515
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -301562,7 +302193,7 @@
     "code": "RBC",
     "name": "RBC — Pier–Macabalan–Agora–Limketkai–Cogon–Velez Line",
     "origin": "CDO Port Terminal (Macabalan)",
-    "destination": "Provincial Capitol / Velez",
+    "destination": "Cogon Public Market / Provincial Capitol",
     "jeepney_type": "Traditional",
     "description": "CDO Port Terminal Macabalan → Julio Pacana St → Agora Bus Terminal → Puregold → Limketkai Center → Cogon Market → SPC → Provincial Capitol.",
     "inbound_distance_km": 6.74,
@@ -301571,23 +302202,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#B91C1C",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 5,
     "directions": [
       {
         "id": "d-rbc-pier-macabalan-agora--in",
         "route_id": "rbc-pier-macabalan-agora-limketkai",
         "direction": "Inbound",
         "distance_km": 6.74,
-        "street_sequence": "CDO Port / Pier Terminal → Agora Bus Terminal → Puregold Lapasan → Limketkai Center → Cogon Public Market → Southern de Oro Philippines College → Provincial Capitol Compound"
+        "street_sequence": "CDO Port Terminal (Macabalan) → Agora Terminal → Limketkai Center → Cogon Public Market"
       },
       {
         "id": "d-rbc-pier-macabalan-agora--out",
         "route_id": "rbc-pier-macabalan-agora-limketkai",
         "direction": "Outbound",
         "distance_km": 4.15,
-        "street_sequence": "Provincial Capitol Compound → Southern de Oro Philippines College → Cogon Public Market → Limketkai Center → Agora Bus Terminal → CDO Port / Pier Terminal"
+        "street_sequence": "Cogon Public Market → Velez St → Provincial Capitol → Julio Pacana St → CDO Port Terminal (Macabalan)"
       }
     ],
     "geometries": [
@@ -305879,25 +306510,81 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-ra-ra-pier-",
-        "name": "CDO Port Terminal (Macabalan) Terminal",
-        "note": "Verified terminus for RA — Pier–Cogon Line",
+        "id": "t-macabalan-port",
+        "name": "CDO Port Terminal (Macabalan)",
+        "note": "Macabalan Port Main Passenger Gate",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.498942,
-        "lng": 124.663128
+        "lat": 8.49927,
+        "lng": 124.66319
       },
       {
-        "id": "term-r1-r1-gaisa",
-        "name": "NMMC / Gaisano City Mall Terminal",
-        "note": "Verified terminus for R1 — Gaisano–Carmen Loop Line",
+        "id": "t-cogon",
+        "name": "Cogon Public Market Terminal",
+        "note": "Cogon Public Market Terminal",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.485993,
-        "lng": 124.650017
+        "lat": 8.47689,
+        "lng": 124.65189
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-rbc-agora",
+        "route_id": "rbc-pier-macabalan-agora-limketkai",
+        "name": "Agora Terminal",
+        "note": "Agora Integrated Bus Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48813,
+        "lng": 124.658
+      },
+      {
+        "id": "lp-rbc-port",
+        "route_id": "rbc-pier-macabalan-agora-limketkai",
+        "name": "CDO Port Terminal (Macabalan)",
+        "note": "Macabalan Port Main Passenger Gate",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.49927,
+        "lng": 124.66319
+      },
+      {
+        "id": "lp-rbc-cogon",
+        "route_id": "rbc-pier-macabalan-agora-limketkai",
+        "name": "Cogon Public Market",
+        "note": "Cogon Market Boarding Area",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47689,
+        "lng": 124.65189
+      },
+      {
+        "id": "lp-rbc-lkk",
+        "route_id": "rbc-pier-macabalan-agora-limketkai",
+        "name": "Limketkai Center",
+        "note": "Limketkai Commercial Center",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48158,
+        "lng": 124.65606
+      },
+      {
+        "id": "lp-rbc-capitol",
+        "route_id": "rbc-pier-macabalan-agora-limketkai",
+        "name": "Provincial Capitol / Velez",
+        "note": "Velez St / Provincial Capitol",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4812,
+        "lng": 124.6465
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -305906,7 +306593,7 @@
     "code": "RC",
     "name": "RC - Cugman – Gusa – Cogon",
     "origin": "Cugman Centro",
-    "destination": "Cogon Public Market / Centrio",
+    "destination": "Ayala Centrio Mall / Cogon",
     "jeepney_type": "Traditional",
     "description": "Cugman Centro → Gusa Coastal/Old Rd → USTP Main Campus → Limketkai Mall → Cogon Market → Centrio Mall.",
     "inbound_distance_km": 11.07,
@@ -305915,23 +306602,23 @@
     "verification_status": "USER_SUPPLIED",
     "color": "#7C3AED",
     "offline_size_mb": 0.5,
-    "last_updated_at": "2026-10-27T01:24:23.000Z",
+    "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 5,
     "directions": [
       {
         "id": "d-rd-gusa-cugman-limketkai--in",
         "route_id": "rd-gusa-cugman-limketkai-cogon",
         "direction": "Inbound",
         "distance_km": 11.07,
-        "street_sequence": "Brgy. Cugman → Brgy. Gusa → USTP Main Campus / Science Complex → Limketkai Center → Cogon Public Market → Ayala Malls Centrio"
+        "street_sequence": "Cugman Centro → Gusa Highway → Limketkai Center → Cogon Public Market → Ayala Centrio Mall"
       },
       {
         "id": "d-rd-gusa-cugman-limketkai--out",
         "route_id": "rd-gusa-cugman-limketkai-cogon",
         "direction": "Outbound",
         "distance_km": 7.61,
-        "street_sequence": "Ayala Malls Centrio → Cogon Public Market → Limketkai Center → USTP Main Campus / Science Complex → Brgy. Gusa → Brgy. Cugman"
+        "street_sequence": "Ayala Centrio Mall / Cogon → CM Recto Ave → Gusa Highway → Cugman Centro"
       }
     ],
     "geometries": [
@@ -311983,25 +312670,81 @@
     "roads": [],
     "terminals": [
       {
-        "id": "term-rd-rd-gusa-",
+        "id": "t-cugman-centro",
         "name": "Cugman Centro Terminal",
-        "note": "Verified terminus for RD — Gusa–Cugman–Limketkai–Cogon Line",
+        "note": "Cugman Centro Terminal Area",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.470448,
-        "lng": 124.705185
+        "lat": 8.469,
+        "lng": 124.70552
       },
       {
-        "id": "term-r1-r1-gaisa",
-        "name": "NMMC / Gaisano City Mall Terminal",
-        "note": "Verified terminus for R1 — Gaisano–Carmen Loop Line",
+        "id": "t-centrio-cogon",
+        "name": "Ayala Centrio Mall / Cogon Terminal",
+        "note": "Ayala Centrio Mall / CM Recto Ave",
         "map_x": 0,
         "map_y": 0,
-        "lat": 8.485993,
-        "lng": 124.650017
+        "lat": 8.48573,
+        "lng": 124.65137
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-rc-centrio",
+        "route_id": "rd-gusa-cugman-limketkai-cogon",
+        "name": "Ayala Centrio Mall / Cogon",
+        "note": "Ayala Centrio Mall Boarding Point",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48573,
+        "lng": 124.65137
+      },
+      {
+        "id": "lp-rc-cogon",
+        "route_id": "rd-gusa-cugman-limketkai-cogon",
+        "name": "Cogon Public Market",
+        "note": "Cogon Public Market Terminal",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.47699,
+        "lng": 124.65128
+      },
+      {
+        "id": "lp-rc-cugman",
+        "route_id": "rd-gusa-cugman-limketkai-cogon",
+        "name": "Cugman Centro",
+        "note": "Cugman Centro Terminal Area",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.469,
+        "lng": 124.70552
+      },
+      {
+        "id": "lp-rc-gusa",
+        "route_id": "rd-gusa-cugman-limketkai-cogon",
+        "name": "Gusa Highway",
+        "note": "Gusa National Highway",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.478,
+        "lng": 124.685
+      },
+      {
+        "id": "lp-rc-lkk",
+        "route_id": "rd-gusa-cugman-limketkai-cogon",
+        "name": "Limketkai Center",
+        "note": "Limketkai Commercial Center",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.48158,
+        "lng": 124.65606
+      }
+    ],
     "transfers": [],
     "landmarks": []
   }

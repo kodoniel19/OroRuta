@@ -35,7 +35,7 @@ class RouteRepository @Inject constructor(
     private var memoryRoutesCache: List<Route>? = null
 
     companion object {
-        private const val BUNDLED_DATA_VERSION = 15
+        private const val BUNDLED_DATA_VERSION = 16
     }
 
     /**
