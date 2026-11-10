@@ -56,8 +56,8 @@ async function sync() {
     // Carmen loading points
     await conn.execute("UPDATE loading_points SET lat = 8.479498, lng = 124.636820 WHERE name LIKE '%Carmen%'");
 
-    console.log('2. Removing spurious Liceo loading points for non-Liceo routes...');
-    const nonLiceoRouteCodes = ['R-BAI', 'R-BAL', 'R-SAN', 'R-TAG', 'R-TUB', 'R-TUM', 'R1', 'R3', 'R4', 'R5', 'R6'];
+    console.log('2. Removing spurious Liceo loading points for non-Liceo hinterland routes...');
+    const nonLiceoRouteCodes = ['R-BAI', 'R-BAL', 'R-SAN', 'R-TAG', 'R-TUB', 'R-TUM'];
     for (const code of nonLiceoRouteCodes) {
       await conn.execute(
         "DELETE lp FROM loading_points lp JOIN routes r ON lp.route_id = r.id WHERE lp.name LIKE '%Liceo%' AND r.code = ?",
@@ -65,8 +65,8 @@ async function sync() {
       );
     }
 
-    // Also remove from route_landmarks for these non-Liceo routes
-    for (const code of ['R-BAI', 'R-BAL', 'R-SAN', 'R-TAG', 'R-TUB', 'R-TUM', 'R1', 'R3', 'R4', 'R5', 'R6']) {
+    // Also remove from route_landmarks for these non-Liceo hinterland routes
+    for (const code of ['R-BAI', 'R-BAL', 'R-SAN', 'R-TAG', 'R-TUB', 'R-TUM']) {
       await conn.execute(
         "DELETE rl FROM route_landmarks rl JOIN routes r ON rl.route_id = r.id JOIN landmarks lm ON rl.landmark_id = lm.id WHERE lm.name LIKE '%Liceo%' AND r.code = ?",
         [code]

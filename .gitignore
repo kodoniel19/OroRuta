@@ -63,3 +63,5 @@ backend/scratch/geocode_cache.json
 .DS_Store
 Thumbs.db
 Desktop.ini
+mysql_data/
+

@@ -219,11 +219,35 @@ function findStopLabel(lat, lng, defaultPrefix, fallbackLandmark, terminalList, 
     if (closest && closestDist <= 250) return closest.name;
   }
 
-  // 3. Approximate by CDO street corridors
+  // 3. Check verified major CDO landmarks (strict <= 250m)
+  const majorLandmarks = [
+    { name: "Liceo de Cagayan University", lat: 8.4862, lng: 124.6388 },
+    { name: "Centrio Mall", lat: 8.4856, lng: 124.6513 },
+    { name: "SM CDO Downtown", lat: 8.4843, lng: 124.6549 },
+    { name: "Limketkai Center", lat: 8.4838, lng: 124.6530 },
+    { name: "Cogon Market", lat: 8.47716, lng: 124.6512 },
+    { name: "Carmen Public Market", lat: 8.479498, lng: 124.63682 },
+    { name: "Agora Terminal", lat: 8.48813, lng: 124.6580 },
+    { name: "Divisoria Plaza", lat: 8.4777, lng: 124.6452 },
+    { name: "Bulua Westbound Terminal", lat: 8.5040, lng: 124.6115 },
+    { name: "USTP Lapasan", lat: 8.4852, lng: 124.6572 },
+    { name: "Camp Evangelista", lat: 8.4878, lng: 124.6256 },
+    { name: "St. Augustine Cathedral", lat: 8.4777, lng: 124.6433 },
+    { name: "Xavier University", lat: 8.4784, lng: 124.6489 }
+  ];
+  for (const lm of majorLandmarks) {
+    const d = haversineMeters(lat, lng, lm.lat, lm.lng);
+    if (d <= 250) {
+      return `${defaultPrefix} near ${lm.name}`;
+    }
+  }
+
+  // 4. Approximate by CDO street corridors with verified boundaries
   const streetHints = [
+    { minLat:8.484, maxLat:8.495, minLng:124.636, maxLng:124.643, name:"RN Pelaez Blvd (Liceo / Kauswagan corridor)" },
     { minLat:8.500, maxLat:8.520, minLng:124.600, maxLng:124.625, name:"Bulua Westbound Terminal corridor" },
     { minLat:8.490, maxLat:8.505, minLng:124.625, maxLng:124.645, name:"Kauswagan / RN Pelaez corridor" },
-    { minLat:8.475, maxLat:8.490, minLng:124.625, maxLng:124.640, name:"Carmen / Vamenta Blvd area" },
+    { minLat:8.475, maxLat:8.4835, minLng:124.625, maxLng:124.639, name:"Carmen / Vamenta Blvd area" },
     { minLat:8.483, maxLat:8.492, minLng:124.646, maxLng:124.656, name:"CM Recto Ave (Centrio / SM Downtown area)" },
     { minLat:8.473, maxLat:8.482, minLng:124.642, maxLng:124.655, name:"Cogon Market area" },
     { minLat:8.475, maxLat:8.482, minLng:124.638, maxLng:124.648, name:"Divisoria area" },
@@ -594,6 +618,14 @@ async function search(req, res, next) {
     const dLat = toLat ? parseFloat(toLat) : destPlace.lat;
     const dLng = toLng ? parseFloat(toLng) : destPlace.lng;
 
+    // If origin and destination are very close (< 300m), the user is already at
+    // or very near their destination — no jeepney ride is needed.
+    const origDestDistM = haversineMeters(oLat, oLng, dLat, dLng);
+    if (origDestDistM < 300) {
+      tripSearchMemoryCache.set(cacheKey, { timestamp: Date.now(), results: [] });
+      return res.json([]);
+    }
+
     // Load active traditional routes & geometries from fast in-memory cache
     const {
       allRoutes, allGeos, allDirs, allTerminals, allRouteTerminals, allLoadingPoints
@@ -648,6 +680,9 @@ async function search(req, res, next) {
     // prioritizing direct destination arrival, nearest boarding point, shortest walking distance,
     // and minimal transfers.
     combined.sort((a, b) => {
+      if (sort === "time") {
+        return a.totalMinutes - b.totalMinutes || a.compositeScore - b.compositeScore;
+      }
       if (sort === "fare") {
         return a.regularFare - b.regularFare || a.compositeScore - b.compositeScore;
       }

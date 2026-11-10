@@ -35,7 +35,7 @@ class RouteRepository @Inject constructor(
     private var memoryRoutesCache: List<Route>? = null
 
     companion object {
-        private const val BUNDLED_DATA_VERSION = 18  // bumped: fixed boolean is_popular + real popular route IDs
+        private const val BUNDLED_DATA_VERSION = 19  // bumped: all 17 verified Google My Maps routes marked as popular
     }
 
     /**

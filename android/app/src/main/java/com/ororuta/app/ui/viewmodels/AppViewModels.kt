@@ -761,6 +761,20 @@ class MapViewModel @Inject constructor(
         toName: String
     ) {
         nearbySheetSearchJob?.cancel()
+
+        // If origin and destination are very close (< 300m), user is already at/near
+        // their destination — skip the API call and return empty results immediately.
+        val dLat = Math.toRadians(toLat - fromLat)
+        val dLng = Math.toRadians(toLng - fromLng)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(fromLat)) * Math.cos(Math.toRadians(toLat)) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2)
+        val origDestDistM = 6371000.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        if (origDestDistM < 300) {
+            nearbySheetTripsState = Resource.Success(emptyList())
+            return
+        }
+
         nearbySheetTripsState = Resource.Loading
         nearbySheetSearchJob = viewModelScope.launch(Dispatchers.Default) {
             val res = tripRepo.searchTrips(

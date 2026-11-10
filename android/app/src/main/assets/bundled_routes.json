@@ -11,12 +11,12 @@
     "outbound_distance_km": 4.32,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": true,
+    "is_popular": 1,
     "color": "#D97706",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:37:02.000Z",
     "terminal_count": 2,
-    "stop_count": 4,
+    "stop_count": 5,
     "directions": [
       {
         "id": "d-c2-patag-gaisano-limketka-in",
@@ -569,6 +569,17 @@
         "map_y": 0,
         "lat": 8.487726,
         "lng": 124.625783
+      },
+      {
+        "id": "lp-liceo-c2-c2-patag",
+        "route_id": "c2-patag-gaisano-limketkai-cogon",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
       }
     ],
     "transfers": [],
@@ -586,7 +597,7 @@
     "outbound_distance_km": 2.29,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": true,
+    "is_popular": 1,
     "color": "#4338CA",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -2448,7 +2459,7 @@
     "outbound_distance_km": 3.88,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": false,
+    "is_popular": 1,
     "color": "#3730A3",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -12637,7 +12648,7 @@
     "outbound_distance_km": 7.37,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": false,
+    "is_popular": 1,
     "color": "#047857",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -16867,7 +16878,7 @@
     "outbound_distance_km": 16.13,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": false,
+    "is_popular": 1,
     "color": "#2563EB",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -21700,7 +21711,7 @@
     "outbound_distance_km": 5.25,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": true,
+    "is_popular": 1,
     "color": "#059669",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -29117,7 +29128,7 @@
     "outbound_distance_km": 7.76,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": false,
+    "is_popular": 1,
     "color": "#92400E",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -32352,7 +32363,7 @@
     "outbound_distance_km": 11.67,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": false,
+    "is_popular": 1,
     "color": "#10B981",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -35846,7 +35857,7 @@
     "outbound_distance_km": 16.27,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": false,
+    "is_popular": 1,
     "color": "#78350F",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -42017,7 +42028,7 @@
     "outbound_distance_km": 4.12,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": false,
+    "is_popular": 1,
     "color": "#B45309",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -43817,7 +43828,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T22:16:30.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 1,
     "directions": [
       {
         "id": "e10c3d41-88c0-48c4-b334-831aca4d6ccc",
@@ -44925,7 +44936,19 @@
         "lng": 124.6452
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-liceo-rpat-e8a63394",
+        "route_id": "e8a63394-79d4-4850-926a-1b34fe8c9ae1",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -44941,7 +44964,7 @@
     "outbound_distance_km": 12.26,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": false,
+    "is_popular": 1,
     "color": "#1D4ED8",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -98116,7 +98139,7 @@
     "outbound_distance_km": 12.91,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": false,
+    "is_popular": 1,
     "color": "#D97706",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -107536,7 +107559,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T20:49:52.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 1,
     "directions": [
       {
         "id": "29c394c5-b02a-4261-a2f1-231ad6551d1e",
@@ -109188,7 +109211,19 @@
         "lng": 124.65189
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-liceo-r1-d0402f5d",
+        "route_id": "d0402f5d-da95-4132-913e-fef5733feed2",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
+      }
+    ],
     "transfers": [],
     "landmarks": [
       {
@@ -139422,7 +139457,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T20:50:02.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 1,
     "directions": [
       {
         "id": "99f20aff-f46f-47bd-b709-19aea33717e6",
@@ -143258,7 +143293,19 @@
         "lng": 124.6373
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-liceo-r1-18036ed4",
+        "route_id": "18036ed4-a14e-4b05-8a1a-2cd9dc624b6d",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -144541,7 +144588,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T21:42:23.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 1,
     "directions": [
       {
         "id": "f044c562-e962-46f4-b77d-7c4969c62bb5",
@@ -146369,7 +146416,19 @@
         "lng": 124.6373
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-liceo-r1-38f1362f",
+        "route_id": "38f1362f-d2a7-4e36-a989-9e178f2ddfae",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -160633,12 +160692,12 @@
     "outbound_distance_km": 2.75,
     "status": "Inactive",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": true,
+    "is_popular": 1,
     "color": "#0F6652",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T02:10:19.000Z",
     "terminal_count": 2,
-    "stop_count": 3,
+    "stop_count": 4,
     "directions": [
       {
         "id": "d-r1-gaisano-carmen-loop-in",
@@ -162419,6 +162478,17 @@
         "map_y": 0,
         "lat": 8.4777,
         "lng": 124.6452
+      },
+      {
+        "id": "lp-liceo-r1-r1-gaisa",
+        "route_id": "r1-gaisano-carmen-loop",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
       }
     ],
     "transfers": [],
@@ -169879,7 +169949,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T20:49:52.000Z",
     "terminal_count": 2,
-    "stop_count": 1,
+    "stop_count": 2,
     "directions": [
       {
         "id": "02ca72ca-f1be-432c-94d0-b2bcde6c26cd",
@@ -172470,6 +172540,17 @@
         "map_y": 0,
         "lat": 8.479498,
         "lng": 124.63682
+      },
+      {
+        "id": "lp-liceo-r2-262139a4",
+        "route_id": "262139a4-3be7-44fc-ac8a-b5f44ed01b03",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
       }
     ],
     "transfers": [],
@@ -172509,7 +172590,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T22:16:23.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 1,
     "directions": [
       {
         "id": "b5092727-24e2-415a-b757-3afe4dddc31d",
@@ -175633,7 +175714,19 @@
         "lng": 124.6373
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-liceo-r2-3bcdc4d3",
+        "route_id": "3bcdc4d3-4790-4a3e-a1bf-ad48b2241ee0",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
+      }
+    ],
     "transfers": [],
     "landmarks": [
       {
@@ -180448,7 +180541,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T20:49:56.000Z",
     "terminal_count": 2,
-    "stop_count": 3,
+    "stop_count": 4,
     "directions": [
       {
         "id": "4ef60ba7-7dcf-43e5-a7d4-eb04c7e3ddb5",
@@ -182917,6 +183010,17 @@
         "map_y": 0,
         "lat": 8.4855,
         "lng": 124.6535
+      },
+      {
+        "id": "lp-liceo-r2-09cfc7ea",
+        "route_id": "09cfc7ea-4f4a-477e-89a4-13666ddf29a1",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
       }
     ],
     "transfers": [],
@@ -201553,7 +201657,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T22:16:29.000Z",
     "terminal_count": 2,
-    "stop_count": 1,
+    "stop_count": 2,
     "directions": [
       {
         "id": "55121c0f-35ca-42db-99bf-3f7fe10900b8",
@@ -203592,6 +203696,17 @@
         "map_y": 0,
         "lat": 8.4965,
         "lng": 124.6345
+      },
+      {
+        "id": "lp-liceo-r2-b2682fed",
+        "route_id": "b2682fed-e85e-43ce-b05d-d4a472c6097a",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
       }
     ],
     "transfers": [],
@@ -214574,12 +214689,12 @@
     "outbound_distance_km": 5.83,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": true,
+    "is_popular": 1,
     "color": "#147D64",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
     "terminal_count": 2,
-    "stop_count": 4,
+    "stop_count": 5,
     "directions": [
       {
         "id": "d-r2-gaisano-agora-cogon-ca-in",
@@ -216163,6 +216278,17 @@
         "map_y": 0,
         "lat": 8.48556,
         "lng": 124.65374
+      },
+      {
+        "id": "lp-liceo-r2-r2-gaisa",
+        "route_id": "r2-gaisano-agora-cogon-carmen",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
       }
     ],
     "transfers": [],
@@ -219186,7 +219312,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T22:16:19.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 1,
     "directions": [
       {
         "id": "63c8fc76-c850-4d93-bac1-2fc5e00b4266",
@@ -221486,7 +221612,19 @@
         "lng": 124.6373
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-liceo-r3-401b4d1b",
+        "route_id": "401b4d1b-e91b-4c6d-b1c9-034aa1c87b6d",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
+      }
+    ],
     "transfers": [],
     "landmarks": [
       {
@@ -221516,7 +221654,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T22:16:24.000Z",
     "terminal_count": 2,
-    "stop_count": 1,
+    "stop_count": 2,
     "directions": [
       {
         "id": "a95f4a43-9e1b-4978-af55-f91cef3e4ff4",
@@ -224259,6 +224397,17 @@
         "map_y": 0,
         "lat": 8.4857,
         "lng": 124.6589
+      },
+      {
+        "id": "lp-liceo-r3-2e8ed762",
+        "route_id": "2e8ed762-ee8d-4694-b3ae-2c529cb926f3",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
       }
     ],
     "transfers": [],
@@ -261095,7 +261244,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T20:49:57.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 1,
     "directions": [
       {
         "id": "32d4ecd2-61eb-4a44-b317-170bb4e673ba",
@@ -263027,7 +263176,19 @@
         "lng": 124.65189
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-liceo-r4-31241d2e",
+        "route_id": "31241d2e-0166-4c9d-9e9a-3e89b9d8a8a9",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -276409,7 +276570,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T22:16:21.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 1,
     "directions": [
       {
         "id": "23245cfa-12b4-49cc-a74b-a4539df9bdfd",
@@ -279141,7 +279302,19 @@
         "lng": 124.658
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-liceo-r5-a38aba4f",
+        "route_id": "a38aba4f-1cfe-404a-862c-7603ad1a67e9",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
+      }
+    ],
     "transfers": [],
     "landmarks": [
       {
@@ -286250,7 +286423,7 @@
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-26T21:42:26.000Z",
     "terminal_count": 2,
-    "stop_count": 0,
+    "stop_count": 1,
     "directions": [
       {
         "id": "c5bfee91-03c5-4f44-9e0c-acec82591927",
@@ -288222,7 +288395,19 @@
         "lng": 124.6373
       }
     ],
-    "stops": [],
+    "stops": [
+      {
+        "id": "lp-liceo-r5-9ef925b0",
+        "route_id": "9ef925b0-d6b4-4565-bd92-05b28173336d",
+        "name": "Liceo de Cagayan Loading Zone",
+        "note": "Rodolfo N. Pelaez Blvd (in front of Main Campus)",
+        "point_type": "loading",
+        "map_x": 0,
+        "map_y": 0,
+        "lat": 8.4862,
+        "lng": 124.6388
+      }
+    ],
     "transfers": [],
     "landmarks": []
   },
@@ -296793,7 +296978,7 @@
     "outbound_distance_km": 2.06,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": true,
+    "is_popular": 1,
     "color": "#DC2626",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -302287,7 +302472,7 @@
     "outbound_distance_km": 4.15,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": true,
+    "is_popular": 1,
     "color": "#B91C1C",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",
@@ -306688,7 +306873,7 @@
     "outbound_distance_km": 7.61,
     "status": "Active",
     "verification_status": "USER_SUPPLIED",
-    "is_popular": true,
+    "is_popular": 1,
     "color": "#7C3AED",
     "offline_size_mb": 0.5,
     "last_updated_at": "2026-10-27T01:57:07.000Z",

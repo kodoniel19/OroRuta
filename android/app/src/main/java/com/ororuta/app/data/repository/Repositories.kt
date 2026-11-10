@@ -117,6 +117,9 @@ class TripRepository @Inject constructor(
 
         val directOrigDestDist = haversine(fLat, fLng, tLat, tLng)
 
+        // If origin and destination are very close (< 300m), user is already there
+        if (directOrigDestDist < 300.0) return@withContext emptyList()
+
         try {
             val allRoutes = decodedRoutesCache ?: run {
                 val cached = routeDao.getAllSync()
@@ -247,17 +250,45 @@ class TripRepository @Inject constructor(
                             val bDist = bStop?.let { haversine(coords[bIdx].first, coords[bIdx].second, it.lat, it.lng) } ?: Double.MAX_VALUE
                             val dDist = dStop?.let { haversine(coords[dIdx].first, coords[dIdx].second, it.lat, it.lng) } ?: Double.MAX_VALUE
 
-                            val boardName = when {
-                                bStop != null && bDist <= 300 -> bStop.name
-                                bStop != null && bDist <= 600 -> "Loading point near ${bStop.name}"
-                                else -> "Boarding point (${route.origin})"
+                            fun resolveStopName(lat: Double, lng: Double, nearestStop: LocalStop?, dist: Double, isBoarding: Boolean, fallback: String): String {
+                                if (nearestStop != null && dist <= 250.0) {
+                                    return if (dist <= 100.0) nearestStop.name else if (isBoarding) "Loading point near ${nearestStop.name}" else "Stop near ${nearestStop.name}"
+                                }
+                                val nearbyLm = PlaceRepository.CURATED_CDO_LANDMARKS.minByOrNull { haversine(lat, lng, it.lat, it.lng) }
+                                val lmDist = nearbyLm?.let { haversine(lat, lng, it.lat, it.lng) } ?: Double.MAX_VALUE
+                                if (nearbyLm != null && lmDist <= 250.0) {
+                                    return if (isBoarding) "Loading point near ${nearbyLm.name}" else "Stop near ${nearbyLm.name}"
+                                }
+                                val corridor = when {
+                                    lat in 8.484..8.495 && lng in 124.636..124.643 -> "RN Pelaez Blvd (Liceo corridor)"
+                                    lat in 8.500..8.520 && lng in 124.600..124.625 -> "Bulua Westbound corridor"
+                                    lat in 8.490..8.505 && lng in 124.625..124.645 -> "Kauswagan / RN Pelaez corridor"
+                                    lat in 8.475..8.4835 && lng in 124.625..124.639 -> "Carmen / Vamenta Blvd area"
+                                    lat in 8.483..8.492 && lng in 124.646..124.656 -> "CM Recto Ave (Centrio / SM Downtown area)"
+                                    lat in 8.473..8.482 && lng in 124.642..124.655 -> "Cogon Market area"
+                                    lat in 8.475..8.482 && lng in 124.638..124.648 -> "Divisoria area"
+                                    lat in 8.480..8.490 && lng in 124.654..124.665 -> "Limketkai / Lapasan corridor"
+                                    lat in 8.484..8.495 && lng in 124.656..124.672 -> "Agora Terminal / Valenzuela Ave"
+                                    lat in 8.445..8.475 && lng in 124.615..124.635 -> "Masterson Ave corridor"
+                                    lat in 8.475..8.510 && lng in 124.720..124.770 -> "Puerto / Bugo Highway"
+                                    else -> null
+                                }
+                                if (corridor != null) {
+                                    return if (isBoarding) "Loading point along $corridor" else "Stop along $corridor"
+                                }
+                                return fallback
                             }
-                            val dropName = when {
-                                dStop != null && dDist <= 300 -> dStop.name
-                                dStop != null && dDist <= 600 -> "Stop near ${dStop.name}"
-                                destination.isNotBlank() -> "Stop near $destination"
-                                else -> "Drop-off stop (${route.destination})"
-                            }
+
+                            val boardName = resolveStopName(
+                                coords[bIdx].first, coords[bIdx].second,
+                                bStop, bDist, isBoarding = true,
+                                fallback = "Boarding point (${route.origin})"
+                            )
+                            val dropName = resolveStopName(
+                                coords[dIdx].first, coords[dIdx].second,
+                                dStop, dDist, isBoarding = false,
+                                fallback = if (destination.isNotBlank()) "Stop near $destination" else "Drop-off stop (${route.destination})"
+                            )
 
                             val rideCoordsSlice = (bIdx..dIdx).map { listOf(coords[it].second, coords[it].first) }
 
