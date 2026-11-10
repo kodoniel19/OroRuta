@@ -76,15 +76,17 @@ async function restoreDatabase() {
     const [[{ stopCount }]] = await conn.query('SELECT COUNT(*) as stopCount FROM route_terminals;');
     const [[{ placeCount }]] = await conn.query('SELECT COUNT(*) as placeCount FROM places;');
     const [[{ fareCount }]] = await conn.query('SELECT COUNT(*) as fareCount FROM fare_rules;');
+    const [[{ popularCount }]] = await conn.query("SELECT COUNT(*) as popularCount FROM routes WHERE is_popular = 1 OR verification_status = 'USER_SUPPLIED';");
 
     console.log('\n========================================================');
     console.log(' RESTORATION COMPLETE AND VERIFIED');
     console.log('========================================================');
-    console.log(` - Traditional & Modern Routes: ${routeCount} (Expected: 68)`);
-    console.log(` - Verified Route Geometries:   ${geoCount} (Expected: 136)`);
+    console.log(` - Traditional & Modern Routes: ${routeCount} (Expected: 89)`);
+    console.log(` - Verified Route Geometries:   ${geoCount} (Expected: 178)`);
     console.log(` - Boarding/Drop-off Stops:     ${stopCount}`);
     console.log(` - Places and Landmarks:        ${placeCount}`);
     console.log(` - Fare Rules Configured:       ${fareCount}`);
+    console.log(` - Popular/Featured Routes:     ${popularCount}`);
     console.log('========================================================\n');
     console.log('Your OroRuta database is ready for local development.');
 

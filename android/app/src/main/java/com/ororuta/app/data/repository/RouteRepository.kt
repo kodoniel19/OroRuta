@@ -35,7 +35,7 @@ class RouteRepository @Inject constructor(
     private var memoryRoutesCache: List<Route>? = null
 
     companion object {
-        private const val BUNDLED_DATA_VERSION = 16
+        private const val BUNDLED_DATA_VERSION = 17  // bumped: added is_popular field + 89 routes in bundle
     }
 
     /**
@@ -48,7 +48,7 @@ class RouteRepository @Inject constructor(
             val prefs = context.getSharedPreferences("ororuta_cache_prefs", Context.MODE_PRIVATE)
             val cachedVer = prefs.getInt("bundled_routes_version", 0)
             val existing = dao.getAllSync()
-            if (cachedVer >= BUNDLED_DATA_VERSION && existing.size >= 86) {
+            if (cachedVer >= BUNDLED_DATA_VERSION && existing.size >= 89) {
                 isCacheSeeded = true
                 return
             }

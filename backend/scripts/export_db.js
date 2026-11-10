@@ -73,7 +73,7 @@ async function exportDatabase() {
     sqlOutput.push('-- OroRuta Portable Database Backup');
     sqlOutput.push(`-- Exported at: ${new Date().toISOString()}`);
     sqlOutput.push('-- Target: MySQL 8.0 / MariaDB 10.4+');
-    sqlOutput.push('-- Includes: Complete schema, 68 LPTRP routes, 136 geometries,');
+    sqlOutput.push('-- Includes: Complete schema, 89 LPTRP routes (68 verified + 21 user-supplied), 178 geometries,');
     sqlOutput.push('--           terminals, landmarks, places, fare rules, and announcements.');
     sqlOutput.push('-- ============================================================');
     sqlOutput.push('');
