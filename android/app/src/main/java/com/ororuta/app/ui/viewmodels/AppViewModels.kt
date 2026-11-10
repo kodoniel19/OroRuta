@@ -553,7 +553,7 @@ class RoutesViewModel @Inject constructor(
     }
 
     private fun isPopularRoute(r: Route): Boolean {
-        return r.verificationStatus.equals("USER_SUPPLIED", ignoreCase = true) || r.isPopular
+        return r.isPopular
     }
 
     fun loadRoutes(debounceMs: Long = 0L) {

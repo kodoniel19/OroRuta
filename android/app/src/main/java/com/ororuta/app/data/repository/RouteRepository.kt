@@ -35,7 +35,7 @@ class RouteRepository @Inject constructor(
     private var memoryRoutesCache: List<Route>? = null
 
     companion object {
-        private const val BUNDLED_DATA_VERSION = 17  // bumped: added is_popular field + 89 routes in bundle
+        private const val BUNDLED_DATA_VERSION = 18  // bumped: fixed boolean is_popular + real popular route IDs
     }
 
     /**

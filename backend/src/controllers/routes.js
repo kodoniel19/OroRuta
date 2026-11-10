@@ -45,6 +45,7 @@ async function list(req, res, next) {
       const [[lCount]] = await db.execute("SELECT COUNT(*) cnt FROM loading_points WHERE route_id = ?", [r.id]);
       r.terminal_count = tCount.cnt;
       r.stop_count = lCount.cnt;
+      r.is_popular = Boolean(r.is_popular);
 
       // Directions
       const [directions] = await db.execute("SELECT * FROM route_directions WHERE route_id = ?", [r.id]);

@@ -79,11 +79,11 @@ fun HomeScreen(
     // Popular CDO Jeepney Routes preview
     val popularRoutes = remember {
         listOf(
-            PopularRouteItem("c2_patag_cogon", "C2", "Patag - Cogon via Bulua & Carmen", "Camp Evangelista, Patag", "Cogon Public Market", "#0284C7", "₱15.50"),
-            PopularRouteItem("r1_bulua_agora", "R1", "Bulua - Agora via National Highway", "Bulua Terminal", "Agora Integrated Terminal", "#1565C0", "₱16.75"),
-            PopularRouteItem("r2_bulua_cogon", "R2", "Bulua - Cogon via Kauswagan", "Bulua Westbound Terminal", "Cogon Public Market", "#10B981", "₱15.50"),
-            PopularRouteItem("rc_carmen_cogon", "RC", "Carmen - Cogon Loop", "Carmen Public Market", "Cogon Public Market", "#8B5CF6", "₱13.00"),
-            PopularRouteItem("ra_agora_carmen", "RA", "Agora - Carmen Direct", "Agora Lapasan", "Carmen Public Market", "#EA580C", "₱14.00")
+            PopularRouteItem("c2-patag-gaisano-limketkai-cogon", "C2", "Patag - Cogon via Bulua & Carmen", "Camp Evangelista, Patag", "Cogon Public Market", "#0284C7", "₱15.50"),
+            PopularRouteItem("r1-gaisano-carmen-loop", "R1", "Gaisano - Carmen Loop Line", "Gaisano City Mall", "Carmen Public Market", "#1565C0", "₱16.75"),
+            PopularRouteItem("r2-gaisano-agora-cogon-carmen", "R2", "Gaisano - Agora - Cogon - Carmen Loop", "Gaisano Mall", "Cogon Public Market", "#10B981", "₱15.50"),
+            PopularRouteItem("rd-gusa-cugman-limketkai-cogon", "RC", "Cugman - Gusa - Cogon", "Cugman Centro", "Cogon Public Market", "#8B5CF6", "₱13.00"),
+            PopularRouteItem("ra-pier-cogon-line", "RA", "Pier - Cogon Line", "Macabalan Port", "Cogon Public Market", "#EA580C", "₱14.00")
         )
     }
 
