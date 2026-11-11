@@ -971,8 +971,28 @@ class AnnouncementRepository @Inject constructor(
     }
 
     suspend fun getAnnouncement(id: String): Resource<Announcement> = try {
-        Resource.Success(api.getAnnouncement(id))
-    } catch (e: Exception) { Resource.Error(e.message ?: "Error") }
+        val remote = api.getAnnouncement(id)
+        dao.insert(
+            CachedAnnouncement(
+                id = remote.id,
+                title = remote.title,
+                date = remote.date,
+                category = remote.category,
+                status = remote.status,
+                jsonData = json.encodeToString(remote)
+            )
+        )
+        Resource.Success(remote, isOffline = false)
+    } catch (e: Exception) {
+        val cached = dao.getById(id)
+        if (cached != null) {
+            val decoded = safeDecode(cached)
+            if (decoded != null) Resource.Success(decoded, isOffline = true)
+            else Resource.Error(e.message ?: "Could not load advisory details")
+        } else {
+            Resource.Error(e.message ?: "Could not load advisory details")
+        }
+    }
 
     private fun safeDecode(cached: CachedAnnouncement): Announcement? {
         return try {

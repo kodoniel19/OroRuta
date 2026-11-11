@@ -30,8 +30,18 @@ async function list(req, res, next) {
     }
 
     if (type) { sql += " AND r.jeepney_type = ?"; params.push(type); }
+
+    const hasUpdatesCondition = `(
+      r.status != 'Active'
+      OR r.id IN (SELECT ar.route_id FROM announcement_routes ar JOIN announcements a ON a.id = ar.announcement_id WHERE a.status IN ('Active', 'Published'))
+      OR r.code IN (SELECT ar.route_id FROM announcement_routes ar JOIN announcements a ON a.id = ar.announcement_id WHERE a.status IN ('Active', 'Published'))
+      OR r.id IN (SELECT act.route_id FROM admin_activity act WHERE act.created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY))
+      OR r.code IN (SELECT act.route_id FROM admin_activity act WHERE act.created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY))
+      OR (r.last_updated_at IS NOT NULL AND r.last_updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY))
+    )`;
+
     if (hasUpdates === "true") {
-      sql += " AND r.status != 'Active'";
+      sql += ` AND ${hasUpdatesCondition}`;
     } else {
       sql += " AND r.status = 'Active'";
     }
@@ -114,6 +124,24 @@ async function list(req, res, next) {
          JOIN route_landmarks rl ON rl.landmark_id = l.id
          WHERE rl.route_id = ? ORDER BY rl.seq`, [r.id]);
       r.landmarks = landmarks;
+
+      // Active announcements affecting this route
+      const [routeAnns] = await db.execute(
+        `SELECT a.id, a.title, a.date, a.category, a.description, a.effective, a.status FROM announcements a
+         JOIN announcement_routes ar ON ar.announcement_id = a.id
+         WHERE (ar.route_id = ? OR ar.route_id = ?) AND a.status IN ('Active', 'Published')
+         ORDER BY a.date DESC`,
+        [r.id, r.code]
+      ).catch(() => [[]]);
+      r.announcements = routeAnns;
+
+      // Has updates flag
+      const [actRows] = await db.execute(
+        "SELECT id FROM admin_activity WHERE (route_id = ? OR route_id = ?) AND created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) LIMIT 1",
+        [r.id, r.code]
+      ).catch(() => [[]]);
+      const isRecentlyUpdated = r.last_updated_at && (new Date() - new Date(r.last_updated_at)) < (7 * 24 * 60 * 60 * 1000);
+      r.has_updates = Boolean(r.status !== 'Active' || actRows.length > 0 || routeAnns.length > 0 || isRecentlyUpdated);
 
       r.travelTime = Math.round((r.length_km || 5) * 3.5);
     }));
@@ -215,7 +243,7 @@ async function getById(req, res, next) {
     route.direction = "Loop";
     route.length_km = Math.max(parseFloat(route.inbound_distance_km) || 0, parseFloat(route.outbound_distance_km) || 0);
 
-    const [announcements] = await db.execute(`SELECT a.* FROM announcements a JOIN announcement_routes ar ON ar.announcement_id = a.id WHERE ar.route_id = ? AND a.status != 'Expired' ORDER BY a.date DESC`, [route.id]);
+    const [announcements] = await db.execute(`SELECT a.* FROM announcements a JOIN announcement_routes ar ON ar.announcement_id = a.id WHERE (ar.route_id = ? OR ar.route_id = ?) AND a.status IN ('Active', 'Published') ORDER BY a.date DESC`, [route.id, route.code]);
 
     const km = route.length_km || 5;
     const fareRes = calculateTraditionalFare(km, "Regular", route.jeepney_type);

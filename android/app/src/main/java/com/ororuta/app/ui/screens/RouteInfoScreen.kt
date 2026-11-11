@@ -777,7 +777,47 @@ fun RouteInfoScreen(
                                                 }
                                             }
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            StatusPill(status = route.status)
+                                            val pillStatus = when {
+                                                route.status != "Active" -> route.status
+                                                route.announcements.isNotEmpty() -> {
+                                                    val ann = route.announcements.first()
+                                                    when {
+                                                        ann.category.contains("Rerout", ignoreCase = true) -> "Rerouted"
+                                                        ann.category.contains("Closure", ignoreCase = true) -> "Road Closure"
+                                                        ann.category.contains("Fare", ignoreCase = true) -> "Fare Update"
+                                                        else -> "Advisory"
+                                                    }
+                                                }
+                                                else -> route.status
+                                            }
+                                            StatusPill(status = pillStatus)
+                                        }
+
+                                        if (route.announcements.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            val activeAnn = route.announcements.first()
+                                            Surface(
+                                                color = Oro100,
+                                                shape = RoundedCornerShape(8.dp),
+                                                border = BorderStroke(1.dp, Oro600.copy(alpha = 0.4f)),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Info, contentDescription = null, tint = Oro700, modifier = Modifier.size(14.dp))
+                                                    Text(
+                                                        text = "${activeAnn.title}: ${activeAnn.description ?: ""}".trim(),
+                                                        fontSize = 11.sp,
+                                                        color = Ink,
+                                                        lineHeight = 14.sp,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
                                         }
 
                                         if (!isDestinationReachable && !initialDestination.isNullOrBlank()) {

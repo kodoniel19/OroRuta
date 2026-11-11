@@ -395,6 +395,19 @@ fun CompactRouteCard(route: Route, onClick: () -> Unit) {
                     if (route.status != "Active") {
                         Spacer(modifier = Modifier.width(6.dp))
                         StatusPill(status = route.status)
+                    } else if (route.announcements.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        val ann = route.announcements.first()
+                        val label = when {
+                            ann.category.contains("Rerout", ignoreCase = true) -> "Rerouted"
+                            ann.category.contains("Closure", ignoreCase = true) -> "Road Closure"
+                            ann.category.contains("Fare", ignoreCase = true) -> "Fare Update"
+                            else -> "Advisory"
+                        }
+                        StatusPill(status = label)
+                    } else if (route.hasUpdates) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        StatusPill(status = "Updated")
                     }
                 }
 

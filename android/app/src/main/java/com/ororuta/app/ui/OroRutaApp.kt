@@ -541,8 +541,13 @@ fun OroRutaApp(initialRoute: String? = null) {
                 arguments = listOf(navArgument("announcementId") { type = NavType.StringType })
             ) { backStack ->
                 val announcementId = backStack.arguments?.getString("announcementId") ?: ""
+                val detailVm = hiltViewModel<AnnouncementDetailViewModel>()
+                LaunchedEffect(announcementId) {
+                    detailVm.loadAnnouncement(announcementId)
+                }
                 AnnouncementDetailScreen(
                     announcementId = announcementId,
+                    viewModel = detailVm,
                     onBack = { navController.popBackStack() },
                     onViewAffectedRoute = { rId -> navController.navigate("route_info/$rId") }
                 )

@@ -106,7 +106,7 @@ class RouteRepository @Inject constructor(
             filtered = filtered.filter { it.jeepneyType.equals(type, ignoreCase = true) }
         }
         if (hasUpdates) {
-            filtered = filtered.filter { it.status != "Active" }
+            filtered = filtered.filter { it.hasUpdates || it.status != "Active" || it.announcements.isNotEmpty() }
         }
         return filtered
     }

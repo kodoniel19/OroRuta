@@ -85,6 +85,7 @@ data class Route(
     @SerialName("terminal_count") val terminalCount: Int = 0,
     @SerialName("stop_count") val stopCount: Int = 0,
     @SerialName("is_popular") val isPopular: Boolean = false,
+    @SerialName("has_updates") val hasUpdates: Boolean = false,
     val terminals: List<Terminal> = emptyList(),
     val stops: List<LoadingPoint> = emptyList(),
     val transfers: List<TransferPoint> = emptyList(),
