@@ -16,7 +16,7 @@ async function list(req, res, next) {
         LEFT JOIN transfer_points tp ON tp.route_id = r.id
         LEFT JOIN route_landmarks rl ON rl.route_id = r.id
         LEFT JOIN landmarks lm ON lm.id = rl.landmark_id
-        WHERE r.verification_status IN ('PUBLISHED', 'USER_SUPPLIED', 'VERIFIED') AND (
+        WHERE (r.verification_status IN ('PUBLISHED', 'USER_SUPPLIED', 'VERIFIED', 'DRAFT') OR r.verification_status IS NULL) AND (
           r.code LIKE ? OR r.name LIKE ? OR r.origin LIKE ? OR r.destination LIKE ? OR r.description LIKE ?
           OR t.name LIKE ?
           OR lp.name LIKE ?
@@ -26,17 +26,21 @@ async function list(req, res, next) {
       params.push(like, like, like, like, like, like, like, like, like);
     } else {
       // The mobile app should see published and user-supplied routes
-      sql = "SELECT r.* FROM routes r WHERE r.verification_status IN ('PUBLISHED', 'USER_SUPPLIED', 'VERIFIED')";
+      sql = "SELECT r.* FROM routes r WHERE (r.verification_status IN ('PUBLISHED', 'USER_SUPPLIED', 'VERIFIED', 'DRAFT') OR r.verification_status IS NULL)";
     }
 
     if (type) { sql += " AND r.jeepney_type = ?"; params.push(type); }
-    if (hasUpdates === "true") { sql += " AND r.status != 'Active'"; }
+    if (hasUpdates === "true") {
+      sql += " AND r.status != 'Active'";
+    } else {
+      sql += " AND r.status = 'Active'";
+    }
     sql += " ORDER BY r.code";
     
-    // Fallback: If no routes are PUBLISHED yet (because we just rebuilt DB), return DRAFT routes for testing
+    // Fallback: If no routes are found yet, return active routes for testing
     let [rows] = await db.execute(sql, params);
-    if (rows.length === 0 && !hasUpdates) {
-       sql = "SELECT * FROM routes WHERE 1=1 ORDER BY code";
+    if (rows.length === 0 && !hasUpdates && !q) {
+       sql = "SELECT * FROM routes WHERE status = 'Active' ORDER BY code";
        [rows] = await db.execute(sql, []);
     }
 

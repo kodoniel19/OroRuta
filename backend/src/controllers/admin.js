@@ -182,12 +182,46 @@ async function createRoute(req, res, next) {
     const outbound_distance_km = parseFloat(body.outboundDistanceKm || 5.0);
     const status = body.status === 'Inactive' ? 'Inactive' : (body.status || 'Active');
     const color = body.color || '#1471B0';
+    const verification_status = body.verificationStatus || body.verification_status || 'PUBLISHED';
 
     await db.execute(
-      `INSERT INTO routes (id, code, name, origin, destination, jeepney_type, description, inbound_distance_km, outbound_distance_km, status, color, last_updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [id, code, name, origin, destination, jeepney_type, description, inbound_distance_km, outbound_distance_km, status, color]
+      `INSERT INTO routes (id, code, name, origin, destination, jeepney_type, description, inbound_distance_km, outbound_distance_km, status, color, verification_status, last_updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [id, code, name, origin, destination, jeepney_type, description, inbound_distance_km, outbound_distance_km, status, color, verification_status]
     );
+
+    // Save drawn route geometry if provided
+    let coords = null;
+    if (body.coordinates && Array.isArray(body.coordinates) && body.coordinates.length > 0) {
+      coords = body.coordinates.map(c => {
+        if (Array.isArray(c)) return [c[0], c[1]];
+        if (c.longitude !== undefined && c.latitude !== undefined) return [c.longitude, c.latitude];
+        if (c.lng !== undefined && c.lat !== undefined) return [c.lng, c.lat];
+        return [0, 0];
+      });
+    } else if (body.path && Array.isArray(body.path) && body.path.length > 0) {
+      coords = body.path.map(p => {
+        if (Array.isArray(p)) return [p[1], p[0]]; // [lat, lng] -> [lng, lat]
+        if (p.lng !== undefined && p.lat !== undefined) return [p.lng, p.lat];
+        return [0, 0];
+      });
+    }
+
+    if (coords && coords.length > 0) {
+      const geomStr = JSON.stringify({ type: 'LineString', coordinates: coords });
+      await db.execute(
+        `INSERT INTO route_geometry (id, route_id, direction, geometry, geometry_status, generated_at)
+         VALUES (?, ?, 'Inbound', ?, 'VERIFIED', NOW()), (?, ?, 'Outbound', ?, 'VERIFIED', NOW())`,
+        [uuidv4(), id, geomStr, uuidv4(), id, geomStr]
+      );
+    }
+
+    // Default route directions if none
+    await db.execute(
+      `INSERT INTO route_directions (id, route_id, direction, street_sequence)
+       VALUES (?, ?, 'Inbound', ?), (?, ?, 'Outbound', ?)`,
+      [uuidv4(), id, `${origin} to ${destination}`, uuidv4(), id, `${destination} to ${origin}`]
+    ).catch(() => {});
 
     res.status(201).json({ ok: true, id });
   } catch (err) {
@@ -211,12 +245,47 @@ async function updateRoute(req, res, next) {
     if (body.outboundDistanceKm !== undefined) { fields.push('outbound_distance_km = ?'); vals.push(parseFloat(body.outboundDistanceKm)); }
     if (body.status !== undefined) { fields.push('status = ?'); vals.push(body.status === 'Inactive' ? 'Inactive' : body.status); }
     if (body.color !== undefined) { fields.push('color = ?'); vals.push(body.color); }
+    if (body.verificationStatus !== undefined || body.verification_status !== undefined) {
+      fields.push('verification_status = ?');
+      vals.push(body.verificationStatus || body.verification_status);
+    }
     
     fields.push('last_updated_at = NOW()');
 
     if (fields.length) {
       vals.push(id);
       await db.execute(`UPDATE routes SET ${fields.join(', ')} WHERE id = ?`, vals);
+    }
+
+    // Handle path / coordinates update (e.g. when drawn or updated in admin map)
+    let coords = null;
+    if (body.coordinates && Array.isArray(body.coordinates) && body.coordinates.length > 0) {
+      coords = body.coordinates.map(c => {
+        if (Array.isArray(c)) return [c[0], c[1]];
+        if (c.longitude !== undefined && c.latitude !== undefined) return [c.longitude, c.latitude];
+        if (c.lng !== undefined && c.lat !== undefined) return [c.lng, c.lat];
+        return [0, 0];
+      });
+    } else if (body.path && Array.isArray(body.path) && body.path.length > 0) {
+      coords = body.path.map(p => {
+        if (Array.isArray(p)) return [p[1], p[0]]; // [lat, lng] -> [lng, lat]
+        if (p.lng !== undefined && p.lat !== undefined) return [p.lng, p.lat];
+        return [0, 0];
+      });
+    }
+
+    if (coords && coords.length > 0) {
+      const geomStr = JSON.stringify({ type: 'LineString', coordinates: coords });
+      const [existing] = await db.execute('SELECT id FROM route_geometry WHERE route_id = ?', [id]);
+      if (existing.length > 0) {
+        await db.execute('UPDATE route_geometry SET geometry = ?, geometry_status = "VERIFIED", generated_at = NOW() WHERE route_id = ?', [geomStr, id]);
+      } else {
+        await db.execute(
+          `INSERT INTO route_geometry (id, route_id, direction, geometry, geometry_status, generated_at)
+           VALUES (?, ?, 'Inbound', ?, 'VERIFIED', NOW()), (?, ?, 'Outbound', ?, 'VERIFIED', NOW())`,
+          [uuidv4(), id, geomStr, uuidv4(), id, geomStr]
+        );
+      }
     }
 
     res.json({ ok: true });
@@ -228,6 +297,12 @@ async function updateRoute(req, res, next) {
 async function deleteRoute(req, res, next) {
   try {
     const { id } = req.params;
+    await db.execute('DELETE FROM route_geometry WHERE route_id = ?', [id]).catch(() => {});
+    await db.execute('DELETE FROM route_directions WHERE route_id = ?', [id]).catch(() => {});
+    await db.execute('DELETE FROM route_terminals WHERE route_id = ?', [id]).catch(() => {});
+    await db.execute('DELETE FROM loading_points WHERE route_id = ?', [id]).catch(() => {});
+    await db.execute('DELETE FROM route_major_roads WHERE route_id = ?', [id]).catch(() => {});
+    await db.execute('DELETE FROM announcement_routes WHERE route_id = ?', [id]).catch(() => {});
     await db.execute('DELETE FROM routes WHERE id = ?', [id]);
     res.json({ ok: true });
   } catch (err) {
@@ -503,6 +578,8 @@ async function updateAnnouncement(req, res, next) {
 async function deleteAnnouncement(req, res, next) {
   try {
     const { id } = req.params;
+    await db.execute('DELETE FROM announcement_routes WHERE announcement_id = ?', [id]).catch(() => {});
+    await db.execute('DELETE FROM announcement_details WHERE announcement_id = ?', [id]).catch(() => {});
     await db.execute('DELETE FROM announcements WHERE id = ?', [id]);
     res.json({ ok: true });
   } catch (err) {
@@ -898,9 +975,215 @@ async function snapToRoad(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ─────────────────────────────────────────────
+// SEARCH ANALYTICS (REAL COMMUTER DATA)
+// ─────────────────────────────────────────────
+async function getSearchAnalytics(req, res, next) {
+  try {
+    // 1. Daily searches for last 30 days
+    const [dailyRows] = await db.execute(`
+      SELECT DATE(created_at) as sDate, COUNT(*) as cnt
+      FROM searches
+      WHERE created_at >= CURDATE() - INTERVAL 29 DAY
+      GROUP BY DATE(created_at)
+    `);
+    const countMap = new Map();
+    for (const r of dailyRows) {
+      const dStr = r.sDate instanceof Date ? r.sDate.toISOString().split('T')[0] : String(r.sDate).split('T')[0];
+      countMap.set(dStr, Number(r.cnt));
+    }
+
+    const dailySearches = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateKey = d.toISOString().split('T')[0];
+      const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      dailySearches.push({
+        date: label,
+        rawDate: dateKey,
+        searches: countMap.get(dateKey) || 0
+      });
+    }
+
+    // 2. Hourly distribution
+    const [hourlyRows] = await db.execute(`
+      SELECT HOUR(created_at) as hr, COUNT(*) as cnt
+      FROM searches
+      WHERE created_at >= NOW() - INTERVAL 30 DAY
+      GROUP BY HOUR(created_at)
+    `);
+    const hourMap = new Map();
+    for (const r of hourlyRows) {
+      hourMap.set(Number(r.hr), Number(r.cnt));
+    }
+    const hourlySearches = [];
+    for (let h = 0; h < 24; h++) {
+      const ampm = h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`;
+      hourlySearches.push({
+        hour: ampm,
+        searches: hourMap.get(h) || 0
+      });
+    }
+
+    // 3. Popular destinations
+    const [destRows] = await db.execute(`
+      SELECT destination as name,
+        COUNT(*) as searches30,
+        SUM(CASE WHEN created_at >= NOW() - INTERVAL 7 DAY THEN 1 ELSE 0 END) as searches7
+      FROM searches
+      WHERE created_at >= NOW() - INTERVAL 30 DAY AND destination IS NOT NULL AND TRIM(destination) != ''
+      GROUP BY destination
+      ORDER BY searches30 DESC
+      LIMIT 10
+    `);
+    const popularDestinations = destRows.map(r => ({
+      name: r.name,
+      searches30: Number(r.searches30),
+      searches7: Number(r.searches7),
+      change: Number(r.searches30) > 0 ? Math.round(((Number(r.searches7) * 4 - Number(r.searches30)) / Number(r.searches30)) * 100) : 0
+    }));
+
+    // 4. Frequent routes
+    const [routeRows] = await db.execute(`
+      SELECT COALESCE(r.code, s.route_id) as routeId, COALESCE(r.name, s.route_id) as routeName,
+        COUNT(*) as searches30,
+        SUM(CASE WHEN s.created_at >= NOW() - INTERVAL 7 DAY THEN 1 ELSE 0 END) as searches7
+      FROM searches s
+      LEFT JOIN routes r ON s.route_id = r.id OR s.route_id = r.code
+      WHERE s.created_at >= NOW() - INTERVAL 30 DAY AND s.route_id IS NOT NULL AND s.route_id != ''
+      GROUP BY COALESCE(r.code, s.route_id), COALESCE(r.name, s.route_id)
+      ORDER BY searches30 DESC
+      LIMIT 10
+    `);
+    const frequentRoutes = routeRows.map(r => ({
+      routeId: r.routeId,
+      name: r.routeName,
+      searches30: Number(r.searches30),
+      searches7: Number(r.searches7),
+      change: 0
+    }));
+
+    // 5. Recent searches
+    const [recentRows] = await db.execute(`
+      SELECT s.id,
+        s.current_location as \`from\`,
+        s.destination as \`to\`,
+        COALESCE(r.code, s.route_id, '') as \`match\`,
+        s.created_at as \`at\`,
+        (s.route_id IS NOT NULL AND s.route_id != '') as found
+      FROM searches s
+      LEFT JOIN routes r ON s.route_id = r.id OR s.route_id = r.code
+      ORDER BY s.created_at DESC
+      LIMIT 20
+    `);
+    const recentSearches = recentRows.map(r => ({
+      id: r.id,
+      from: r.from,
+      to: r.to,
+      match: r.match,
+      at: r.at,
+      found: Boolean(r.found)
+    }));
+
+    // 6. Summary metrics
+    const [[summaryRow]] = await db.execute(`
+      SELECT
+        COUNT(*) as sessions30,
+        SUM(CASE WHEN created_at >= NOW() - INTERVAL 7 DAY THEN 1 ELSE 0 END) as sessions7,
+        SUM(CASE WHEN route_id IS NULL OR route_id = '' THEN 1 ELSE 0 END) as noResult30,
+        SUM(CASE WHEN created_at >= NOW() - INTERVAL 7 DAY AND (route_id IS NULL OR route_id = '') THEN 1 ELSE 0 END) as noResult7
+      FROM searches
+      WHERE created_at >= NOW() - INTERVAL 30 DAY
+    `);
+
+    const s30 = Number(summaryRow.sessions30 || 0);
+    const s7 = Number(summaryRow.sessions7 || 0);
+    const nr30 = Number(summaryRow.noResult30 || 0);
+    const nr7 = Number(summaryRow.noResult7 || 0);
+
+    const analyticsSummary = {
+      sessions30: s30,
+      sessions7: s7,
+      noResultRate30: s30 > 0 ? Math.round((nr30 / s30) * 100) : 0,
+      noResultRate7: s7 > 0 ? Math.round((nr7 / s7) * 100) : 0
+    };
+
+    res.json({
+      dailySearches,
+      hourlySearches,
+      popularDestinations,
+      frequentRoutes,
+      recentSearches,
+      analyticsSummary
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────
+// SYSTEM SETTINGS
+// ─────────────────────────────────────────────
+async function getSettings(req, res, next) {
+  try {
+    const [rows] = await db.execute('SELECT `key`, `value` FROM system_settings');
+    const settings = {
+      systemName: 'OroRuta Admin Portal',
+      apiUrl: 'http://localhost:3000/api/v1',
+      timezone: 'Asia/Manila',
+      maintenanceMode: false,
+      reportNotify: true,
+      offlineNotify: true,
+    };
+    for (const r of rows) {
+      if (r.key === 'maintenance_mode') settings.maintenanceMode = r.value === 'true';
+      if (r.key === 'system_name') settings.systemName = r.value;
+      if (r.key === 'timezone') settings.timezone = r.value;
+      if (r.key === 'report_notify') settings.reportNotify = r.value === 'true';
+      if (r.key === 'offline_notify') settings.offlineNotify = r.value === 'true';
+    }
+    res.json(settings);
+  } catch (err) { next(err); }
+}
+
+async function updateSettings(req, res, next) {
+  try {
+    const { systemName, timezone, maintenanceMode, reportNotify, offlineNotify } = req.body;
+    const { setMaintenanceCache } = require('../middleware/maintenance');
+
+    if (maintenanceMode !== undefined) {
+      await db.execute('INSERT INTO system_settings (`key`, `value`) VALUES ("maintenance_mode", ?) ON DUPLICATE KEY UPDATE `value` = ?', [String(maintenanceMode), String(maintenanceMode)]);
+      setMaintenanceCache(maintenanceMode);
+    }
+    if (systemName !== undefined) {
+      await db.execute('INSERT INTO system_settings (`key`, `value`) VALUES ("system_name", ?) ON DUPLICATE KEY UPDATE `value` = ?', [String(systemName), String(systemName)]);
+    }
+    if (timezone !== undefined) {
+      await db.execute('INSERT INTO system_settings (`key`, `value`) VALUES ("timezone", ?) ON DUPLICATE KEY UPDATE `value` = ?', [String(timezone), String(timezone)]);
+    }
+    if (reportNotify !== undefined) {
+      await db.execute('INSERT INTO system_settings (`key`, `value`) VALUES ("report_notify", ?) ON DUPLICATE KEY UPDATE `value` = ?', [String(reportNotify), String(reportNotify)]);
+    }
+    if (offlineNotify !== undefined) {
+      await db.execute('INSERT INTO system_settings (`key`, `value`) VALUES ("offline_notify", ?) ON DUPLICATE KEY UPDATE `value` = ?', [String(offlineNotify), String(offlineNotify)]);
+    }
+
+    // Log admin activity
+    await db.execute(
+      'INSERT INTO admin_activity (id, route_id, action, detail, admin_by, created_at) VALUES (?, NULL, "Settings", "System settings updated", ?, NOW())',
+      [uuidv4(), req.admin ? req.admin.name : 'Admin']
+    ).catch(() => {});
+
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   login,
   getOverview,
+  getSearchAnalytics,
+  getSettings, updateSettings,
   getRoutes, createRoute, updateRoute, deleteRoute,
   getLocations, createLocation, updateLocation, deleteLocation,
   getFares, createFare, updateFare, deleteFare,

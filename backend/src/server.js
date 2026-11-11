@@ -6,6 +6,7 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const router = require("./routes");
 const { errorHandler } = require("./middleware");
+const { checkMaintenanceMode } = require("./middleware/maintenance");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use(morgan("dev"));
 app.use(rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false }));
 
+app.use(checkMaintenanceMode);
 app.use("/api/v1", router);
 
 app.use((req, res) => res.status(404).json({ error: { code: "NOT_FOUND", message: "Endpoint not found" } }));

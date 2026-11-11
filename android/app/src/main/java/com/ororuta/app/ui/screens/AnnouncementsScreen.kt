@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.Refresh
 import com.ororuta.app.domain.models.Resource
 import com.ororuta.app.ui.components.*
 import com.ororuta.app.ui.theme.Brand600
@@ -36,7 +37,16 @@ fun AnnouncementsScreen(
                 ScreenHeader(
                     title = "Transportation Updates",
                     subtitle = "Jeepney route changes & advisories",
-                    onBack = onBack
+                    onBack = onBack,
+                    rightAction = {
+                        IconButton(onClick = { viewModel.refresh() }) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh",
+                                tint = Brand600
+                            )
+                        }
+                    }
                 )
                 // Filter chips: All | Active | Updated | Temporary | Expired
                 val filters = listOf("All", "Active", "Updated", "Temporary", "Expired")

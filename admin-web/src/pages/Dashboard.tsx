@@ -15,7 +15,7 @@ import { RouteChip } from '../components/ui/RouteChip';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useSimulatedLoad } from '../hooks/useSimulatedLoad';
-import { dailySearches } from '../data/analytics';
+import { api } from '../services/api';
 import { announcementTypes } from '../data/announcementTypes';
 import { formatRelative, formatDateTime } from '../utils/format';
 import { format } from 'date-fns';
@@ -68,13 +68,21 @@ export function Dashboard() {
   const navigate = useNavigate();
   const loading = useSimulatedLoad(500);
 
+  const [analytics, setAnalytics] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    api.analytics.getSearches()
+      .then((data) => setAnalytics(data))
+      .catch((err) => console.error('Failed to load search analytics:', err));
+  }, []);
+
   const colorOf = (id: string) => routes.find((r) => r.id === id)?.color;
   const ofKind = (kind: string) => locations.filter((l) => l.kind === kind);
   const activeOf = (kind: string) => ofKind(kind).filter((l) => l.status === 'Active').length;
   const published = announcements.filter((a) => a.status === 'Published');
   const pending = reports.filter((r) => r.status === 'Pending').length;
 
-  const chartData = dailySearches.slice(-14).map(d => ({
+  const chartData = (analytics?.dailySearches ?? []).slice(-14).map((d: any) => ({
     date: d.date,
     searches: d.searches,
   }));

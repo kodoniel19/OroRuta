@@ -74,6 +74,9 @@ interface AnnouncementDao {
     @Query("SELECT * FROM cached_announcements WHERE status = :status ORDER BY date DESC")
     suspend fun getByStatusSync(status: String): List<CachedAnnouncement>
 
+    @Query("DELETE FROM cached_announcements")
+    suspend fun clearAll()
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<CachedAnnouncement>)
 }

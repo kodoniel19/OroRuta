@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -7,14 +7,7 @@ import { TrendingUpIcon, TrendingDownIcon, ArrowRightIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Panel } from '../components/ui/Panel';
 import { RouteChip } from '../components/ui/RouteChip';
-import {
-  dailySearches,
-  hourlySearches,
-  popularDestinations,
-  frequentRoutes,
-  recentSearches,
-  analyticsSummary,
-} from '../data/analytics';
+import { api } from '../services/api';
 import { useData } from '../contexts/DataContext';
 import { formatRelative } from '../utils/format';
 import { cn } from '../utils/cn';
@@ -41,14 +34,29 @@ function StatCard({ label, value, sub, trend }: { label: string; value: string |
 export function SearchAnalytics() {
   const { routes } = useData();
   const [period, setPeriod] = useState<'7' | '30'>('30');
+  const [analytics, setAnalytics] = useState<any>(null);
 
-  const colorOf = (id: string) => routes.find(r => r.id === id)?.color;
-  const nameOf = (id: string) => routes.find(r => r.id === id)?.name ?? id;
+  useEffect(() => {
+    api.analytics.getSearches()
+      .then(res => setAnalytics(res))
+      .catch(err => console.error('Failed to load search analytics:', err));
+  }, []);
 
-  const trendDays = period === '7' ? dailySearches.slice(-7) : dailySearches;
-  const thisP = trendDays.reduce((s, d) => s + d.searches, 0);
-  const prevP = dailySearches.slice(-(Number(period) * 2), -Number(period)).reduce((s, d) => s + d.searches, 0);
-  const change = prevP > 0 ? ((thisP - prevP) / prevP) * 100 : 0;
+  const colorOf = (id: string) => routes.find(r => r.id === id || r.code === id)?.color;
+  const nameOf = (id: string) => routes.find(r => r.id === id || r.code === id)?.name ?? id;
+
+  const allDaily = analytics?.dailySearches ?? [];
+  const trendDays = period === '7' ? allDaily.slice(-7) : allDaily;
+  const hourlySearches = analytics?.hourlySearches ?? [];
+  const popularDestinations = analytics?.popularDestinations ?? [];
+  const frequentRoutes = analytics?.frequentRoutes ?? [];
+  const recentSearches = analytics?.recentSearches ?? [];
+  const analyticsSummary = analytics?.analyticsSummary ?? {
+    sessions30: 0,
+    sessions7: 0,
+    noResultRate30: 0,
+    noResultRate7: 0,
+  };
 
   return (
     <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
@@ -119,21 +127,29 @@ export function SearchAnalytics() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {popularDestinations.map((d, i) => (
-                <tr key={d.name} className="hover:bg-canvas transition-colors duration-150">
-                  <td className="px-5 py-3">
-                    <span className="font-mono text-[11px] text-fg-subtle mr-2">{i + 1}</span>
-                    <span className="font-medium text-fg">{d.name}</span>
-                  </td>
-                  <td className="px-3 py-3 text-right tabular-nums text-fg-muted">{d.searches30.toLocaleString()}</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-fg-muted">{d.searches7.toLocaleString()}</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className={cn('text-xs font-medium', d.change >= 0 ? 'text-primary-700' : 'text-danger-600')}>
-                      {d.change >= 0 ? '+' : ''}{d.change.toFixed(1)}%
-                    </span>
+              {popularDestinations.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-5 py-8 text-center text-xs text-fg-muted">
+                    No destination search activity recorded yet
                   </td>
                 </tr>
-              ))}
+              ) : (
+                popularDestinations.map((d: any, i: number) => (
+                  <tr key={d.name} className="hover:bg-canvas transition-colors duration-150">
+                    <td className="px-5 py-3">
+                      <span className="font-mono text-[11px] text-fg-subtle mr-2">{i + 1}</span>
+                      <span className="font-medium text-fg">{d.name}</span>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums text-fg-muted">{d.searches30.toLocaleString()}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-fg-muted">{d.searches7.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right">
+                      <span className={cn('text-xs font-medium', d.change >= 0 ? 'text-primary-700' : 'text-danger-600')}>
+                        {d.change >= 0 ? '+' : ''}{d.change.toFixed(1)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </Panel>
@@ -149,29 +165,37 @@ export function SearchAnalytics() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {frequentRoutes.map(fr => (
-                <tr key={fr.routeId} className="hover:bg-canvas transition-colors duration-150">
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <RouteChip id={fr.routeId} color={colorOf(fr.routeId)} />
-                      <span className="truncate text-fg-muted">{nameOf(fr.routeId)}</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right tabular-nums text-fg-muted">{fr.searches30.toLocaleString()}</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-fg-muted">{fr.searches7.toLocaleString()}</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className={cn('text-xs font-medium', fr.change >= 0 ? 'text-primary-700' : 'text-danger-600')}>
-                      {fr.change >= 0 ? '+' : ''}{fr.change.toFixed(1)}%
-                    </span>
+              {frequentRoutes.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-5 py-8 text-center text-xs text-fg-muted">
+                    No route search matches recorded yet
                   </td>
                 </tr>
-              ))}
+              ) : (
+                frequentRoutes.map((fr: any) => (
+                  <tr key={fr.routeId} className="hover:bg-canvas transition-colors duration-150">
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <RouteChip id={fr.routeId} color={colorOf(fr.routeId)} />
+                        <span className="truncate text-fg-muted">{nameOf(fr.routeId)}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums text-fg-muted">{fr.searches30.toLocaleString()}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-fg-muted">{fr.searches7.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right">
+                      <span className={cn('text-xs font-medium', fr.change >= 0 ? 'text-primary-700' : 'text-danger-600')}>
+                        {fr.change >= 0 ? '+' : ''}{fr.change.toFixed(1)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </Panel>
       </div>
 
-      <Panel className="mt-6" title="Recent searches" description="Last 9 route searches across all devices">
+      <Panel className="mt-6" title="Recent searches" description="Live route searches recorded from the OroRuta commuter app">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-line text-left text-xs text-fg-muted">
@@ -183,20 +207,28 @@ export function SearchAnalytics() {
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {recentSearches.map(s => (
-              <tr key={s.id} className="hover:bg-canvas transition-colors duration-150">
-                <td className="px-5 py-3 font-medium text-fg">{s.from}</td>
-                <td className="px-3 py-3 font-medium text-fg">{s.to}</td>
-                <td className="px-3 py-3 font-mono text-xs text-fg-muted">{s.match}</td>
-                <td className="px-3 py-3 text-xs text-fg-subtle">{formatRelative(s.at)}</td>
-                <td className="px-3 py-3">
-                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium',
-                    s.found ? 'bg-primary-50 text-primary-700' : 'bg-danger-50 text-danger-600')}>
-                    {s.found ? 'Route found' : 'No result'}
-                  </span>
+            {recentSearches.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-5 py-8 text-center text-xs text-fg-muted">
+                  No commuter searches logged yet. Search a route in the OroRuta mobile app to see live results here!
                 </td>
               </tr>
-            ))}
+            ) : (
+              recentSearches.map((s: any) => (
+                <tr key={s.id} className="hover:bg-canvas transition-colors duration-150">
+                  <td className="px-5 py-3 font-medium text-fg">{s.from}</td>
+                  <td className="px-3 py-3 font-medium text-fg">{s.to}</td>
+                  <td className="px-3 py-3 font-mono text-xs text-fg-muted">{s.match || '—'}</td>
+                  <td className="px-3 py-3 text-xs text-fg-subtle">{formatRelative(s.at)}</td>
+                  <td className="px-3 py-3">
+                    <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium',
+                      s.found ? 'bg-primary-50 text-primary-700' : 'bg-danger-50 text-danger-600')}>
+                      {s.found ? 'Route found' : 'No result'}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </Panel>

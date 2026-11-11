@@ -1,4 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { MessageSquareWarningIcon, SearchXIcon, CheckCircleIcon, XCircleIcon, CheckIcon, MessageCircleIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -147,9 +148,17 @@ export function Reports() {
   const { reports, setReports, routes } = useData();
   const { user } = useAuth();
   const loading = useSimulatedLoad();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlReportId = searchParams.get('id');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | ReportStatus>('All');
-  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(urlReportId);
+
+  useEffect(() => {
+    if (urlReportId) {
+      setViewingId(urlReportId);
+    }
+  }, [urlReportId]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
@@ -237,8 +246,18 @@ export function Reports() {
         )}
       </div>
 
-      <ReportDetailDrawer report={viewing} routes={routes} onClose={() => setViewingId(null)}
-        onStatusChange={handleStatusChange} onAddNote={handleAddNote} />
+      <ReportDetailDrawer
+        report={viewing}
+        routes={routes}
+        onClose={() => {
+          setViewingId(null);
+          if (urlReportId) {
+            setSearchParams({});
+          }
+        }}
+        onStatusChange={handleStatusChange}
+        onAddNote={handleAddNote}
+      />
     </div>
   );
 }

@@ -1,4 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { routes as initialRoutes } from '../data/routes';
 import { locations as initialLocations } from '../data/locations';
 import { fares as initialFares } from '../data/fares';
@@ -43,8 +45,31 @@ interface DataContextValue {
 
 const DataContext = createContext<DataContextValue | null>(null);
 
+function playChime() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const knownReportIdsRef = useRef<Set<string>>(new Set());
+  const isFirstReportsFetch = useRef(true);
+
   const [routes, setRoutes] = useState<JeepneyRoute[]>(() =>
     initialRoutes.map((r) => ({ ...r, coordinates: r.coordinates ?? toCoordinates(r.path) })),
   );
@@ -111,6 +136,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
       if (repData.status === 'fulfilled' && Array.isArray(repData.value) && repData.value.length > 0) {
         setReports(repData.value);
+        repData.value.forEach((r: any) => knownReportIdsRef.current.add(r.id));
+        isFirstReportsFetch.current = false;
       }
       if (actData.status === 'fulfilled' && Array.isArray(actData.value) && actData.value.length > 0) {
         setActivity(actData.value);
@@ -125,6 +152,45 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshData();
   }, [refreshData]);
+
+  // Periodic polling for commuter reports & feedback every 15 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const freshReports = await api.reports.list();
+        if (Array.isArray(freshReports)) {
+          if (!isFirstReportsFetch.current && knownReportIdsRef.current.size > 0) {
+            // Identify incoming pending reports that were not previously present
+            const newReports = freshReports.filter(
+              (r) => !knownReportIdsRef.current.has(r.id) && r.status === 'Pending'
+            );
+
+            if (newReports.length > 0) {
+              playChime();
+              newReports.forEach((nr) => {
+                toast.info(`New Commuter Report: ${nr.category || 'Feedback'}`, {
+                  description: nr.message.length > 70 ? nr.message.slice(0, 70) + '…' : nr.message,
+                  action: {
+                    label: 'Review',
+                    onClick: () => navigate(`/reports?id=${nr.id}`),
+                  },
+                  duration: 8000,
+                });
+              });
+            }
+          }
+
+          freshReports.forEach((r) => knownReportIdsRef.current.add(r.id));
+          isFirstReportsFetch.current = false;
+          setReports(freshReports);
+        }
+      } catch {
+        // Silently ignore background polling errors
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [navigate]);
 
   const logActivity = useCallback(
     (entry: Pick<RouteActivity, 'routeId' | 'action' | 'detail'>) => {

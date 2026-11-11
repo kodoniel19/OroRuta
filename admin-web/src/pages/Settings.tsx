@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { SettingsIcon, GlobeIcon, BellIcon, ShieldIcon, DatabaseIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Field, inputClass } from '../components/ui/Field';
 import { Toggle } from '../components/ui/Toggle';
 import { Select } from '../components/ui/Select';
-import { delay } from '../utils/async';
+import { api } from '../services/api';
 
 export function Settings() {
   const [systemName, setSystemName] = useState('OroRuta Admin Portal');
@@ -16,13 +16,46 @@ export function Settings() {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [reportNotify, setReportNotify] = useState(true);
   const [offlineNotify, setOfflineNotify] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    api.settings.get()
+      .then((data) => {
+        if (!mounted || !data) return;
+        if (data.systemName !== undefined) setSystemName(data.systemName);
+        if (data.apiUrl !== undefined) setApiUrl(data.apiUrl);
+        if (data.timezone !== undefined) setTimezone(data.timezone);
+        if (data.maintenanceMode !== undefined) setMaintenanceMode(data.maintenanceMode);
+        if (data.reportNotify !== undefined) setReportNotify(data.reportNotify);
+        if (data.offlineNotify !== undefined) setOfflineNotify(data.offlineNotify);
+      })
+      .catch((err) => {
+        console.error('Failed to load settings:', err);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => { mounted = false; };
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
-    await delay(700);
-    setSaving(false);
-    toast.success('Settings saved', { description: 'System configuration has been updated.' });
+    try {
+      await api.settings.update({
+        systemName,
+        timezone,
+        maintenanceMode,
+        reportNotify,
+        offlineNotify,
+      });
+      toast.success('Settings saved', { description: 'System configuration has been updated.' });
+    } catch (err: any) {
+      toast.error('Failed to save settings', { description: err.message || 'Unknown error' });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

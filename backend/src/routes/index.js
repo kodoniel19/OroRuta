@@ -84,6 +84,7 @@ router.post("/admin/auth/login", admin.login);
 
 // Admin (Protected)
 router.get("/admin/overview", requireAdmin, admin.getOverview);
+router.get("/admin/analytics/searches", requireAdmin, admin.getSearchAnalytics);
 
 // Admin Routes CRUD
 router.get("/admin/routes", requireAdmin, admin.getRoutes);
@@ -122,6 +123,10 @@ router.delete("/admin/reports/:id", requireAdmin, admin.deleteReport);
 // Admin Activity Log
 router.get("/admin/activity", requireAdmin, admin.getActivity);
 router.post("/admin/activity", requireAdmin, admin.logActivity);
+
+// Admin Settings
+router.get("/admin/settings", requireAdmin, admin.getSettings);
+router.put("/admin/settings", requireAdmin, admin.updateSettings);
 
 // Admin Location Verification System
 router.get("/admin/verification/locations", requireAdmin, admin.getVerificationLocations);

@@ -27,6 +27,23 @@ async function setupAdminTables() {
     `);
 
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        \`key\` VARCHAR(50) PRIMARY KEY,
+        \`value\` TEXT NOT NULL,
+        \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    await pool.query(`
+      INSERT IGNORE INTO system_settings (\`key\`, \`value\`) VALUES
+        ('maintenance_mode', 'false'),
+        ('system_name', 'OroRuta Admin Portal'),
+        ('timezone', 'Asia/Manila'),
+        ('report_notify', 'true'),
+        ('offline_notify', 'true');
+    `);
+
+    await pool.query(`
       INSERT IGNORE INTO admin_users (id, username, email, password, name, role, phone)
       VALUES 
         ('u-01', 'deko74415', 'deko74415@liceo.edu.ph', 'Ororuta2026', 'Doniel Eunson Ko', 'Super Admin', '+63 917 555 0142'),

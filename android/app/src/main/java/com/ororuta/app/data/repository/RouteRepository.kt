@@ -142,30 +142,19 @@ class RouteRepository @Inject constructor(
             }
         }
 
-        val isDeviceOnline = networkMonitor.isOnline()
-        if (!isDeviceOnline) {
-            if (memoryRoutesCache.isNullOrEmpty() && dao.getAllSync().isEmpty()) {
-                emit(Resource.Error("You're offline and no cached routes are available.", isOffline = true))
-            }
-            return@flow
-        }
-
         try {
             val remote = api.getRoutes(q, type, if (hasUpdates) "true" else "")
-            if (remote.isNotEmpty()) {
-                if (q.isBlank() && type.isBlank() && !hasUpdates) {
-                    memoryRoutesCache = remote
-                }
-                dao.insertAll(remote.map { it.toCached() })
-                val filtered = filterRoutes(remote, q, type, hasUpdates)
-                emit(Resource.Success(filtered, isOffline = false))
-            } else if (memoryRoutesCache.isNullOrEmpty() && dao.getAllSync().isEmpty()) {
-                emit(Resource.Error("No routes available.", isOffline = false))
+            if (q.isBlank() && type.isBlank() && !hasUpdates) {
+                memoryRoutesCache = remote
+                dao.clearAll()
             }
+            dao.insertAll(remote.map { it.toCached() })
+            val filtered = filterRoutes(remote, q, type, hasUpdates)
+            emit(Resource.Success(filtered, isOffline = false))
         } catch (e: Exception) {
             if (memoryRoutesCache.isNullOrEmpty() && dao.getAllSync().isEmpty()) {
                 val msg = classifyError(e)
-                emit(Resource.Error(msg, isOffline = false))
+                emit(Resource.Error(msg, isOffline = true))
             }
         }
     }
@@ -173,16 +162,15 @@ class RouteRepository @Inject constructor(
     suspend fun getRoute(id: String): Resource<Route> {
         ensureInitialCache()
 
-        // 1. If online, attempt API fetch for the freshest geometry
+        // 1. Attempt API fetch for the freshest geometry
+        try {
+            val remote = api.getRoute(id)
+            dao.insert(remote.toCached())
+            memoryRoutesCache = memoryRoutesCache?.map { if (it.id == remote.id) remote else it }
+            return Resource.Success(remote, isOffline = false)
+        } catch (_: Exception) {}
+
         val isDeviceOnline = networkMonitor.isOnline()
-        if (isDeviceOnline) {
-            try {
-                val remote = api.getRoute(id)
-                dao.insert(remote.toCached())
-                memoryRoutesCache = memoryRoutesCache?.map { if (it.id == remote.id) remote else it }
-                return Resource.Success(remote, isOffline = false)
-            } catch (_: Exception) {}
-        }
 
         // 2. Fallback: Check in-memory cache
         val inMem = memoryRoutesCache?.firstOrNull { it.id == id }
