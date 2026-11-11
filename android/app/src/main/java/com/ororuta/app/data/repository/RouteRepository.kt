@@ -142,19 +142,16 @@ class RouteRepository @Inject constructor(
             }
         }
 
-        val isDeviceOnline = networkMonitor.isOnline()
-        if (!isDeviceOnline) {
-            if (memoryRoutesCache.isNullOrEmpty() && dao.getAllSync().isEmpty()) {
-                emit(Resource.Error("You're offline and no cached routes are available.", isOffline = true))
-            }
-            return@flow
-        }
-
+        // Always attempt background network fetch so route status changes (Active/Inactive)
+        // sync live without being blocked by network capability false-negatives (e.g. adb reverse).
         try {
             val remote = api.getRoutes(q, type, if (hasUpdates) "true" else "")
             if (remote.isNotEmpty()) {
                 if (q.isBlank() && type.isBlank() && !hasUpdates) {
                     memoryRoutesCache = remote
+                } else {
+                    val remoteMap = remote.associateBy { it.id }
+                    memoryRoutesCache = memoryRoutesCache?.map { remoteMap[it.id] ?: it }
                 }
                 dao.insertAll(remote.map { it.toCached() })
                 val filtered = filterRoutes(remote, q, type, hasUpdates)
@@ -165,7 +162,7 @@ class RouteRepository @Inject constructor(
         } catch (e: Exception) {
             if (memoryRoutesCache.isNullOrEmpty() && dao.getAllSync().isEmpty()) {
                 val msg = classifyError(e)
-                emit(Resource.Error(msg, isOffline = false))
+                emit(Resource.Error(msg, isOffline = true))
             }
         }
     }
@@ -173,22 +170,19 @@ class RouteRepository @Inject constructor(
     suspend fun getRoute(id: String): Resource<Route> {
         ensureInitialCache()
 
-        // 1. If online, attempt API fetch for the freshest geometry
-        val isDeviceOnline = networkMonitor.isOnline()
-        if (isDeviceOnline) {
-            try {
-                val remote = api.getRoute(id)
-                dao.insert(remote.toCached())
-                memoryRoutesCache = memoryRoutesCache?.map { if (it.id == remote.id) remote else it }
-                return Resource.Success(remote, isOffline = false)
-            } catch (_: Exception) {}
-        }
+        // 1. Attempt API fetch for freshest geometry and status
+        try {
+            val remote = api.getRoute(id)
+            dao.insert(remote.toCached())
+            memoryRoutesCache = memoryRoutesCache?.map { if (it.id == remote.id) remote else it }
+            return Resource.Success(remote, isOffline = false)
+        } catch (_: Exception) {}
 
         // 2. Fallback: Check in-memory cache
         val inMem = memoryRoutesCache?.firstOrNull { it.id == id }
             ?: memoryRoutesCache?.firstOrNull { it.code.equals(id, true) }
         if (inMem != null) {
-            return Resource.Success(inMem, isOffline = !isDeviceOnline)
+            return Resource.Success(inMem, isOffline = !networkMonitor.isOnline())
         }
 
         // 3. Fallback: Check local SQLite Room database
@@ -196,7 +190,7 @@ class RouteRepository @Inject constructor(
         if (cached != null) {
             val route = safeDecode(cached)
             if (route != null) {
-                return Resource.Success(route, isOffline = !isDeviceOnline)
+                return Resource.Success(route, isOffline = !networkMonitor.isOnline())
             }
         }
 

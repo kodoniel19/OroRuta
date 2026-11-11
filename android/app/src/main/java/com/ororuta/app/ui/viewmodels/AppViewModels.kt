@@ -16,12 +16,14 @@ import com.ororuta.app.data.local.dao.RecentSearchDao
 import com.ororuta.app.data.local.entities.RecentSearchEntity
 import com.ororuta.app.data.repository.*
 import com.ororuta.app.domain.models.*
+import com.google.android.gms.maps.model.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -533,13 +535,26 @@ class RoutesViewModel @Inject constructor(
     var routesState by mutableStateOf<Resource<List<Route>>>(Resource.Loading)
     var searchQuery by mutableStateOf("")
     var selectedFilter by mutableStateOf("All") // All, Updated
+    var isRefreshing by mutableStateOf(false)
 
     // Tracks the active load job so we can cancel it before starting a new one.
     // This prevents multiple concurrent collectors racing to update routesState.
     private var loadJob: kotlinx.coroutines.Job? = null
+    private var pollJob: kotlinx.coroutines.Job? = null
 
     init {
         loadRoutes()
+        startAutoPolling()
+    }
+
+    fun startAutoPolling() {
+        pollJob?.cancel()
+        pollJob = viewModelScope.launch {
+            while (isActive) {
+                delay(3000L) // Poll every 3s to live-sync route activation/deactivation from admin portal
+                refreshSilently()
+            }
+        }
     }
 
     fun onSearchChange(q: String) {
@@ -554,6 +569,37 @@ class RoutesViewModel @Inject constructor(
 
     private fun isPopularRoute(r: Route): Boolean {
         return r.isPopular
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            isRefreshing = true
+            loadRoutes(debounceMs = 0L)
+            delay(400L)
+            isRefreshing = false
+        }
+    }
+
+    fun refreshSilently() {
+        viewModelScope.launch {
+            try {
+                val hasUpdates = selectedFilter == "Updated"
+                routeRepo.getRoutes(searchQuery, "", hasUpdates).collect { res ->
+                    if (res is Resource.Success) {
+                        val traditionalOnly = res.data.filter {
+                            it.jeepneyType.isBlank() ||
+                            it.jeepneyType.equals("Traditional", ignoreCase = true)
+                        }
+                        val finalFiltered = if (selectedFilter == "Popular") {
+                            traditionalOnly.filter { isPopularRoute(it) }
+                        } else {
+                            traditionalOnly
+                        }
+                        routesState = Resource.Success(finalFiltered, res.isOffline)
+                    }
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     fun loadRoutes(debounceMs: Long = 0L) {
@@ -602,10 +648,26 @@ class RouteInfoViewModel @Inject constructor(
     var isDownloaded by mutableStateOf(false)
     var downloadProgress by mutableFloatStateOf(0f)
 
+    private var pollJob: kotlinx.coroutines.Job? = null
+
     fun loadRoute(id: String) {
         viewModelScope.launch {
             routeState = Resource.Loading
             routeState = routeRepo.getRoute(id)
+        }
+        startPolling(id)
+    }
+
+    private fun startPolling(id: String) {
+        pollJob?.cancel()
+        pollJob = viewModelScope.launch {
+            while (isActive) {
+                delay(3000L)
+                val fresh = routeRepo.getRoute(id)
+                if (fresh is Resource.Success) {
+                    routeState = fresh
+                }
+            }
         }
     }
 
@@ -690,6 +752,62 @@ data class MapDirectionsState(
 ) {
     val selectedTrip: TripOption?
         get() = itineraries.getOrNull(selectedIndex)
+}
+
+fun parseGeometries(route: Route, direction: String? = null): List<LatLng> {
+    val allPts = mutableListOf<LatLng>()
+    if (route.geometries.isNotEmpty()) {
+        val targetGeos = if (!direction.isNullOrBlank()) {
+            val exact = route.geometries.filter { it.direction.equals(direction, ignoreCase = true) }
+            if (exact.isNotEmpty()) {
+                exact
+            } else {
+                val partial = route.geometries.filter {
+                    it.direction.contains(direction, ignoreCase = true) || direction.contains(it.direction, ignoreCase = true)
+                }
+                if (partial.isNotEmpty()) partial else listOf(route.geometries.first())
+            }
+        } else {
+            val inb = route.geometries.filter { it.direction.equals("Inbound", ignoreCase = true) }
+            if (inb.isNotEmpty()) inb else listOf(route.geometries.first())
+        }
+        fun extractCoords(coordsArr: org.json.JSONArray) {
+            for (i in 0 until coordsArr.length()) {
+                val item = coordsArr.opt(i)
+                if (item is org.json.JSONArray) {
+                    if (item.length() >= 2 && item.opt(0) is Number && item.opt(1) is Number) {
+                        val lng = item.getDouble(0)
+                        val lat = item.getDouble(1)
+                        if (lat.isFinite() && lng.isFinite() && (lat != 0.0 || lng != 0.0)) {
+                            allPts.add(LatLng(lat, lng))
+                        }
+                    } else {
+                        extractCoords(item)
+                    }
+                }
+            }
+        }
+        for (g in targetGeos) {
+            val raw = g.geometry
+            if (!raw.isNullOrBlank()) {
+                try {
+                    val geoObj = org.json.JSONObject(raw)
+                    val coordsArr = geoObj.optJSONArray("coordinates")
+                    if (coordsArr != null) {
+                        extractCoords(coordsArr)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+    if (allPts.isEmpty() && route.path.isNotEmpty()) {
+        for (p in route.path) {
+            if (p.lat.isFinite() && p.lng.isFinite() && (p.lat != 0.0 || p.lng != 0.0)) {
+                allPts.add(LatLng(p.lat, p.lng))
+            }
+        }
+    }
+    return allPts
 }
 
 // Map ViewModel (Database-driven Routes, Places, Landmarks, Directions, Recommendations)
@@ -978,7 +1096,7 @@ class MapViewModel @Inject constructor(
             val r = routes.find { it.id == seg?.routeId || it.code.equals(seg?.code, ignoreCase = true) }
             if (r != null) {
                 val direction = trip.direction ?: "Inbound"
-                val fullPts = com.ororuta.app.ui.screens.parseGeometries(r, direction)
+                val fullPts: List<LatLng> = parseGeometries(r, direction)
                 if (fullPts.size >= 2) {
                     val bLat = trip.boardingLat
                     val bLng = trip.boardingLng
@@ -1256,7 +1374,7 @@ class MapViewModel @Inject constructor(
         direction: String,
         userLoc: com.google.android.gms.maps.model.LatLng?
     ) {
-        val routePoints = com.ororuta.app.ui.screens.parseGeometries(route, direction)
+        val routePoints: List<LatLng> = parseGeometries(route, direction)
 
         fun haversineMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
             val r = 6371000.0
