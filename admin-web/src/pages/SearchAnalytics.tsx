@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -7,15 +7,8 @@ import { TrendingUpIcon, TrendingDownIcon, ArrowRightIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Panel } from '../components/ui/Panel';
 import { RouteChip } from '../components/ui/RouteChip';
-import {
-  dailySearches,
-  hourlySearches,
-  popularDestinations,
-  frequentRoutes,
-  recentSearches,
-  analyticsSummary,
-} from '../data/analytics';
 import { useData } from '../contexts/DataContext';
+import { api, type AnalyticsData } from '../services/api';
 import { formatRelative } from '../utils/format';
 import { cn } from '../utils/cn';
 
@@ -41,14 +34,31 @@ function StatCard({ label, value, sub, trend }: { label: string; value: string |
 export function SearchAnalytics() {
   const { routes } = useData();
   const [period, setPeriod] = useState<'7' | '30'>('30');
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const colorOf = (id: string) => routes.find(r => r.id === id)?.color;
-  const nameOf = (id: string) => routes.find(r => r.id === id)?.name ?? id;
+  useEffect(() => {
+    setLoading(true);
+    api.analytics.get(Number(period))
+      .then(setData)
+      .catch((err) => console.error('Failed to load analytics:', err))
+      .finally(() => setLoading(false));
+  }, [period]);
 
-  const trendDays = period === '7' ? dailySearches.slice(-7) : dailySearches;
-  const thisP = trendDays.reduce((s, d) => s + d.searches, 0);
-  const prevP = dailySearches.slice(-(Number(period) * 2), -Number(period)).reduce((s, d) => s + d.searches, 0);
-  const change = prevP > 0 ? ((thisP - prevP) / prevP) * 100 : 0;
+  const colorOf = (id: string) => routes.find(r => r.id === id || r.code === id)?.color;
+  const nameOf = (id: string) => routes.find(r => r.id === id || r.code === id)?.name ?? id;
+
+  const trendDays = data?.dailySearches ?? [];
+  const hourlySearches = data?.hourlySearches ?? [];
+  const popularDestinations = data?.popularDestinations ?? [];
+  const frequentRoutes = data?.frequentRoutes ?? [];
+  const recentSearches = data?.recentSearches ?? [];
+  const analyticsSummary = data?.summary ?? {
+    sessions30: 0,
+    sessions7: 0,
+    noResultRate30: 0,
+    noResultRate7: 0,
+  };
 
   return (
     <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
@@ -153,7 +163,7 @@ export function SearchAnalytics() {
                 <tr key={fr.routeId} className="hover:bg-canvas transition-colors duration-150">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
-                      <RouteChip id={fr.routeId} color={colorOf(fr.routeId)} />
+                      <RouteChip id={fr.routeId} code={routes.find(rt => rt.id === fr.routeId || rt.code === fr.routeId)?.code} color={colorOf(fr.routeId)} />
                       <span className="truncate text-fg-muted">{nameOf(fr.routeId)}</span>
                     </div>
                   </td>

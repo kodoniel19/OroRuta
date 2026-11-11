@@ -242,7 +242,65 @@ export const api = {
         method: 'POST',
       }),
   },
+
+  // Analytics
+  analytics: {
+    get: (days: number = 30) => request<AnalyticsData>(`/admin/analytics?days=${days}`),
+  },
+
+  // Admin Users
+  users: {
+    list: () => request<AdminTeamMember[]>('/admin/users'),
+    updateProfile: (data: { name: string; email: string; phone?: string; id?: string }) =>
+      request<{ ok: boolean }>('/admin/users/profile', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    changePassword: (data: { currentPassword: string; newPassword: string; email: string }) =>
+      request<{ ok: boolean }>('/admin/users/change-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
+
+  // Offline Stats
+  offline: {
+    getStats: () =>
+      request<{
+        routesCount: number;
+        locationsCount: number;
+        faresCount: number;
+        announcementsCount: number;
+        activeDevices: number;
+      }>('/admin/offline-stats'),
+  },
 };
+
+export interface AnalyticsData {
+  dailySearches: { date: string; searches: number }[];
+  hourlySearches: { hour: string; searches: number }[];
+  popularDestinations: { name: string; searches30: number; searches7: number; change: number }[];
+  frequentRoutes: { routeId: string; searches30: number; searches7: number; change: number }[];
+  recentSearches: { id: string; from: string; to: string; match: string; at: string; found: boolean }[];
+  summary: {
+    sessions30: number;
+    sessions7: number;
+    noResultRate30: number;
+    noResultRate7: number;
+  };
+}
+
+export interface AdminTeamMember {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  role: string;
+  phone: string | null;
+  status: string;
+  createdAt?: string;
+  lastActive?: string;
+}
 
 // Types for the verification system
 export interface VerificationLocation {

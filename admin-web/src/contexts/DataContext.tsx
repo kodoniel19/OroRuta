@@ -1,11 +1,4 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { routes as initialRoutes } from '../data/routes';
-import { locations as initialLocations } from '../data/locations';
-import { fares as initialFares } from '../data/fares';
-import { announcements as initialAnnouncements } from '../data/announcements';
-import { reports as initialReports } from '../data/reports';
-import { routeActivity as initialActivity } from '../data/activity';
-import { offlineBundles as initialBundles } from '../data/offline';
 import { useAuth } from './AuthContext';
 import { nowIso } from '../utils/format';
 import { toCoordinates } from '../utils/geo';
@@ -20,7 +13,13 @@ import type {
 } from '../types/transit';
 
 type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
-export type OfflineBundle = (typeof initialBundles)[number];
+export interface OfflineBundle {
+  version: string;
+  publishedAt: string;
+  size: string;
+  changes: number;
+  status: 'Published' | 'Superseded' | 'Deprecated';
+}
 
 interface DataContextValue {
   routes: JeepneyRoute[];
@@ -45,15 +44,16 @@ const DataContext = createContext<DataContextValue | null>(null);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [routes, setRoutes] = useState<JeepneyRoute[]>(() =>
-    initialRoutes.map((r) => ({ ...r, coordinates: r.coordinates ?? toCoordinates(r.path) })),
-  );
-  const [locations, setLocations] = useState(initialLocations);
-  const [fares, setFares] = useState(initialFares);
-  const [announcements, setAnnouncements] = useState(initialAnnouncements);
-  const [reports, setReports] = useState(initialReports);
-  const [activity, setActivity] = useState(initialActivity);
-  const [bundles, setBundles] = useState<OfflineBundle[]>(initialBundles);
+  const [routes, setRoutes] = useState<JeepneyRoute[]>([]);
+  const [locations, setLocations] = useState<TransitLocation[]>([]);
+  const [fares, setFares] = useState<FareRule[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [reports, setReports] = useState<UserReport[]>([]);
+  const [activity, setActivity] = useState<RouteActivity[]>([]);
+  const [bundles, setBundles] = useState<OfflineBundle[]>([
+    { version: 'v2026.09.3', publishedAt: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString(), size: '4.0 MB', changes: 5, status: 'Published' },
+    { version: 'v2026.09.2', publishedAt: new Date(Date.now() - 8 * 24 * 60 * 60000).toISOString(), size: '3.8 MB', changes: 12, status: 'Superseded' },
+  ]);
   const [loading, setLoading] = useState(true);
 
   const refreshData = useCallback(async () => {
@@ -68,7 +68,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         api.activity.list(),
       ]);
 
-      if (rData.status === 'fulfilled' && Array.isArray(rData.value) && rData.value.length > 0) {
+      if (rData.status === 'fulfilled' && Array.isArray(rData.value)) {
         setRoutes(rData.value.map((r: any) => ({
           id: r.id,
           code: r.code ?? r.id,
@@ -100,23 +100,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           terminals: r.terminals ?? [],
         } as JeepneyRoute)));
       }
-      if (lData.status === 'fulfilled' && Array.isArray(lData.value) && lData.value.length > 0) {
+      if (lData.status === 'fulfilled' && Array.isArray(lData.value)) {
         setLocations(lData.value);
       }
-      if (fData.status === 'fulfilled' && Array.isArray(fData.value) && fData.value.length > 0) {
+      if (fData.status === 'fulfilled' && Array.isArray(fData.value)) {
         setFares(fData.value.filter((f: any) => f.vehicle !== 'Modern Jeepney'));
       }
-      if (aData.status === 'fulfilled' && Array.isArray(aData.value) && aData.value.length > 0) {
+      if (aData.status === 'fulfilled' && Array.isArray(aData.value)) {
         setAnnouncements(aData.value);
       }
-      if (repData.status === 'fulfilled' && Array.isArray(repData.value) && repData.value.length > 0) {
+      if (repData.status === 'fulfilled' && Array.isArray(repData.value)) {
         setReports(repData.value);
       }
-      if (actData.status === 'fulfilled' && Array.isArray(actData.value) && actData.value.length > 0) {
+      if (actData.status === 'fulfilled' && Array.isArray(actData.value)) {
         setActivity(actData.value);
       }
     } catch (err) {
-      console.warn('Backend API sync fallback to local store:', err);
+      console.warn('Backend API sync error:', err);
     } finally {
       setLoading(false);
     }

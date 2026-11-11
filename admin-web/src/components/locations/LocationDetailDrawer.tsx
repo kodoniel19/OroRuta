@@ -120,7 +120,7 @@ export function LocationDetailDrawer({
                       className="flex items-center justify-between rounded-lg border border-line bg-canvas/60 px-3 py-2 text-sm"
                     >
                       <div className="flex items-center gap-2">
-                        <RouteChip id={r.id} color={r.color} />
+                        <RouteChip id={r.id} code={r.code} color={r.color} />
                         <span className="font-medium text-fg">{r.name}</span>
                       </div>
                       <span className="text-xs text-fg-muted">

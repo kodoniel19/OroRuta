@@ -72,7 +72,7 @@ async function getOverview(req, res, next) {
   try {
     const [[rCount]] = await db.execute('SELECT COUNT(*) total, SUM(CASE WHEN status="Active" THEN 1 ELSE 0 END) active FROM routes');
     const [[locCount]] = await db.execute('SELECT COUNT(*) total FROM transit_locations WHERE status="Active"');
-    const [[annCount]] = await db.execute('SELECT COUNT(*) active FROM announcements WHERE status="Active"');
+    const [[annCount]] = await db.execute("SELECT COUNT(*) active FROM announcements WHERE status IN ('Active', 'Updated', 'Temporary', 'Published')");
     const [[repCount]] = await db.execute('SELECT COUNT(*) pending FROM reports WHERE status="pending"');
     const [recentActivity] = await db.execute('SELECT id, route_id routeId, action, detail, admin_by `by`, created_at at FROM admin_activity ORDER BY created_at DESC LIMIT 10');
 
@@ -898,6 +898,182 @@ async function snapToRoad(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ─────────────────────────────────────────────
+// SEARCH ANALYTICS
+// ─────────────────────────────────────────────
+async function getAnalytics(req, res, next) {
+  try {
+    const days = parseInt(req.query.days || '30', 10);
+    
+    // Daily searches
+    const [dailyRows] = await db.execute(`
+      SELECT DATE_FORMAT(created_at, '%Y-%m-%d') as date, COUNT(*) as searches
+      FROM searches
+      WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+      GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
+      ORDER BY date ASC
+    `, [days]);
+
+    // Fill missing days with 0 so the chart displays continuous timeline
+    const dailyMap = new Map(dailyRows.map(r => [r.date, Number(r.searches)]));
+    const dailySearches = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      dailySearches.push({ date: key, searches: dailyMap.get(key) || 0 });
+    }
+
+    // Hourly distribution
+    const [hourlyRows] = await db.execute(`
+      SELECT HOUR(created_at) as h, COUNT(*) as searches
+      FROM searches
+      GROUP BY h
+      ORDER BY h ASC
+    `);
+    const hourlyMap = new Map(hourlyRows.map(r => [Number(r.h), Number(r.searches)]));
+    const hourlySearches = [];
+    for (let h = 0; h < 24; h++) {
+      const hourStr = h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`;
+      hourlySearches.push({ hour: hourStr, searches: hourlyMap.get(h) || 0 });
+    }
+
+    // Popular destinations
+    const [popularDestinations] = await db.execute(`
+      SELECT destination as name,
+             COUNT(*) as searches30,
+             SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as searches7,
+             0.0 as \`change\`
+      FROM searches
+      WHERE destination IS NOT NULL AND TRIM(destination) != ''
+      GROUP BY destination
+      ORDER BY searches30 DESC
+      LIMIT 10
+    `);
+
+    // Frequent routes
+    const [frequentRoutes] = await db.execute(`
+      SELECT COALESCE(r.code, s.route_id) as routeId,
+             COUNT(*) as searches30,
+             SUM(CASE WHEN s.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as searches7,
+             0.0 as \`change\`
+      FROM searches s
+      LEFT JOIN routes r ON s.route_id = r.id
+      WHERE s.route_id IS NOT NULL
+      GROUP BY routeId
+      ORDER BY searches30 DESC
+      LIMIT 10
+    `);
+
+    // Recent searches
+    const [recentSearches] = await db.execute(`
+      SELECT s.id, s.current_location as \`from\`, s.destination as \`to\`,
+             COALESCE(r.code, 'No direct route') as \`match\`,
+             s.created_at as \`at\`,
+             (s.route_id IS NOT NULL) as found
+      FROM searches s
+      LEFT JOIN routes r ON s.route_id = r.id
+      ORDER BY s.created_at DESC
+      LIMIT 20
+    `);
+
+    // Summary KPIs
+    const [[summary]] = await db.execute(`
+      SELECT
+        COUNT(*) as total30,
+        SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as total7,
+        SUM(CASE WHEN route_id IS NULL THEN 1 ELSE 0 END) as noResult30,
+        SUM(CASE WHEN route_id IS NULL AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as noResult7
+      FROM searches
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+    `);
+
+    const total30 = summary?.total30 || 0;
+    const total7 = summary?.total7 || 0;
+    const noResult30 = summary?.noResult30 || 0;
+    const noResult7 = summary?.noResult7 || 0;
+
+    res.json({
+      dailySearches,
+      hourlySearches,
+      popularDestinations,
+      frequentRoutes,
+      recentSearches,
+      summary: {
+        sessions30: total30,
+        sessions7: total7,
+        noResultRate30: total30 > 0 ? Math.round((noResult30 / total30) * 1000) / 10 : 0,
+        noResultRate7: total7 > 0 ? Math.round((noResult7 / total7) * 1000) / 10 : 0,
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─────────────────────────────────────────────
+// ADMIN USERS
+// ─────────────────────────────────────────────
+async function getUsers(req, res, next) {
+  try {
+    const [rows] = await db.execute(
+      'SELECT id, username, email, name, role, phone, created_at as createdAt, "Active" as status FROM admin_users ORDER BY name'
+    );
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateProfile(req, res, next) {
+  try {
+    const { name, email, phone } = req.body;
+    const id = req.body.id || req.admin?.id;
+    if (id) {
+      await db.execute('UPDATE admin_users SET name = ?, email = ?, phone = ? WHERE id = ?', [name, email, phone, id]);
+    } else {
+      await db.execute('UPDATE admin_users SET phone = ?, name = ? WHERE email = ?', [phone, name, email]);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function changePassword(req, res, next) {
+  try {
+    const { currentPassword, newPassword, email } = req.body;
+    const [[user]] = await db.execute('SELECT * FROM admin_users WHERE email = ?', [email]);
+    if (!user || user.password !== currentPassword) {
+      return res.status(400).json({ ok: false, error: 'Current password is incorrect' });
+    }
+    await db.execute('UPDATE admin_users SET password = ? WHERE id = ?', [newPassword, user.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getOfflineStats(req, res, next) {
+  try {
+    const [[rCount]] = await db.execute('SELECT COUNT(*) as count FROM routes WHERE status = "Active"');
+    const [[lCount]] = await db.execute('SELECT COUNT(*) as count FROM transit_locations WHERE status = "Active"');
+    const [[fCount]] = await db.execute('SELECT COUNT(*) as count FROM admin_fares WHERE status = "Current"');
+    const [[aCount]] = await db.execute("SELECT COUNT(*) as count FROM announcements WHERE status IN ('Active', 'Updated', 'Temporary', 'Published')");
+    const [[devCount]] = await db.execute('SELECT COUNT(*) as count FROM devices');
+
+    res.json({
+      routesCount: rCount.count,
+      locationsCount: lCount.count,
+      faresCount: fCount.count,
+      announcementsCount: aCount.count,
+      activeDevices: devCount.count,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   login,
   getOverview,
@@ -909,6 +1085,8 @@ module.exports = {
   getActivity, logActivity,
   getRouteDirections, saveRouteDirections, generateGeometry, verifyRoute,
   snapToRoad,
+  // Analytics & Users
+  getAnalytics, getUsers, updateProfile, changePassword, getOfflineStats,
   // Location Verification
   getVerificationLocations, geocodeLocation, verifyLocation,
   createVerificationLocation, deleteVerificationLocation,
