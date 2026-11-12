@@ -128,18 +128,6 @@ fun RoutesScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
-
-                        IconButton(
-                            onClick = { viewModel.refresh() },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Refresh routes",
-                                tint = if (viewModel.isRefreshing) Brand600 else InkMuted,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
