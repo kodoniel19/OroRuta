@@ -21,6 +21,29 @@ function Free-Port($port) {
 Free-Port 3000
 Free-Port 5173
 
+# 0. Ensure MySQL Server is running on port 3306
+$mysqlConn = Get-NetTCPConnection -LocalPort 3306 -State Listen -ErrorAction SilentlyContinue
+if (-not $mysqlConn) {
+    Write-Host "MySQL is not running. Starting MySQL server..." -ForegroundColor Yellow
+    $mysqldPath = "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe"
+    $dataPath = "$PSScriptRoot\mysql_data"
+    if (Test-Path $mysqldPath) {
+        Invoke-WmiMethod -Class Win32_Process -Name Create -ArgumentList "`"$mysqldPath`" --datadir=`"$dataPath`"" | Out-Null
+        $attempts = 0
+        while ($attempts -lt 10) {
+            Start-Sleep -Seconds 1
+            $mysqlConn = Get-NetTCPConnection -LocalPort 3306 -State Listen -ErrorAction SilentlyContinue
+            if ($mysqlConn) { break }
+            $attempts++
+        }
+    }
+}
+if ($mysqlConn) {
+    Write-Host "[OK] MySQL Database is ready on port 3306." -ForegroundColor Green
+} else {
+    Write-Host "Warning: Could not automatically start MySQL. Make sure MySQL is running on port 3306." -ForegroundColor Red
+}
+
 # 1. Setup ADB Reverse for mobile app
 & "$PSScriptRoot\setup-adb-reverse.ps1"
 
