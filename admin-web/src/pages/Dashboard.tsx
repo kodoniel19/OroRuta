@@ -1,9 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts';
-import {
   ArrowRightIcon, BusFrontIcon, MegaphoneIcon, MapPinIcon, AlertCircleIcon,
   ActivityIcon, TrendingUpIcon, TrendingDownIcon, PlusIcon,
 } from 'lucide-react';
@@ -15,7 +12,6 @@ import { RouteChip } from '../components/ui/RouteChip';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useSimulatedLoad } from '../hooks/useSimulatedLoad';
-import { api, type AnalyticsData } from '../services/api';
 import { announcementTypes } from '../data/announcementTypes';
 import { formatRelative, formatDateTime } from '../utils/format';
 import { format } from 'date-fns';
@@ -67,28 +63,12 @@ export function Dashboard() {
   const { routes, locations, announcements, reports, activity } = useData();
   const navigate = useNavigate();
   const loading = useSimulatedLoad(500);
-  const [analytics, setAnalytics] = React.useState<AnalyticsData | null>(null);
-
-  React.useEffect(() => {
-    api.analytics.get(14)
-      .then(setAnalytics)
-      .catch(() => {
-        api.analytics.getSearches()
-          .then((data) => setAnalytics(data))
-          .catch((err) => console.error('Failed to load search analytics:', err));
-      });
-  }, []);
 
   const colorOf = (id: string) => routes.find((r) => r.id === id || r.code === id)?.color;
   const ofKind = (kind: string) => locations.filter((l) => l.kind === kind);
   const activeOf = (kind: string) => ofKind(kind).filter((l) => l.status === 'Active').length;
   const published = announcements.filter((a) => ['Active', 'Updated', 'Temporary', 'Published'].includes(a.status));
   const pending = reports.filter((r) => r.status === 'Pending').length;
-
-  const chartData = (analytics?.dailySearches ?? []).slice(-14).map(d => ({
-    date: d.date,
-    searches: d.searches,
-  }));
 
   const recentActivity = [...activity]
     .sort((a, b) => b.at.localeCompare(a.at))
@@ -136,69 +116,8 @@ export function Dashboard() {
           icon={<AlertCircleIcon className="h-4 w-4" />} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        {/* Search trend chart */}
-        <Panel title="Search activity (14 days)" description="Route searches from the OroRuta Android app"
-          className="xl:col-span-2">
-          <div className="h-56 px-2 pb-4 pt-5">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke="#E3E6EB" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8A93A3' }} axisLine={false} tickLine={false}
-                  interval={2} />
-                <YAxis tick={{ fontSize: 11, fill: '#8A93A3' }} axisLine={false} tickLine={false} width={38} />
-                <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #E3E6EB', fontSize: 12 }}
-                  formatter={(v: number) => [v.toLocaleString(), 'Searches']} />
-                <Area type="monotone" dataKey="searches" stroke="#0B6E4F" strokeWidth={2.5}
-                  fill="#0B6E4F" fillOpacity={0.07} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Panel>
-
-        {/* Active announcements */}
-        <Panel title={`Active announcements (${published.length})`}
-          actions={<Link to="/announcements" className="flex items-center gap-1 text-xs text-primary-600 hover:underline">Manage <ArrowRightIcon className="h-3.5 w-3.5" /></Link>}>
-          {published.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <MegaphoneIcon className="h-8 w-8 text-fg-subtle mb-2" />
-              <p className="text-sm text-fg-muted">No active announcements</p>
-              <Button size="sm" className="mt-3" onClick={() => navigate('/announcements')}>Create one</Button>
-            </div>
-          ) : (
-            <ul className="divide-y divide-line">
-              {published.slice(0, 5).map(a => {
-                const meta = announcementTypes.find(t => t.type === a.type) ?? announcementTypes[announcementTypes.length - 1];
-                return (
-                  <li key={a.id} className="flex items-start gap-3 px-5 py-3.5">
-                    <span className={cn('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', meta.className)}>
-                      <meta.icon className="h-3.5 w-3.5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-1 text-sm font-medium text-fg">{a.title}</p>
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-fg-subtle">
-                        <span>{a.type}</span>
-                        <span>·</span>
-                        <span>{a.startDate}</span>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-              {published.length > 5 && (
-                <li className="px-5 py-2.5">
-                  <Link to="/announcements" className="text-xs text-primary-600 hover:underline">
-                    +{published.length - 5} more
-                  </Link>
-                </li>
-              )}
-            </ul>
-          )}
-        </Panel>
-      </div>
-
-      {/* Route summary + activity log */}
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-2">
+        {/* Route network */}
         <Panel title="Route network"
           actions={<Link to="/routes" className="flex items-center gap-1 text-xs text-primary-600 hover:underline">Manage routes <ArrowRightIcon className="h-3.5 w-3.5" /></Link>}>
           <table className="w-full text-sm">
@@ -236,6 +155,49 @@ export function Dashboard() {
           )}
         </Panel>
 
+        {/* Active announcements */}
+        <Panel title={`Active announcements (${published.length})`}
+          actions={<Link to="/announcements" className="flex items-center gap-1 text-xs text-primary-600 hover:underline">Manage <ArrowRightIcon className="h-3.5 w-3.5" /></Link>}>
+          {published.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <MegaphoneIcon className="h-8 w-8 text-fg-subtle mb-2" />
+              <p className="text-sm text-fg-muted">No active announcements</p>
+              <Button size="sm" className="mt-3" onClick={() => navigate('/announcements')}>Create one</Button>
+            </div>
+          ) : (
+            <ul className="divide-y divide-line">
+              {published.slice(0, 7).map(a => {
+                const meta = announcementTypes.find(t => t.type === a.type) ?? announcementTypes[announcementTypes.length - 1];
+                return (
+                  <li key={a.id} className="flex items-start gap-3 px-5 py-3.5">
+                    <span className={cn('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', meta.className)}>
+                      <meta.icon className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-sm font-medium text-fg">{a.title}</p>
+                      <div className="mt-0.5 flex items-center gap-2 text-xs text-fg-subtle">
+                        <span>{a.type}</span>
+                        <span>·</span>
+                        <span>{a.startDate}</span>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+              {published.length > 7 && (
+                <li className="px-5 py-2.5">
+                  <Link to="/announcements" className="text-xs text-primary-600 hover:underline">
+                    +{published.length - 7} more
+                  </Link>
+                </li>
+              )}
+            </ul>
+          )}
+        </Panel>
+      </div>
+
+      {/* Activity log */}
+      <div className="mt-6">
         <Panel title="Recent activity"
           description="Last admin actions on routes and data"
           actions={<span className="flex h-7 w-7 items-center justify-center rounded-lg bg-canvas"><ActivityIcon className="h-4 w-4 text-fg-muted" /></span>}>
