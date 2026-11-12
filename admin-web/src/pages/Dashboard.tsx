@@ -15,7 +15,7 @@ import { RouteChip } from '../components/ui/RouteChip';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useSimulatedLoad } from '../hooks/useSimulatedLoad';
-import { dailySearches } from '../data/analytics';
+import { api, type AnalyticsData } from '../services/api';
 import { announcementTypes } from '../data/announcementTypes';
 import { formatRelative, formatDateTime } from '../utils/format';
 import { format } from 'date-fns';
@@ -67,14 +67,19 @@ export function Dashboard() {
   const { routes, locations, announcements, reports, activity } = useData();
   const navigate = useNavigate();
   const loading = useSimulatedLoad(500);
+  const [analytics, setAnalytics] = React.useState<AnalyticsData | null>(null);
 
-  const colorOf = (id: string) => routes.find((r) => r.id === id)?.color;
+  React.useEffect(() => {
+    api.analytics.get(14).then(setAnalytics).catch(() => {});
+  }, []);
+
+  const colorOf = (id: string) => routes.find((r) => r.id === id || r.code === id)?.color;
   const ofKind = (kind: string) => locations.filter((l) => l.kind === kind);
   const activeOf = (kind: string) => ofKind(kind).filter((l) => l.status === 'Active').length;
-  const published = announcements.filter((a) => a.status === 'Published');
+  const published = announcements.filter((a) => ['Active', 'Updated', 'Temporary', 'Published'].includes(a.status));
   const pending = reports.filter((r) => r.status === 'Pending').length;
 
-  const chartData = dailySearches.slice(-14).map(d => ({
+  const chartData = (analytics?.dailySearches ?? []).map(d => ({
     date: d.date,
     searches: d.searches,
   }));
@@ -205,7 +210,7 @@ export function Dashboard() {
                   onClick={() => navigate('/routes')}>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
-                      <RouteChip id={r.id} color={r.color} />
+                      <RouteChip id={r.id} code={r.code} color={r.color} />
                       <span className="truncate text-fg font-medium max-w-[12rem]">{r.name}</span>
                     </div>
                   </td>
@@ -238,7 +243,7 @@ export function Dashboard() {
               {recentActivity.map(log => (
                 <li key={log.id} className="flex items-start gap-3 py-3.5">
                   <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-canvas ring-1 ring-inset ring-line">
-                    <RouteChip id={log.routeId} color={colorOf(log.routeId)} className="h-4 text-[10px]" />
+                    <RouteChip id={log.routeId} code={routes.find(rt => rt.id === log.routeId || rt.code === log.routeId)?.code} color={colorOf(log.routeId)} className="h-4 text-[10px]" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-fg">

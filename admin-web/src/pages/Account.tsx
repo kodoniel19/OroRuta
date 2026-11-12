@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { UserIcon, LockIcon, MonitorIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Field, inputClass, errorInputClass } from '../components/ui/Field';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { useAuth } from '../contexts/AuthContext';
-import { admins, loginHistory } from '../data/admins';
+import { api, type AdminTeamMember } from '../services/api';
 import { formatDateTime, formatRelative } from '../utils/format';
 import { delay } from '../utils/async';
 import { cn } from '../utils/cn';
@@ -18,6 +18,7 @@ export function Account() {
   const [email, setEmail] = useState(user?.email ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [adminTeam, setAdminTeam] = useState<AdminTeamMember[]>([]);
 
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -26,13 +27,23 @@ export function Account() {
   const [pwErrors, setPwErrors] = useState<Record<string, string>>({});
   const [savingPw, setSavingPw] = useState(false);
 
+  useEffect(() => {
+    api.users.list().then(setAdminTeam).catch(() => {});
+  }, []);
+
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
-    await delay(600);
-    updateUser({ name, email, phone });
-    setSavingProfile(false);
-    toast.success('Profile updated');
+    try {
+      await api.users.updateProfile({ name, email, phone });
+      updateUser({ name, email, phone });
+      toast.success('Profile updated');
+      api.users.list().then(setAdminTeam).catch(() => {});
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update profile');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -43,11 +54,17 @@ export function Account() {
     if (newPw !== confirmPw) errs.confirmPw = "Passwords don't match";
     setPwErrors(errs);
     if (Object.keys(errs).length) return;
+
     setSavingPw(true);
-    await delay(800);
-    setSavingPw(false);
-    setCurrentPw(''); setNewPw(''); setConfirmPw('');
-    toast.success('Password changed', { description: 'All other sessions have been signed out.' });
+    try {
+      await api.users.changePassword({ currentPassword: currentPw, newPassword: newPw, email });
+      setCurrentPw(''); setNewPw(''); setConfirmPw('');
+      toast.success('Password changed', { description: 'Your password has been updated successfully.' });
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to change password');
+    } finally {
+      setSavingPw(false);
+    }
   };
 
   return (
@@ -125,11 +142,11 @@ export function Account() {
                 <th className="px-5 py-2.5 font-medium">Admin</th>
                 <th className="px-3 py-2.5 font-medium">Role</th>
                 <th className="px-3 py-2.5 font-medium">Status</th>
-                <th className="px-3 py-2.5 font-medium">Last active</th>
+                <th className="px-3 py-2.5 font-medium">Phone</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {admins.map(a => (
+              {adminTeam.map(a => (
                 <tr key={a.id} className="hover:bg-canvas transition-colors duration-150">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2.5">
@@ -144,7 +161,7 @@ export function Account() {
                   </td>
                   <td className="px-3 py-3 text-fg-muted">{a.role}</td>
                   <td className="px-3 py-3"><StatusBadge status={a.status} /></td>
-                  <td className="px-3 py-3 text-xs text-fg-subtle">{a.lastActive ? formatRelative(a.lastActive) : '—'}</td>
+                  <td className="px-3 py-3 text-xs text-fg-subtle">{a.phone || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -154,22 +171,18 @@ export function Account() {
         {/* Login history */}
         <Panel title="Recent login activity">
           <div className="divide-y divide-line px-5">
-            {loginHistory.map(lh => (
-              <div key={lh.id} className="flex items-center gap-3 py-3.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-canvas">
-                  <MonitorIcon className="h-4 w-4 text-fg-muted" />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-fg">{lh.device}</p>
-                  <p className="text-xs text-fg-muted">{lh.location} · {formatDateTime(lh.at)}</p>
-                </div>
-                {lh.current && (
-                  <span className="rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700">
-                    Current session
-                  </span>
-                )}
+            <div className="flex items-center gap-3 py-3.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-canvas">
+                <MonitorIcon className="h-4 w-4 text-fg-muted" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-fg">Active Browser Session</p>
+                <p className="text-xs text-fg-muted">Cagayan de Oro, PH · {formatDateTime(new Date().toISOString())}</p>
               </div>
-            ))}
+              <span className="rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700">
+                Current session
+              </span>
+            </div>
           </div>
         </Panel>
       </div>

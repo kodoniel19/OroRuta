@@ -18,6 +18,7 @@ async function list(req, res, next) {
     sql += " ORDER BY date DESC";
     const [rows] = await db.execute(sql, params);
     for (const a of rows) {
+      if (a.status === 'Published') a.status = 'Active';
       if (a.date) {
         if (typeof a.date === 'string') {
           a.date = a.date.split('T')[0];

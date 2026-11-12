@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,6 +48,8 @@ fun ResultsScreen(
     onNavigateRoutes: () -> Unit,
     onNavigateNearby: () -> Unit
 ) {
+    val context = LocalContext.current
+
     LaunchedEffect(from, to) {
         viewModel.searchTrips(from, to, viewModel.currentSort, fromLat, fromLng, toLat, toLng)
     }
@@ -216,12 +219,87 @@ fun ResultsScreen(
                 is Resource.Success -> {
                     val trips = state.data
                     if (trips.isEmpty()) {
+                        // Check if origin and destination are essentially the same location (< 300m)
+                        val isNearOrSame = remember(from, to, fromLat, fromLng, toLat, toLng) {
+                            if (from.isNotBlank() && to.isNotBlank() && from.trim().equals(to.trim(), ignoreCase = true)) {
+                                true
+                            } else if (fromLat != null && fromLng != null && toLat != null && toLng != null) {
+                                val dLat = Math.toRadians(toLat - fromLat)
+                                val dLng = Math.toRadians(toLng - fromLng)
+                                val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                                        Math.cos(Math.toRadians(fromLat)) * Math.cos(Math.toRadians(toLat)) *
+                                        Math.sin(dLng / 2) * Math.sin(dLng / 2)
+                                val distM = 6371000.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                                distM < 300
+                            } else {
+                                false
+                            }
+                        }
+
+                        // Approximate walking distance text
+                        val walkDistText = remember(fromLat, fromLng, toLat, toLng) {
+                            if (fromLat != null && fromLng != null && toLat != null && toLng != null) {
+                                val dLat = Math.toRadians(toLat - fromLat)
+                                val dLng = Math.toRadians(toLng - fromLng)
+                                val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                                        Math.cos(Math.toRadians(fromLat)) * Math.cos(Math.toRadians(toLat)) *
+                                        Math.sin(dLng / 2) * Math.sin(dLng / 2)
+                                val distM = 6371000.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                                "${distM.toInt()}m"
+                            } else "a few steps"
+                        }
+
                         // Check if destination is outside CDO service area
                         val isOutsideArea = remember(to, toLat, toLng) {
                             isOutsideCdoServiceArea(to, toLat, toLng)
                         }
 
-                        if (isOutsideArea) {
+                        if (isNearOrSame) {
+                            EmptyState(
+                                icon = Icons.Default.NearMe,
+                                title = "You\u2019re Already Here!",
+                                message = "Your destination is only $walkDistText away from your location. No jeepney ride is needed \u2014 it\u2019s a short walk away.",
+                                tone = EmptyTone.Brand,
+                                action = {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        OroButton(
+                                            text = "Walk There",
+                                            onClick = {
+                                                val tLat = toLat ?: return@OroButton
+                                                val tLng = toLng ?: return@OroButton
+                                                try {
+                                                    val uri = android.net.Uri.parse("google.navigation:q=$tLat,$tLng&mode=w")
+                                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                                        setPackage("com.google.android.apps.maps")
+                                                    }
+                                                    context.startActivity(intent)
+                                                } catch (_: Exception) {
+                                                    try {
+                                                        val uri = android.net.Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$tLat,$tLng&travelmode=walking")
+                                                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
+                                                    } catch (_: Exception) {}
+                                                }
+                                            },
+                                            variant = ButtonVariant.Primary,
+                                            size = ButtonSize.Md,
+                                            icon = Icons.Default.DirectionsWalk,
+                                            fullWidth = true
+                                        )
+                                        OroButton(
+                                            text = "Choose Another Destination",
+                                            onClick = onEditSearch,
+                                            variant = ButtonVariant.Ghost,
+                                            size = ButtonSize.Md,
+                                            fullWidth = true
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.padding(top = 32.dp)
+                            )
+                        } else if (isOutsideArea) {
                             EmptyState(
                                 icon = Icons.Default.LocationOff,
                                 title = "Destination Outside Service Area",

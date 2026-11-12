@@ -439,6 +439,7 @@ fun MapScreen(
                 CdoGeoStop("t2", "Agora Eastbound Terminal (Lapasan)", "terminal", 8.4907, 124.6610, "R1, B1, C1", "Lapasan"),
                 CdoGeoStop("pl-15", "St. Augustine Metropolitan Cathedral", "landmark", 8.4777, 124.6433, "R1, C1", "Poblacion"),
                 CdoGeoStop("l1", "Carmen Public Market", "loading", 8.4804, 124.6369, "R1, C1", "Carmen"),
+                CdoGeoStop("l5", "Liceo de Cagayan University", "loading", 8.4862, 124.6388, "R1, R2, C2", "Kauswagan"),
                 CdoGeoStop("l2", "Divisoria Plaza (Golden Friendship)", "loading", 8.4772, 124.6465, "R1, R2, C1", "Divisoria"),
                 CdoGeoStop("x1", "Velez-Recto Junction (Centrio / Gaisano)", "transfer", 8.4871, 124.6508, "R1, C1", "Recto"),
                 CdoGeoStop("u1", "Limketkai Center Drop-off", "unloading", 8.4842, 124.6568, "R1, R2", "Limketkai"),
@@ -1164,7 +1165,91 @@ fun MapScreen(
                             isOutsideCdoServiceArea(target.title, target.lat, target.lng)
                         }
 
+                        // Determine whether user is already at / very near the destination (< 300m)
+                        val isAlreadyNearDestination = remember(userLocation, target.lat, target.lng) {
+                            val uLat = userLocation?.latitude
+                            val uLng = userLocation?.longitude
+                            val tLat = target.lat
+                            val tLng = target.lng
+                            if (uLat != null && uLng != null && tLat != null && tLng != null) {
+                                val dLat = Math.toRadians(tLat - uLat)
+                                val dLng = Math.toRadians(tLng - uLng)
+                                val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                                        Math.cos(Math.toRadians(uLat)) * Math.cos(Math.toRadians(tLat)) *
+                                        Math.sin(dLng / 2) * Math.sin(dLng / 2)
+                                val distM = 6371000.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                                distM < 300
+                            } else false
+                        }
+
+                        // Walking distance text when near destination
+                        val walkDistText = remember(userLocation, target.lat, target.lng) {
+                            val uLat = userLocation?.latitude
+                            val uLng = userLocation?.longitude
+                            val tLat = target.lat
+                            val tLng = target.lng
+                            if (uLat != null && uLng != null && tLat != null && tLng != null) {
+                                val dLat = Math.toRadians(tLat - uLat)
+                                val dLng = Math.toRadians(tLng - uLng)
+                                val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                                        Math.cos(Math.toRadians(uLat)) * Math.cos(Math.toRadians(tLat)) *
+                                        Math.sin(dLng / 2) * Math.sin(dLng / 2)
+                                val distM = 6371000.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                                "${distM.toInt()}m"
+                            } else ""
+                        }
+
                         when {
+                            isAlreadyNearDestination -> {
+                                EmptyState(
+                                    icon = Icons.Default.NearMe,
+                                    title = "You\u2019re Already Here!",
+                                    message = "You are only ${walkDistText} from ${target.title}. No jeepney ride is needed \u2014 it\u2019s a short walk away.",
+                                    tone = EmptyTone.Brand,
+                                    action = {
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            OroButton(
+                                                text = "Walk There",
+                                                onClick = {
+                                                    nearbyRoutesTarget = null
+                                                    // Open walking navigation in Google Maps if available
+                                                    val tLat = target.lat ?: return@OroButton
+                                                    val tLng = target.lng ?: return@OroButton
+                                                    try {
+                                                        val uri = android.net.Uri.parse("google.navigation:q=$tLat,$tLng&mode=w")
+                                                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                                            setPackage("com.google.android.apps.maps")
+                                                        }
+                                                        context.startActivity(intent)
+                                                    } catch (_: Exception) {
+                                                        // Google Maps not installed, open browser
+                                                        try {
+                                                            val uri = android.net.Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$tLat,$tLng&travelmode=walking")
+                                                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                                                        } catch (_: Exception) {}
+                                                    }
+                                                },
+                                                variant = ButtonVariant.Primary,
+                                                size = ButtonSize.Sm,
+                                                icon = Icons.Default.DirectionsWalk
+                                            )
+                                            OroButton(
+                                                text = "Choose Another Destination",
+                                                onClick = {
+                                                    nearbyRoutesTarget = null
+                                                    onSearchClick?.invoke()
+                                                },
+                                                variant = ButtonVariant.Ghost,
+                                                size = ButtonSize.Sm
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+
                             target.isGpsBasedNearMe -> {
                                 // GPS-based "Near Me" search with no results
                                 EmptyState(

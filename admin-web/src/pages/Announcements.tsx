@@ -34,7 +34,7 @@ function AnnouncementForm({
   onClose: () => void;
   initial: Announcement | null;
   announcements: Announcement[];
-  routes: { id: string; name: string; color: string }[];
+  routes: { id: string; code?: string; name: string; color: string }[];
   onSave: (a: Announcement) => void;
 }) {
   const { user } = useAuth();
@@ -155,7 +155,7 @@ function AnnouncementForm({
               <label key={r.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-canvas">
                 <input type="checkbox" checked={affectedRoutes.includes(r.id)} onChange={() => toggleRoute(r.id)}
                   className="h-3.5 w-3.5 rounded border-line accent-primary-600" />
-                <RouteChip id={r.id} color={r.color} />
+                <RouteChip id={r.id} code={r.code} color={r.color} />
                 <span className="truncate text-fg-muted">{r.name}</span>
               </label>
             ))}
@@ -170,7 +170,7 @@ function AnnouncementDetail({
   announcement, routes, onClose,
 }: {
   announcement: Announcement | null;
-  routes: { id: string; name: string; color: string }[];
+  routes: { id: string; code?: string; name: string; color: string }[];
   onClose: () => void;
 }) {
   const lastRef = React.useRef<Announcement | null>(null);
@@ -207,8 +207,8 @@ function AnnouncementDetail({
               <p className="text-xs text-fg-muted mb-2">Affected routes</p>
               <div className="flex flex-wrap gap-2">
                 {shown.affectedRoutes.map(id => {
-                  const r = routes.find(rt => rt.id === id);
-                  return <RouteChip key={id} id={id} color={r?.color} />;
+                  const r = routes.find(rt => rt.id === id || rt.code === id);
+                  return <RouteChip key={id} id={id} code={r?.code} color={r?.color} />;
                 })}
               </div>
             </div>
@@ -223,18 +223,32 @@ export function Announcements() {
   const { announcements, setAnnouncements, routes } = useData();
   const loading = useSimulatedLoad();
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'All' | AnnouncementStatus>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Draft' | 'Inactive'>('All');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Announcement | null>(null);
 
+  const activeCount = useMemo(() => announcements.filter(a => ['Active', 'Updated', 'Temporary', 'Published'].includes(a.status)).length, [announcements]);
+  const draftCount = useMemo(() => announcements.filter(a => a.status === 'Draft').length, [announcements]);
+  const inactiveCount = useMemo(() => announcements.filter(a => ['Inactive', 'Expired'].includes(a.status)).length, [announcements]);
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
-    return announcements.filter(a =>
-      (statusFilter === 'All' || a.status === statusFilter) &&
-      (!q || a.title.toLowerCase().includes(q) || a.body.toLowerCase().includes(q) || a.type.toLowerCase().includes(q)),
-    );
+    return announcements.filter(a => {
+      let matchesStatus = true;
+      if (statusFilter === 'Active') {
+        matchesStatus = ['Active', 'Updated', 'Temporary', 'Published'].includes(a.status);
+      } else if (statusFilter === 'Draft') {
+        matchesStatus = a.status === 'Draft';
+      } else if (statusFilter === 'Inactive') {
+        matchesStatus = ['Inactive', 'Expired'].includes(a.status);
+      }
+      return (
+        matchesStatus &&
+        (!q || a.title.toLowerCase().includes(q) || a.body.toLowerCase().includes(q) || a.type.toLowerCase().includes(q))
+      );
+    });
   }, [announcements, query, statusFilter]);
 
   const viewing = announcements.find(a => a.id === viewingId) ?? null;
@@ -243,17 +257,17 @@ export function Announcements() {
     if (editing) {
       setAnnouncements(prev => prev.map(a => a.id === editing.id ? ann : a));
       api.announcements.update(editing.id, ann).catch(e => console.error('Announcement update error:', e));
-      toast.success(`${ann.id} ${ann.status === 'Published' ? 'published' : 'saved as draft'}`);
+      toast.success(`${ann.id} ${ann.status === 'Published' || ann.status === 'Active' ? 'published' : 'saved as draft'}`);
     } else {
       setAnnouncements(prev => [ann, ...prev]);
       api.announcements.create(ann).catch(e => console.error('Announcement create error:', e));
-      toast.success(`${ann.id} ${ann.status === 'Published' ? 'published' : 'created as draft'}`);
+      toast.success(`${ann.id} ${ann.status === 'Published' || ann.status === 'Active' ? 'published' : 'created as draft'}`);
     }
   };
 
   const quickPublish = (ann: Announcement) => {
-    setAnnouncements(prev => prev.map(a => a.id === ann.id ? { ...a, status: 'Published' as AnnouncementStatus, updatedAt: nowIso() } : a));
-    api.announcements.update(ann.id, { status: 'Published' as AnnouncementStatus }).catch(e => console.error('Announcement publish error:', e));
+    setAnnouncements(prev => prev.map(a => a.id === ann.id ? { ...a, status: 'Active' as AnnouncementStatus, updatedAt: nowIso() } : a));
+    api.announcements.update(ann.id, { status: 'Active' as AnnouncementStatus }).catch(e => console.error('Announcement publish error:', e));
     toast.success(`${ann.id} published — visible in the Android app`);
   };
 
@@ -274,7 +288,7 @@ export function Announcements() {
     <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
       <PageHeader
         title="Announcements"
-        description={`${announcements.filter(a => a.status === 'Published').length} published · ${announcements.filter(a => a.status === 'Draft').length} drafts`}
+        description={`${activeCount} active · ${draftCount} drafts`}
         actions={
           <Button icon={<PlusIcon className="h-4 w-4" />} onClick={() => { setEditing(null); setFormOpen(true); }}>
             New announcement
@@ -287,9 +301,9 @@ export function Announcements() {
           <SearchInput value={query} onChange={setQuery} placeholder="Search title, type, body…" className="w-full sm:w-72" />
           <SegmentedControl label="Filter by status" value={statusFilter} onChange={(v) => setStatusFilter(v as any)} options={[
             { value: 'All', label: 'All', count: announcements.length },
-            { value: 'Published', label: 'Published', count: announcements.filter(a => a.status === 'Published').length },
-            { value: 'Draft', label: 'Draft', count: announcements.filter(a => a.status === 'Draft').length },
-            { value: 'Inactive', label: 'Inactive', count: announcements.filter(a => a.status === 'Inactive').length },
+            { value: 'Active', label: 'Active', count: activeCount },
+            { value: 'Draft', label: 'Draft', count: draftCount },
+            { value: 'Inactive', label: 'Inactive', count: inactiveCount },
           ]} />
           <p className="ml-auto text-[13px] text-fg-muted">Showing {filtered.length} of {announcements.length}</p>
         </div>
@@ -332,9 +346,12 @@ export function Announcements() {
                         <>
                           <span>·</span>
                           <div className="flex gap-1">
-                            {a.affectedRoutes.slice(0, 3).map(id => (
-                              <RouteChip key={id} id={id} color={routes.find(r => r.id === id)?.color} />
-                            ))}
+                            {a.affectedRoutes.slice(0, 3).map(id => {
+                              const r = routes.find(rt => rt.id === id || rt.code === id);
+                              return (
+                                <RouteChip key={id} id={id} code={r?.code} color={r?.color} />
+                              );
+                            })}
                             {a.affectedRoutes.length > 3 && <span>+{a.affectedRoutes.length - 3}</span>}
                           </div>
                         </>
@@ -345,8 +362,11 @@ export function Announcements() {
                     {a.status === 'Draft' && (
                       <Button size="sm" onClick={() => quickPublish(a)}>Publish</Button>
                     )}
-                    {a.status === 'Published' && (
+                    {['Active', 'Updated', 'Temporary', 'Published'].includes(a.status) && (
                       <Button size="sm" variant="secondary" onClick={() => quickDeactivate(a)}>Deactivate</Button>
+                    )}
+                    {['Inactive', 'Expired'].includes(a.status) && (
+                      <Button size="sm" onClick={() => quickPublish(a)}>Activate</Button>
                     )}
                     <IconButton label={`Edit ${a.id}`} onClick={() => { setEditing(a); setFormOpen(true); }}>
                       <PencilIcon className="h-4 w-4" />

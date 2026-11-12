@@ -132,5 +132,12 @@ router.delete("/admin/verification/locations/:id", requireAdmin, admin.deleteVer
 router.post("/admin/verification/locations/bulk-validate", requireAdmin, admin.bulkValidateLocations);
 router.post("/admin/verification/locations/extract-from-routes", requireAdmin, admin.extractRouteLocations);
 
+// Admin Analytics, Users, and System Stats
+router.get("/admin/analytics", requireAdmin, admin.getAnalytics);
+router.get("/admin/users", requireAdmin, admin.getUsers);
+router.put("/admin/users/profile", requireAdmin, admin.updateProfile);
+router.post("/admin/users/change-password", requireAdmin, admin.changePassword);
+router.get("/admin/offline-stats", requireAdmin, admin.getOfflineStats);
+
 module.exports = router;
 

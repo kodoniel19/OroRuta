@@ -274,13 +274,35 @@ fun RouteInfoScreen(
 
                     // Helper to get descriptive stop/point names instead of generic corridors
                     fun getDescriptiveCdoStopName(lat: Double, lng: Double, defaultPrefix: String): String {
+                        val landmarks = listOf(
+                            Triple("Liceo de Cagayan University", 8.4862, 124.6388),
+                            Triple("Carmen Public Market", 8.479498, 124.63682),
+                            Triple("Centrio Mall", 8.4856, 124.6513),
+                            Triple("SM CDO Downtown", 8.4843, 124.6549),
+                            Triple("Limketkai Center", 8.4838, 124.6530),
+                            Triple("Cogon Market", 8.47716, 124.6512),
+                            Triple("Agora Terminal", 8.48813, 124.6580),
+                            Triple("Divisoria Plaza", 8.4777, 124.6452),
+                            Triple("Bulua Westbound Terminal", 8.5040, 124.6115),
+                            Triple("USTP Lapasan", 8.4852, 124.6572),
+                            Triple("Camp Evangelista", 8.4878, 124.6256),
+                            Triple("St. Augustine Cathedral", 8.4777, 124.6433),
+                            Triple("Xavier University", 8.4784, 124.6489)
+                        )
+                        for (lm in landmarks) {
+                            if (computeDistanceMeters(lat, lng, lm.second, lm.third) <= 250.0) {
+                                return "$defaultPrefix near ${lm.first}"
+                            }
+                        }
+
                         return when {
+                            lat in 8.484..8.495 && lng in 124.636..124.643 -> "$defaultPrefix along RN Pelaez Blvd (Liceo corridor)"
+                            lat in 8.475..8.4835 && lng in 124.630..124.639 -> "$defaultPrefix near Carmen Public Market area"
                             lat in 8.483..8.490 && lng in 124.648..124.660 -> "$defaultPrefix along CM Recto Ave (Centrio / SM Downtown area)"
                             lat in 8.480..8.488 && lng in 124.654..124.665 -> "$defaultPrefix along Limketkai / Lapasan corridor"
                             lat in 8.484..8.495 && lng in 124.656..124.672 -> "$defaultPrefix near Agora Terminal / Valenzuela Ave"
                             lat in 8.473..8.482 && lng in 124.642..124.655 -> "$defaultPrefix near Cogon Market area"
                             lat in 8.475..8.485 && lng in 124.638..124.648 -> "$defaultPrefix near Divisoria area"
-                            lat in 8.478..8.488 && lng in 124.630..124.640 -> "$defaultPrefix near Carmen Public Market area"
                             lat in 8.500..8.512 && lng in 124.605..124.625 -> "$defaultPrefix near Bulua Westbound Terminal corridor"
                             lat in 8.445..8.475 && lng in 124.615..124.635 -> "$defaultPrefix along Masterson Ave corridor"
                             lat in 8.490..8.505 && lng in 124.625..124.645 -> "$defaultPrefix along Kauswagan / Bonbon corridor"
@@ -418,7 +440,7 @@ fun RouteInfoScreen(
                         }
                     }
 
-                    val candidateBoardingStops = remember(route, routeGeomPts, selectedDirection, dropoffIdx) {
+                    val candidateBoardingStops = remember(route, routeGeomPts, selectedDirection, dropoffIdx, userLocation) {
                         val list = mutableListOf<RouteStopPoint>()
                         val rawStops = mutableListOf<RouteStopPoint>()
 
@@ -442,6 +464,23 @@ fun RouteInfoScreen(
                                 }
                             } else {
                                 list.add(s)
+                            }
+                        }
+
+                        // If user is near the route line before drop-off, ensure the closest roadside corridor boarding point is available
+                        val uLoc = userLocation
+                        if (uLoc != null && routeGeomPts.isNotEmpty()) {
+                            val uIdx = routeGeomPts.indices.minByOrNull {
+                                computeDistanceMeters(routeGeomPts[it].latitude, routeGeomPts[it].longitude, uLoc.latitude, uLoc.longitude)
+                            } ?: 0
+                            val uDist = computeDistanceMeters(routeGeomPts[uIdx].latitude, routeGeomPts[uIdx].longitude, uLoc.latitude, uLoc.longitude)
+                            if (uDist <= 850.0 && (dropoffIdx <= 0 || uIdx < dropoffIdx)) {
+                                val uPt = routeGeomPts[uIdx]
+                                val hasNearbyCandidate = list.any { computeDistanceMeters(it.lat, it.lng, uPt.latitude, uPt.longitude) <= 80.0 }
+                                if (!hasNearbyCandidate) {
+                                    val stopTitle = getDescriptiveCdoStopName(uPt.latitude, uPt.longitude, "Boarding point")
+                                    list.add(RouteStopPoint("corridor_board_${selectedDirection.lowercase()}", stopTitle, "loading", uPt.latitude, uPt.longitude, "Verified Corridor Boarding"))
+                                }
                             }
                         }
 
@@ -469,19 +508,55 @@ fun RouteInfoScreen(
                         list
                     }
 
-                    // 4. Select nearest valid boarding stop
+                    // 4. Select nearest valid boarding stop based on user GPS and verified stops
                     val nearestBoardingStop = remember(initialBoardingLat, initialBoardingLng, initialBoardingName, candidateBoardingStops, userLocation, routeGeomPts, isInitialDir, dropoffIdx, selectedDirection) {
+                        fun sanitizeBoardingName(name: String?, lat: Double, lng: Double): String {
+                            val descName = getDescriptiveCdoStopName(lat, lng, "Loading point")
+                            if (name.isNullOrBlank()) return descName
+                            val distToCarmen = computeDistanceMeters(lat, lng, 8.479498, 124.636820)
+                            val distToLiceo = computeDistanceMeters(lat, lng, 8.4862, 124.6388)
+                            if (name.contains("Carmen", ignoreCase = true) && distToCarmen > 350.0 && distToLiceo <= 300.0) {
+                                return "Liceo de Cagayan Loading Zone"
+                            }
+                            if (name.contains("Carmen", ignoreCase = true) && distToCarmen > 400.0) {
+                                return descName
+                            }
+                            return name
+                        }
+
                         val hasValidInitialBoard = isInitialDir && initialBoardingLat != null && initialBoardingLng != null &&
                                 initialBoardingLat != 0.0 && initialBoardingLng != 0.0 &&
                                 (initialBoardingName == null || !initialBoardingName.contains("Miami", ignoreCase = true)) &&
                                 (routeGeomPts.isEmpty() || (routeGeomPts.minOfOrNull { computeDistanceMeters(it.latitude, it.longitude, initialBoardingLat, initialBoardingLng) } ?: Double.MAX_VALUE) <= 120.0)
 
-                        if (hasValidInitialBoard) {
+                        val uLoc = userLocation
+                        if (uLoc != null && candidateBoardingStops.isNotEmpty()) {
+                            val nearestToUser = candidateBoardingStops.minByOrNull {
+                                computeDistanceMeters(uLoc.latitude, uLoc.longitude, it.lat, it.lng)
+                            }
+                            if (hasValidInitialBoard) {
+                                val bIdx = if (routeGeomPts.isNotEmpty()) {
+                                    routeGeomPts.indices.minByOrNull { computeDistanceMeters(routeGeomPts[it].latitude, routeGeomPts[it].longitude, initialBoardingLat!!, initialBoardingLng!!) } ?: 0
+                                } else 0
+                                val distToUserInitial = computeDistanceMeters(uLoc.latitude, uLoc.longitude, initialBoardingLat!!, initialBoardingLng!!)
+                                val distToUserNearest = nearestToUser?.let { computeDistanceMeters(uLoc.latitude, uLoc.longitude, it.lat, it.lng) } ?: Double.MAX_VALUE
+
+                                if ((dropoffIdx <= 0 || bIdx < dropoffIdx) && distToUserInitial <= distToUserNearest + 50.0) {
+                                    val safeName = sanitizeBoardingName(initialBoardingName, initialBoardingLat!!, initialBoardingLng!!)
+                                    RouteStopPoint("initial_board", safeName, "loading", initialBoardingLat!!, initialBoardingLng!!, "Selected Boarding Point")
+                                } else {
+                                    nearestToUser ?: candidateBoardingStops.first()
+                                }
+                            } else {
+                                nearestToUser ?: candidateBoardingStops.first()
+                            }
+                        } else if (hasValidInitialBoard) {
                             val bIdx = if (routeGeomPts.isNotEmpty()) {
                                 routeGeomPts.indices.minByOrNull { computeDistanceMeters(routeGeomPts[it].latitude, routeGeomPts[it].longitude, initialBoardingLat!!, initialBoardingLng!!) } ?: 0
                             } else 0
                             if (dropoffIdx <= 0 || bIdx < dropoffIdx) {
-                                RouteStopPoint("initial_board", initialBoardingName ?: "Boarding Stop", "loading", initialBoardingLat!!, initialBoardingLng!!, "Selected Boarding Point")
+                                val safeName = sanitizeBoardingName(initialBoardingName, initialBoardingLat!!, initialBoardingLng!!)
+                                RouteStopPoint("initial_board", safeName, "loading", initialBoardingLat!!, initialBoardingLng!!, "Selected Boarding Point")
                             } else {
                                 candidateBoardingStops.firstOrNull() ?: RouteStopPoint("start_${selectedDirection.lowercase()}", "Boarding Point", "loading", routeGeomPts.first().latitude, routeGeomPts.first().longitude, "Route Origin")
                             }

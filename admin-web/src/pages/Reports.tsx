@@ -33,7 +33,7 @@ function ReportDetailDrawer({
   onAddNote,
 }: {
   report: UserReport | null;
-  routes: { id: string; name: string; color: string }[];
+  routes: { id: string; code?: string; name: string; color: string }[];
   onClose: () => void;
   onStatusChange: (id: string, status: ReportStatus) => void;
   onAddNote: (id: string, text: string) => void;
@@ -100,7 +100,7 @@ function ReportDetailDrawer({
             {servedRoute && (
               <div className="col-span-2">
                 <dt className="text-xs text-fg-muted mb-1">Related Route</dt>
-                <dd><RouteChip id={servedRoute.id} color={servedRoute.color} /></dd>
+                <dd><RouteChip id={servedRoute.id} code={servedRoute.code} color={servedRoute.color} /></dd>
               </div>
             )}
           </dl>
@@ -219,7 +219,7 @@ export function Reports() {
                       <span className="font-mono text-xs text-fg-muted">{r.id}</span>
                       <StatusBadge status={r.status} />
                       <span className="rounded-full bg-canvas px-2 py-0.5 text-xs text-fg ring-1 ring-inset ring-line">{r.category}</span>
-                      {route && <RouteChip id={route.id} color={route.color} />}
+                      {route && <RouteChip id={route.id} code={route.code} color={route.color} />}
                     </div>
                     <p className="mt-1.5 text-sm font-medium text-fg line-clamp-2">{r.message}</p>
                     <div className="mt-1.5 flex items-center gap-3 text-xs text-fg-subtle flex-wrap">

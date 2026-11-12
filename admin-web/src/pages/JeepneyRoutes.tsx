@@ -213,7 +213,7 @@ export function JeepneyRoutes() {
                   <tr key={r.id} className="cursor-pointer transition-colors duration-150 hover:bg-canvas"
                     onClick={() => setViewingId(r.id)}>
                     <td className="px-4 py-3.5">
-                      <RouteChip id={r.id} color={r.color} />
+                      <RouteChip id={r.id} code={r.code} color={r.color} />
                     </td>
                     <td className="px-4 py-3.5">
                       <p className="max-w-[200px] truncate font-medium text-fg">{r.name}</p>

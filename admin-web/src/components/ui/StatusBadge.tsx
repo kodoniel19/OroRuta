@@ -5,7 +5,9 @@ type Tone = 'success' | 'neutral' | 'warn' | 'info' | 'danger';
 
 const toneByStatus: Record<string, Tone> = {
   Active: 'success', Published: 'success', Resolved: 'success', Current: 'success', Invited: 'info',
-  Inactive: 'neutral', Archived: 'neutral', Draft: 'neutral', Superseded: 'neutral',
+  Updated: 'info',
+  Temporary: 'warn',
+  Inactive: 'neutral', Archived: 'neutral', Draft: 'neutral', Superseded: 'neutral', Expired: 'neutral',
   Pending: 'warn', 'Under Review': 'warn', Outdated: 'warn',
   Verified: 'info', Scheduled: 'info', Building: 'info',
   Rejected: 'danger', Failed: 'danger',

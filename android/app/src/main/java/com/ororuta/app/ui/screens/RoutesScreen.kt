@@ -34,6 +34,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ororuta.app.domain.fare.PassengerCategory
 import com.ororuta.app.domain.fare.TraditionalJeepneyFareService
 import com.ororuta.app.domain.models.Resource
@@ -50,6 +53,20 @@ fun RoutesScreen(
     onSelectRoute: (routeId: String) -> Unit
 ) {
     val state = viewModel.routesState
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Automatically refresh routes whenever user enters or resumes this screen
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshSilently()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -97,6 +114,30 @@ fun RoutesScreen(
                                 text = "Official routes in Cagayan de Oro City",
                                 fontSize = 12.sp,
                                 color = InkMuted
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.refresh() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh routes",
+                                tint = if (viewModel.isRefreshing) Brand600 else InkMuted,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.refresh() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh routes",
+                                tint = if (viewModel.isRefreshing) Brand600 else InkMuted,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }

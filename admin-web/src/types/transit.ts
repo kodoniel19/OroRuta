@@ -81,7 +81,7 @@ export type AnnouncementType =
   | 'Terminal Change'
   | 'Loading/Unloading Change'
   | 'General Update';
-export type AnnouncementStatus = 'Draft' | 'Published' | 'Inactive';
+export type AnnouncementStatus = 'Active' | 'Updated' | 'Temporary' | 'Expired' | 'Published' | 'Draft' | 'Inactive';
 
 export interface Announcement {
   id: string;

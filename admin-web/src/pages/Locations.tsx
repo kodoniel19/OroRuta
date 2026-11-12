@@ -244,8 +244,8 @@ export function Locations({ kind }: LocationsProps) {
                     <td className="px-3 py-3.5">
                       <div className="flex flex-wrap gap-1">
                         {item.routeIds.slice(0, 4).map((rid) => {
-                          const r = routes.find((rt) => rt.id === rid);
-                          return <RouteChip key={rid} id={rid} color={r?.color} />;
+                          const r = routes.find((rt) => rt.id === rid || rt.code === rid);
+                          return <RouteChip key={rid} id={rid} code={r?.code} color={r?.color} />;
                         })}
                         {item.routeIds.length > 4 && (
                           <span className="rounded bg-canvas px-1.5 py-0.5 text-xs text-fg-muted">

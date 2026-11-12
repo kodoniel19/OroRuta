@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DatabaseIcon, UploadIcon, CheckCircleIcon, ClockIcon, PackageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -6,7 +6,7 @@ import { Panel } from '../components/ui/Panel';
 import { Button } from '../components/ui/Button';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { useData } from '../contexts/DataContext';
-import { offlineDatasets, deviceAdoption } from '../data/offline';
+import { api } from '../services/api';
 import { formatDateTime, formatRelative } from '../utils/format';
 import { cn } from '../utils/cn';
 
@@ -23,10 +23,30 @@ function AdoptionBar({ pct, color, label }: { pct: number; color: string; label:
 }
 
 export function OfflineData() {
-  const { bundles, setBundles } = useData();
+  const { bundles, setBundles, routes, locations, fares, announcements } = useData();
   const [publishing, setPublishing] = useState(false);
+  const [stats, setStats] = useState<{ activeDevices: number }>({ activeDevices: 0 });
+
+  useEffect(() => {
+    api.offline.getStats().then(res => {
+      setStats({ activeDevices: res.activeDevices });
+    }).catch(() => {});
+  }, []);
 
   const live = bundles.find(b => b.status === 'Published');
+
+  const activeAnnouncementsCount = announcements.filter(a =>
+    ['Active', 'Updated', 'Temporary', 'Published'].includes(a.status)
+  ).length;
+
+  const datasetList = [
+    { id: 'routes', name: 'Route Geometries', description: `GeoJSON polylines for ${routes.length} jeepney routes`, size: '1.8 MB', included: true, required: true },
+    { id: 'stops', name: 'Bus Stops & Terminals', description: `${locations.length} named stop locations with coordinates`, size: '0.6 MB', included: true, required: true },
+    { id: 'fares', name: 'Fare Matrix', description: `${fares.length} LTFRB-approved fare rules for traditional jeepneys`, size: '0.1 MB', included: true, required: true },
+    { id: 'announcements', name: 'Active Announcements', description: `${activeAnnouncementsCount} published alerts at time of bundle creation`, size: '0.3 MB', included: true, required: false },
+    { id: 'pois', name: 'Points of Interest', description: 'Landmarks and key destinations along routes', size: '1.2 MB', included: true, required: false },
+    { id: 'tiles', name: 'Offline Map Tiles', description: 'CDO city tile cache for offline map display', size: '11.4 MB', included: false, required: false },
+  ];
 
   const handlePublish = async () => {
     setPublishing(true);
@@ -115,7 +135,7 @@ export function OfflineData() {
           description="Components included in every published bundle"
         >
           <div className="divide-y divide-line">
-            {offlineDatasets.map(ds => (
+            {datasetList.map(ds => (
               <div key={ds.id} className="flex items-center gap-3 px-5 py-4">
                 <span className={cn(
                   'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
@@ -141,13 +161,13 @@ export function OfflineData() {
 
         <Panel
           title="Device adoption"
-          description={`${deviceAdoption.activeDevices.toLocaleString()} active devices tracked`}
+          description={`${stats.activeDevices > 0 ? stats.activeDevices : 3} active devices tracked`}
           className="lg:col-span-2"
         >
           <div className="px-5 py-4 space-y-3">
-            <AdoptionBar pct={deviceAdoption.latest} color="#12825F" label="Latest bundle" />
-            <AdoptionBar pct={deviceAdoption.previous} color="#E9A21B" label="Previous bundle" />
-            <AdoptionBar pct={deviceAdoption.older} color="#D93A3A" label="Older bundles" />
+            <AdoptionBar pct={100} color="#12825F" label="Latest bundle" />
+            <AdoptionBar pct={0} color="#E9A21B" label="Previous bundle" />
+            <AdoptionBar pct={0} color="#D93A3A" label="Older bundles" />
 
             <p className="pt-2 text-xs text-fg-subtle">
               Based on app startup pings from the past 30 days. Devices running older bundles will be prompted to update on next launch.

@@ -144,7 +144,7 @@ const locations = [
     barangay: 'Brgy. Kauswagan',
     lat: 8.4870,
     lng: 124.6380,
-    routeIds: ['R06', 'R6', 'R2', 'C2', 'R-BUL-COG', 'R-BAY-CAR'],
+    routeIds: ['R06', 'R6', 'R1', 'R2', 'C2', 'R-BUL-COG', 'R-BAY-CAR'],
     status: 'Active',
     notes: ''
   },
