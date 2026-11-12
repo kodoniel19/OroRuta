@@ -574,9 +574,27 @@ class RoutesViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             isRefreshing = true
-            loadRoutes(debounceMs = 0L)
-            delay(400L)
-            isRefreshing = false
+            try {
+                val hasUpdates = selectedFilter == "Updated"
+                val freshRoutes = routeRepo.refreshRemoteRoutes(searchQuery, "", hasUpdates)
+                if (freshRoutes != null) {
+                    val traditionalOnly = freshRoutes.filter {
+                        it.jeepneyType.isBlank() ||
+                        it.jeepneyType.equals("Traditional", ignoreCase = true)
+                    }
+                    val finalFiltered = when (selectedFilter) {
+                        "Popular" -> traditionalOnly.filter { isPopularRoute(it) }
+                        "Updated" -> traditionalOnly.filter { it.hasUpdates || it.status != "Active" || it.announcements.isNotEmpty() }
+                        else -> traditionalOnly
+                    }
+                    routesState = Resource.Success(finalFiltered, isOffline = false)
+                } else {
+                    loadRoutes(debounceMs = 0L)
+                }
+            } finally {
+                delay(300L)
+                isRefreshing = false
+            }
         }
     }
 
@@ -584,19 +602,21 @@ class RoutesViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val hasUpdates = selectedFilter == "Updated"
-                routeRepo.getRoutes(searchQuery, "", hasUpdates).collect { res ->
-                    if (res is Resource.Success) {
-                        val traditionalOnly = res.data.filter {
-                            it.jeepneyType.isBlank() ||
-                            it.jeepneyType.equals("Traditional", ignoreCase = true)
-                        }
-                        val finalFiltered = if (selectedFilter == "Popular") {
-                            traditionalOnly.filter { isPopularRoute(it) }
-                        } else {
-                            traditionalOnly
-                        }
-                        routesState = Resource.Success(finalFiltered, res.isOffline)
-                    }
+                val freshRoutes = routeRepo.refreshRemoteRoutes(searchQuery, "", hasUpdates) ?: return@launch
+                val traditionalOnly = freshRoutes.filter {
+                    it.jeepneyType.isBlank() ||
+                    it.jeepneyType.equals("Traditional", ignoreCase = true)
+                }
+                val finalFiltered = when (selectedFilter) {
+                    "Popular" -> traditionalOnly.filter { isPopularRoute(it) }
+                    "Updated" -> traditionalOnly.filter { it.hasUpdates || it.status != "Active" || it.announcements.isNotEmpty() }
+                    else -> traditionalOnly
+                }
+
+                // Smooth update: only reassign routesState if the list actually changed (route added/removed/status changed)
+                val current = (routesState as? Resource.Success)?.data
+                if (current == null || current != finalFiltered) {
+                    routesState = Resource.Success(finalFiltered, isOffline = false)
                 }
             } catch (_: Exception) {}
         }
@@ -652,8 +672,9 @@ class RouteInfoViewModel @Inject constructor(
 
     fun loadRoute(id: String) {
         viewModelScope.launch {
-            routeState = Resource.Loading
-            routeState = routeRepo.getRoute(id)
+            routeRepo.getRouteStream(id).collect { freshState ->
+                routeState = freshState
+            }
         }
         startPolling(id)
     }
@@ -662,8 +683,8 @@ class RouteInfoViewModel @Inject constructor(
         pollJob?.cancel()
         pollJob = viewModelScope.launch {
             while (isActive) {
-                delay(3000L)
-                val fresh = routeRepo.getRoute(id)
+                delay(15000L)
+                val fresh = routeRepo.getRoute(id, forceRefresh = true)
                 if (fresh is Resource.Success) {
                     routeState = fresh
                 }

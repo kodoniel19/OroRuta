@@ -8,8 +8,11 @@ import com.ororuta.app.data.remote.OroRutaApi
 import com.ororuta.app.domain.models.Resource
 import com.ororuta.app.domain.models.Route
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
@@ -48,19 +51,20 @@ class RouteRepository @Inject constructor(
             val prefs = context.getSharedPreferences("ororuta_cache_prefs", Context.MODE_PRIVATE)
             val cachedVer = prefs.getInt("bundled_routes_version", 0)
             val existing = dao.getAllSync()
-            if (cachedVer >= BUNDLED_DATA_VERSION && existing.size >= 89) {
+            if (cachedVer >= BUNDLED_DATA_VERSION && existing.isNotEmpty()) {
                 isCacheSeeded = true
                 return
             }
 
-            context.assets.open("bundled_routes.json").use { stream ->
-                val text = stream.bufferedReader().use { it.readText() }
-                val routes = json.decodeFromString<List<Route>>(text)
-                if (routes.isNotEmpty()) {
-                    dao.clearAll()
-                    dao.insertAll(routes.map { it.toCached() })
-                    memoryRoutesCache = routes
-                    prefs.edit().putInt("bundled_routes_version", BUNDLED_DATA_VERSION).apply()
+            if (existing.isEmpty() || cachedVer < BUNDLED_DATA_VERSION) {
+                context.assets.open("bundled_routes.json").use { stream ->
+                    val text = stream.bufferedReader().use { it.readText() }
+                    val routes = json.decodeFromString<List<Route>>(text)
+                    if (routes.isNotEmpty()) {
+                        dao.replaceAll(routes.map { it.toCached() })
+                        memoryRoutesCache = routes
+                        prefs.edit().putInt("bundled_routes_version", BUNDLED_DATA_VERSION).apply()
+                    }
                 }
             }
             isCacheSeeded = true
@@ -146,15 +150,15 @@ class RouteRepository @Inject constructor(
         // sync live without being blocked by network capability false-negatives (e.g. adb reverse).
         try {
             val remote = api.getRoutes(q, type, if (hasUpdates) "true" else "")
-            if (remote.isNotEmpty()) {
-                if (q.isBlank() && type.isBlank() && !hasUpdates) {
-                    memoryRoutesCache = remote
-                    dao.clearAll()
-                } else {
-                    val remoteMap = remote.associateBy { it.id }
-                    memoryRoutesCache = memoryRoutesCache?.map { remoteMap[it.id] ?: it }
-                }
+            if (q.isBlank() && type.isBlank() && !hasUpdates) {
+                memoryRoutesCache = remote
+                dao.replaceAll(remote.map { it.toCached() })
+            } else if (remote.isNotEmpty()) {
+                val remoteMap = remote.associateBy { it.id }
+                memoryRoutesCache = memoryRoutesCache?.map { remoteMap[it.id] ?: it }
                 dao.insertAll(remote.map { it.toCached() })
+            }
+            if (remote.isNotEmpty() || (memoryRoutesCache?.isNotEmpty() == true)) {
                 val filtered = filterRoutes(remote, q, type, hasUpdates)
                 emit(Resource.Success(filtered, isOffline = false))
             } else if (memoryRoutesCache.isNullOrEmpty() && dao.getAllSync().isEmpty()) {
@@ -168,10 +172,98 @@ class RouteRepository @Inject constructor(
         }
     }
 
-    suspend fun getRoute(id: String): Resource<Route> {
+    /**
+     * Directly fetches latest routes from the API and atomically updates database & memory cache.
+     * Returns the fresh filtered route list, or null if network failed.
+     */
+    suspend fun refreshRemoteRoutes(q: String = "", type: String = "", hasUpdates: Boolean = false): List<Route>? {
+        return try {
+            val remote = api.getRoutes(q, type, if (hasUpdates) "true" else "")
+            if (q.isBlank() && type.isBlank() && !hasUpdates) {
+                memoryRoutesCache = remote
+                dao.replaceAll(remote.map { it.toCached() })
+            } else {
+                val remoteMap = remote.associateBy { it.id }
+                memoryRoutesCache = memoryRoutesCache?.map { remoteMap[it.id] ?: it }
+                dao.insertAll(remote.map { it.toCached() })
+            }
+            filterRoutes(remote, q, type, hasUpdates)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Fast synchronously accessible route from in-memory cache, SQLite database, or bundled JSON.
+     */
+    suspend fun getCachedRoute(id: String): Route? {
         ensureInitialCache()
 
-        // 1. Attempt API fetch for freshest geometry and status
+        // 1. In-memory cache
+        val inMem = memoryRoutesCache?.firstOrNull { it.id == id || it.code.equals(id, true) }
+        if (inMem != null) return inMem
+
+        // 2. Local SQLite Room database
+        val cached = dao.getById(id) ?: dao.getAllSync().firstOrNull { it.code.equals(id, true) }
+        if (cached != null) {
+            val route = safeDecode(cached)
+            if (route != null) return route
+        }
+
+        // 3. Search in bundled_routes.json asset directly
+        try {
+            context.assets.open("bundled_routes.json").use { stream ->
+                val text = stream.bufferedReader().use { it.readText() }
+                val routes = json.decodeFromString<List<Route>>(text)
+                val matching = routes.firstOrNull { it.id == id || it.code.equals(id, true) }
+                if (matching != null) {
+                    dao.insert(matching.toCached())
+                    return matching
+                }
+            }
+        } catch (_: Exception) {}
+
+        return null
+    }
+
+    /**
+     * Stale-while-revalidate route stream: emits cached route immediately (0ms)
+     * so UI displays instantly, followed by freshest remote route from API.
+     */
+    fun getRouteStream(id: String): Flow<Resource<Route>> = flow {
+        val cached = getCachedRoute(id)
+        if (cached != null) {
+            emit(Resource.Success(cached, isOffline = !networkMonitor.isOnline()))
+        } else {
+            emit(Resource.Loading)
+        }
+
+        try {
+            val remote = api.getRoute(id)
+            dao.insert(remote.toCached())
+            memoryRoutesCache = memoryRoutesCache?.map { if (it.id == remote.id) remote else it }
+            emit(Resource.Success(remote, isOffline = false))
+        } catch (e: Exception) {
+            if (cached == null) {
+                emit(Resource.Error(classifyError(e), isOffline = true))
+            }
+        }
+    }
+
+    suspend fun getRoute(id: String, forceRefresh: Boolean = false): Resource<Route> {
+        val cached = getCachedRoute(id)
+        if (cached != null && !forceRefresh) {
+            // Return cached route immediately; trigger background refresh if online
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val remote = api.getRoute(id)
+                    dao.insert(remote.toCached())
+                    memoryRoutesCache = memoryRoutesCache?.map { if (it.id == remote.id) remote else it }
+                } catch (_: Exception) {}
+            }
+            return Resource.Success(cached, isOffline = !networkMonitor.isOnline())
+        }
+
         try {
             val remote = api.getRoute(id)
             dao.insert(remote.toCached())
@@ -179,35 +271,9 @@ class RouteRepository @Inject constructor(
             return Resource.Success(remote, isOffline = false)
         } catch (_: Exception) {}
 
-        // 2. Fallback: Check in-memory cache
-        val inMem = memoryRoutesCache?.firstOrNull { it.id == id }
-            ?: memoryRoutesCache?.firstOrNull { it.code.equals(id, true) }
-        if (inMem != null) {
-            return Resource.Success(inMem, isOffline = !networkMonitor.isOnline())
-        }
-
-        // 3. Fallback: Check local SQLite Room database
-        val cached = dao.getById(id) ?: dao.getAllSync().firstOrNull { it.code.equals(id, true) }
         if (cached != null) {
-            val route = safeDecode(cached)
-            if (route != null) {
-                return Resource.Success(route, isOffline = !networkMonitor.isOnline())
-            }
+            return Resource.Success(cached, isOffline = !networkMonitor.isOnline())
         }
-
-        // 4. Fallback: Search in bundled_routes.json asset directly
-        try {
-            context.assets.open("bundled_routes.json").use { stream ->
-                val text = stream.bufferedReader().use { it.readText() }
-                val routes = json.decodeFromString<List<Route>>(text)
-                val matching = routes.firstOrNull { it.id == id }
-                    ?: routes.firstOrNull { it.code.equals(id, true) }
-                if (matching != null) {
-                    dao.insert(matching.toCached())
-                    return Resource.Success(matching, isOffline = true)
-                }
-            }
-        } catch (_: Exception) {}
 
         return Resource.Error("Route not available offline.", isOffline = true)
     }

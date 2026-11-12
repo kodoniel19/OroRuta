@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,6 +21,8 @@ import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +31,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,6 +51,7 @@ import com.ororuta.app.ui.components.StatusPill
 import com.ororuta.app.ui.theme.*
 import com.ororuta.app.ui.viewmodels.RoutesViewModel
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun RoutesScreen(
     viewModel: RoutesViewModel,
@@ -54,6 +59,19 @@ fun RoutesScreen(
 ) {
     val state = viewModel.routesState
     val lifecycleOwner = LocalLifecycleOwner.current
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    if (pullToRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.refresh()
+        }
+    }
+
+    LaunchedEffect(viewModel.isRefreshing) {
+        if (!viewModel.isRefreshing) {
+            pullToRefreshState.endRefresh()
+        }
+    }
 
     // Automatically refresh routes whenever user enters or resumes this screen
     DisposableEffect(lifecycleOwner) {
@@ -254,6 +272,7 @@ fun RoutesScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .nestedScroll(pullToRefreshState.nestedScrollConnection)
                 .background(Canvas)
         ) {
             when (state) {
@@ -350,12 +369,21 @@ fun RoutesScreen(
                             }
 
                             items(routes, key = { it.id }) { route ->
-                                CompactRouteCard(route = route, onClick = { onSelectRoute(route.id) })
+                                Box(modifier = Modifier.animateItemPlacement()) {
+                                    CompactRouteCard(route = route, onClick = { onSelectRoute(route.id) })
+                                }
                             }
                         }
                     }
                 }
             }
+
+            PullToRefreshContainer(
+                state = pullToRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = Color.White,
+                contentColor = Brand600
+            )
         }
     }
 }
