@@ -54,19 +54,71 @@ async function list(req, res, next) {
        [rows] = await db.execute(sql, []);
     }
 
-    await Promise.all(rows.map(async (r) => {
-      const [[tCount]] = await db.execute("SELECT COUNT(*) cnt FROM route_terminals WHERE route_id = ?", [r.id]);
-      const [[lCount]] = await db.execute("SELECT COUNT(*) cnt FROM loading_points WHERE route_id = ?", [r.id]);
-      r.terminal_count = tCount.cnt;
-      r.stop_count = lCount.cnt;
+    // High-performance bulk hydration: 11 bulk queries instead of 979 individual per-route queries
+    if (rows.length === 0) {
+      return res.json([]);
+    }
+
+    const [
+      [tCounts],
+      [lCounts],
+      [allDirections],
+      [allGeometries],
+      [allRoads],
+      [allTerminals],
+      [allStops],
+      [allTransfers],
+      [allLandmarks],
+      [allAnns],
+      [allActivities]
+    ] = await Promise.all([
+      db.execute("SELECT route_id, COUNT(*) cnt FROM route_terminals GROUP BY route_id"),
+      db.execute("SELECT route_id, COUNT(*) cnt FROM loading_points GROUP BY route_id"),
+      db.execute("SELECT * FROM route_directions"),
+      db.execute("SELECT * FROM route_geometry"),
+      db.execute("SELECT rmr.route_id, mr.* FROM major_roads mr JOIN route_major_roads rmr ON rmr.road_id = mr.id ORDER BY rmr.seq"),
+      db.execute("SELECT rt.route_id, t.* FROM terminals t JOIN route_terminals rt ON rt.terminal_id = t.id ORDER BY rt.seq"),
+      db.execute("SELECT * FROM loading_points ORDER BY name"),
+      db.execute("SELECT * FROM transfer_points ORDER BY name"),
+      db.execute("SELECT rl.route_id, l.* FROM landmarks l JOIN route_landmarks rl ON rl.landmark_id = l.id ORDER BY rl.seq"),
+      db.execute("SELECT ar.route_id, a.id, a.title, a.date, a.category, a.description, a.effective, a.status FROM announcements a JOIN announcement_routes ar ON ar.announcement_id = a.id WHERE a.status IN ('Active', 'Published') ORDER BY a.date DESC").catch(() => [[]]),
+      db.execute("SELECT DISTINCT route_id FROM admin_activity WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)").catch(() => [[]])
+    ]);
+
+    const tCountMap = new Map(tCounts.map(tc => [tc.route_id, tc.cnt]));
+    const lCountMap = new Map(lCounts.map(lc => [lc.route_id, lc.cnt]));
+    const actSet = new Set(allActivities.map(a => a.route_id));
+
+    const groupBy = (items, key = 'route_id') => {
+      const m = new Map();
+      for (const item of items) {
+        const k = item[key];
+        let arr = m.get(k);
+        if (!arr) { arr = []; m.set(k, arr); }
+        arr.push(item);
+      }
+      return m;
+    };
+
+    const dirMap = groupBy(allDirections);
+    const geomMap = groupBy(allGeometries);
+    const roadMap = groupBy(allRoads);
+    const termMap = groupBy(allTerminals);
+    const stopMap = groupBy(allStops);
+    const transMap = groupBy(allTransfers);
+    const lmMap = groupBy(allLandmarks);
+    const annMap = groupBy(allAnns);
+
+    const now = new Date();
+
+    for (const r of rows) {
+      r.terminal_count = tCountMap.get(r.id) || 0;
+      r.stop_count = lCountMap.get(r.id) || 0;
       r.is_popular = Boolean(r.is_popular);
 
-      // Directions
-      const [directions] = await db.execute("SELECT * FROM route_directions WHERE route_id = ?", [r.id]);
-      r.directions = directions;
+      r.directions = dirMap.get(r.id) || [];
 
-      // Geometries
-      const [geometries] = await db.execute("SELECT * FROM route_geometry WHERE route_id = ?", [r.id]);
+      const geometries = geomMap.get(r.id) || [];
       for (const g of geometries) {
         if (g.geometry && typeof g.geometry === 'object') {
           g.geometry = JSON.stringify(g.geometry);
@@ -74,77 +126,42 @@ async function list(req, res, next) {
       }
       r.geometries = geometries;
 
-      // Construct path for legacy compatibility
       r.path = [];
       if (geometries && geometries.length > 0) {
-        // Just take inbound for the preview path
         const inbound = geometries.find(g => g.direction === 'Inbound') || geometries[0];
         if (inbound && inbound.geometry) {
-            try {
-                const geom = typeof inbound.geometry === 'string' ? JSON.parse(inbound.geometry) : inbound.geometry;
-                if (geom.coordinates) {
-                    r.path = geom.coordinates.map((c, i) => ({ route_id: r.id, seq: i, lat: c[1], lng: c[0], map_x: 0, map_y: 0 }));
-                }
-            } catch(e) {}
+          try {
+            const geom = typeof inbound.geometry === 'string' ? JSON.parse(inbound.geometry) : inbound.geometry;
+            if (geom.coordinates) {
+              r.path = geom.coordinates.map((c, i) => ({ route_id: r.id, seq: i, lat: c[1], lng: c[0], map_x: 0, map_y: 0 }));
+            }
+          } catch(e) {}
         }
       }
 
-      // Legacy fallback
       r.direction = "Loop";
       r.length_km = Math.max(parseFloat(r.inbound_distance_km) || 0, parseFloat(r.outbound_distance_km) || 0);
+      r.roads = roadMap.get(r.id) || [];
 
-      // Major roads
-      const [roads] = await db.execute(
-        `SELECT mr.* FROM major_roads mr
-         JOIN route_major_roads rmr ON rmr.road_id = mr.id
-         WHERE rmr.route_id = ? ORDER BY rmr.seq`, [r.id]);
-      r.roads = roads;
-
-      // Traditional jeepney fare estimate
       const km = r.length_km || 5;
       const fareRes = calculateTraditionalFare(km, "Regular", r.jeepney_type);
       r.fare = fareRes.selectedCategoryFare ?? 13.00;
       r.discountedFare = fareRes.discountedFare ?? 10.40;
 
-      // Terminals
-      const [terminals] = await db.execute(
-        `SELECT t.* FROM terminals t
-         JOIN route_terminals rt ON rt.terminal_id = t.id
-         WHERE rt.route_id = ? ORDER BY rt.seq`, [r.id]);
-      r.terminals = terminals;
+      r.terminals = termMap.get(r.id) || [];
+      r.stops = stopMap.get(r.id) || [];
+      r.transfers = transMap.get(r.id) || [];
+      r.landmarks = lmMap.get(r.id) || [];
 
-      const [stops] = await db.execute("SELECT * FROM loading_points WHERE route_id = ? ORDER BY name", [r.id]);
-      r.stops = stops;
-
-      const [transfers] = await db.execute("SELECT * FROM transfer_points WHERE route_id = ? ORDER BY name", [r.id]);
-      r.transfers = transfers;
-
-      const [landmarks] = await db.execute(
-        `SELECT l.* FROM landmarks l
-         JOIN route_landmarks rl ON rl.landmark_id = l.id
-         WHERE rl.route_id = ? ORDER BY rl.seq`, [r.id]);
-      r.landmarks = landmarks;
-
-      // Active announcements affecting this route
-      const [routeAnns] = await db.execute(
-        `SELECT a.id, a.title, a.date, a.category, a.description, a.effective, a.status FROM announcements a
-         JOIN announcement_routes ar ON ar.announcement_id = a.id
-         WHERE (ar.route_id = ? OR ar.route_id = ?) AND a.status IN ('Active', 'Published')
-         ORDER BY a.date DESC`,
-        [r.id, r.code]
-      ).catch(() => [[]]);
+      const routeAnns = (annMap.get(r.id) || []).concat(annMap.get(r.code) || []);
       r.announcements = routeAnns;
 
-      // Has updates flag
-      const [actRows] = await db.execute(
-        "SELECT id FROM admin_activity WHERE (route_id = ? OR route_id = ?) AND created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) LIMIT 1",
-        [r.id, r.code]
-      ).catch(() => [[]]);
-      const isRecentlyUpdated = r.last_updated_at && (new Date() - new Date(r.last_updated_at)) < (7 * 24 * 60 * 60 * 1000);
-      r.has_updates = Boolean(r.status !== 'Active' || actRows.length > 0 || routeAnns.length > 0 || isRecentlyUpdated);
+      const isRecentlyUpdated = r.last_updated_at && (now - new Date(r.last_updated_at)) < (7 * 24 * 60 * 60 * 1000);
+      const hasAct = actSet.has(r.id) || actSet.has(r.code);
+      r.has_updates = Boolean(r.status !== 'Active' || hasAct || routeAnns.length > 0 || isRecentlyUpdated);
 
       r.travelTime = Math.round((r.length_km || 5) * 3.5);
-    }));
+    }
     res.json(rows);
   } catch (err) { next(err); }
 }

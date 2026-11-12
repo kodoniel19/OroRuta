@@ -86,6 +86,12 @@ interface AnnouncementDao {
     @Query("DELETE FROM cached_announcements")
     suspend fun clearAll()
 
+    @Transaction
+    suspend fun replaceAll(items: List<CachedAnnouncement>) {
+        clearAll()
+        insertAll(items)
+    }
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: CachedAnnouncement)
 

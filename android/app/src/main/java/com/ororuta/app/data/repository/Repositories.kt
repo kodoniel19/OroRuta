@@ -962,42 +962,72 @@ class AnnouncementRepository @Inject constructor(
     private val dao: AnnouncementDao,
     private val json: Json
 ) {
-    fun getAnnouncements(status: String? = null): Flow<Resource<List<Announcement>>> = flow {
-        // Emit cached first if available so UI renders immediately
+    @Volatile
+    private var memoryAnnouncementsCache: List<Announcement>? = null
+
+    suspend fun getCachedAnnouncements(status: String? = null): List<Announcement> {
+        val inMem = memoryAnnouncementsCache
+        if (!inMem.isNullOrEmpty()) {
+            return if (status.isNullOrBlank()) inMem
+            else inMem.filter { it.status.equals(status, ignoreCase = true) }
+        }
+
         val cached = if (status.isNullOrBlank()) dao.getAllSync() else dao.getByStatusSync(status)
+        val decoded = cached.mapNotNull { safeDecode(it) }
+        if (decoded.isNotEmpty() && status.isNullOrBlank()) {
+            memoryAnnouncementsCache = decoded
+        }
+        return decoded
+    }
+
+    suspend fun refreshRemoteAnnouncements(status: String? = null): List<Announcement>? {
+        val queryStatus = status?.takeIf { it.isNotBlank() } ?: ""
+        return try {
+            val remote = api.getAnnouncements(queryStatus)
+            if (queryStatus.isBlank()) {
+                memoryAnnouncementsCache = remote
+                dao.replaceAll(remote.map {
+                    CachedAnnouncement(
+                        id = it.id,
+                        title = it.title,
+                        date = it.date,
+                        category = it.category,
+                        status = it.status,
+                        jsonData = json.encodeToString(it)
+                    )
+                })
+            } else {
+                dao.insertAll(remote.map {
+                    CachedAnnouncement(
+                        id = it.id,
+                        title = it.title,
+                        date = it.date,
+                        category = it.category,
+                        status = it.status,
+                        jsonData = json.encodeToString(it)
+                    )
+                })
+            }
+            remote
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun getAnnouncements(status: String? = null): Flow<Resource<List<Announcement>>> = flow {
+        // Emit cached first immediately (0ms delay) so UI renders instantly
+        val cached = getCachedAnnouncements(status)
         if (cached.isNotEmpty()) {
-            val list = cached.mapNotNull { safeDecode(it) }
-            emit(Resource.Success(list, isOffline = true))
+            emit(Resource.Success(cached, isOffline = true))
         } else {
             emit(Resource.Loading)
         }
 
-        val queryStatus = status?.takeIf { it.isNotBlank() } ?: ""
-        try {
-            val remote = api.getAnnouncements(queryStatus)
-            // When querying full list, clear stale cache so deleted announcements vanish!
-            if (queryStatus.isBlank()) {
-                dao.clearAll()
-            }
-            dao.insertAll(remote.map {
-                CachedAnnouncement(
-                    id = it.id,
-                    title = it.title,
-                    date = it.date,
-                    category = it.category,
-                    status = it.status,
-                    jsonData = json.encodeToString(it)
-                )
-            })
+        val remote = refreshRemoteAnnouncements(status)
+        if (remote != null) {
             emit(Resource.Success(remote, isOffline = false))
-        } catch (e: IOException) {
-            if (cached.isEmpty()) {
-                emit(Resource.Error("You are offline. Connect to the internet to load transportation updates.", isOffline = true))
-            }
-        } catch (e: Exception) {
-            if (cached.isEmpty()) {
-                emit(Resource.Error(e.message ?: "Could not load updates"))
-            }
+        } else if (cached.isEmpty()) {
+            emit(Resource.Error("You are offline. Connect to the internet to load transportation updates.", isOffline = true))
         }
     }
 

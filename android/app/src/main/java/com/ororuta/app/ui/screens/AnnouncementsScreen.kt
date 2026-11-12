@@ -1,5 +1,6 @@
 package com.ororuta.app.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -7,10 +8,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
@@ -18,6 +24,9 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Refresh
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ororuta.app.domain.models.Resource
 import com.ororuta.app.ui.components.*
 import com.ororuta.app.ui.theme.Brand600
@@ -25,12 +34,37 @@ import com.ororuta.app.ui.theme.Canvas
 import com.ororuta.app.ui.theme.InkMuted
 import com.ororuta.app.ui.viewmodels.AnnouncementsViewModel
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AnnouncementsScreen(
     viewModel: AnnouncementsViewModel,
     onBack: () -> Unit,
     onSelectAnnouncement: (String) -> Unit
 ) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshSilently()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    if (pullToRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.refresh()
+        }
+    }
+    LaunchedEffect(viewModel.isRefreshing) {
+        if (!viewModel.isRefreshing) {
+            pullToRefreshState.endRefresh()
+        }
+    }
+
     Scaffold(
         topBar = {
             Column {
@@ -43,7 +77,7 @@ fun AnnouncementsScreen(
                             Icon(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "Refresh",
-                                tint = Brand600
+                                tint = if (viewModel.isRefreshing) Brand600 else InkMuted
                             )
                         }
                     }
@@ -74,6 +108,7 @@ fun AnnouncementsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .nestedScroll(pullToRefreshState.nestedScrollConnection)
                 .background(Canvas)
         ) {
             when (val state = viewModel.announcementsState) {
@@ -154,17 +189,26 @@ fun AnnouncementsScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(announcements) { ann ->
-                                AnnouncementCard(
-                                    announcement = ann,
-                                    compact = false,
-                                    onClick = { onSelectAnnouncement(ann.id) }
-                                )
+                            items(announcements, key = { it.id }) { ann ->
+                                Box(modifier = Modifier.animateItemPlacement()) {
+                                    AnnouncementCard(
+                                        announcement = ann,
+                                        compact = false,
+                                        onClick = { onSelectAnnouncement(ann.id) }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+
+            PullToRefreshContainer(
+                state = pullToRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = Color.White,
+                contentColor = Brand600
+            )
         }
     }
 }
