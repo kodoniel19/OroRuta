@@ -26,11 +26,11 @@ Free-Port 5173
 
 # 2. Start Backend API
 Write-Host "Starting Backend API (Port 3000)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\backend'; Write-Host '--- OroRuta Backend API (Port 3000) ---' -ForegroundColor Cyan; npm run dev"
+Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-NoExit", "-Command", "cd '$PSScriptRoot\backend'; Write-Host '--- OroRuta Backend API (Port 3000) ---' -ForegroundColor Cyan; npm.cmd run dev"
 
 # 3. Start Admin Web
 Write-Host "Starting Admin Web Portal (Port 5173)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\admin-web'; Write-Host '--- OroRuta Admin Web (Port 5173) ---' -ForegroundColor Cyan; npm run dev"
+Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-NoExit", "-Command", "cd '$PSScriptRoot\admin-web'; Write-Host '--- OroRuta Admin Web (Port 5173) ---' -ForegroundColor Cyan; npm.cmd run dev"
 
 Write-Host ""
 Write-Host "[OK] Backend and Admin Web are now running in separate windows!" -ForegroundColor Green
