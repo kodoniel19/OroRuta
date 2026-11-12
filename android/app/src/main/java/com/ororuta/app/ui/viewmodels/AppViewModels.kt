@@ -1647,21 +1647,9 @@ class AnnouncementsViewModel @Inject constructor(
     var announcementsState by mutableStateOf<Resource<List<Announcement>>>(Resource.Loading)
     var selectedFilter by mutableStateOf("All") // All, Active, Updated, Temporary, Expired
     var isRefreshing by mutableStateOf(false)
-    private var pollJob: kotlinx.coroutines.Job? = null
 
     init {
         loadAnnouncements()
-        startAutoPolling()
-    }
-
-    fun startAutoPolling() {
-        pollJob?.cancel()
-        pollJob = viewModelScope.launch {
-            while (isActive) {
-                delay(6000L) // Poll every 6s to live-sync announcements from admin portal
-                refreshSilently()
-            }
-        }
     }
 
     fun setFilter(filter: String) {
@@ -1670,33 +1658,7 @@ class AnnouncementsViewModel @Inject constructor(
     }
 
     fun refresh() {
-        viewModelScope.launch {
-            isRefreshing = true
-            try {
-                val fresh = announcementRepo.refreshRemoteAnnouncements()
-                if (fresh != null) {
-                    allAnnouncements = fresh
-                    applyFilter()
-                } else {
-                    loadAnnouncements(forceRefresh = true)
-                }
-            } finally {
-                delay(300L)
-                isRefreshing = false
-            }
-        }
-    }
-
-    fun refreshSilently() {
-        viewModelScope.launch {
-            try {
-                val fresh = announcementRepo.refreshRemoteAnnouncements() ?: return@launch
-                if (allAnnouncements != fresh) {
-                    allAnnouncements = fresh
-                    applyFilter()
-                }
-            } catch (_: Exception) {}
-        }
+        loadAnnouncements(forceRefresh = true)
     }
 
     private fun applyFilter() {
@@ -1718,13 +1680,7 @@ class AnnouncementsViewModel @Inject constructor(
             if (forceRefresh) {
                 isRefreshing = true
             } else if (allAnnouncements.isEmpty()) {
-                val cached = announcementRepo.getCachedAnnouncements()
-                if (cached.isNotEmpty()) {
-                    allAnnouncements = cached
-                    applyFilter()
-                } else {
-                    announcementsState = Resource.Loading
-                }
+                announcementsState = Resource.Loading
             }
 
             announcementRepo.getAnnouncements(null).collect { res ->
