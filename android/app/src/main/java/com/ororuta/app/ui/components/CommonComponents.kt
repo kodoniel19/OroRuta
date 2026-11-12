@@ -195,9 +195,9 @@ fun RouteBadge(
 fun StatusPill(status: String, modifier: Modifier = Modifier) {
     val (bgColor, textColor) = when (status) {
         "Active", "Published" -> Pair(Ok50, Ok600)
-        "Rerouted" -> Pair(Warn50, Warn600)
-        "Updated" -> Pair(Brand50, Brand600)
-        "Temporary" -> Pair(Oro100, Oro700)
+        "Rerouted", "Reroute", "Road Closure" -> Pair(Warn50, Warn600)
+        "Advisory", "General Update", "Notice", "Temporary" -> Pair(Oro100, Oro700)
+        "Updated", "New", "Fare Update" -> Pair(Brand50, Brand600)
         else -> Pair(Line, InkMuted)
     }
 

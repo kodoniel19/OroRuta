@@ -70,7 +70,13 @@ export function Dashboard() {
   const [analytics, setAnalytics] = React.useState<AnalyticsData | null>(null);
 
   React.useEffect(() => {
-    api.analytics.get(14).then(setAnalytics).catch(() => {});
+    api.analytics.get(14)
+      .then(setAnalytics)
+      .catch(() => {
+        api.analytics.getSearches()
+          .then((data) => setAnalytics(data))
+          .catch((err) => console.error('Failed to load search analytics:', err));
+      });
   }, []);
 
   const colorOf = (id: string) => routes.find((r) => r.id === id || r.code === id)?.color;
@@ -79,7 +85,7 @@ export function Dashboard() {
   const published = announcements.filter((a) => ['Active', 'Updated', 'Temporary', 'Published'].includes(a.status));
   const pending = reports.filter((r) => r.status === 'Pending').length;
 
-  const chartData = (analytics?.dailySearches ?? []).map(d => ({
+  const chartData = (analytics?.dailySearches ?? []).slice(-14).map(d => ({
     date: d.date,
     searches: d.searches,
   }));

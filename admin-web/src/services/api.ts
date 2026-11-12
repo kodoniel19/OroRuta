@@ -79,6 +79,18 @@ export const api = {
     get: () => request<any>('/admin/overview'),
   },
 
+  // Search Analytics
+  analytics: {
+    getSearches: () => request<{
+      dailySearches: { date: string; rawDate: string; searches: number }[];
+      hourlySearches: { hour: string; searches: number }[];
+      popularDestinations: { name: string; searches30: number; searches7: number; change: number }[];
+      frequentRoutes: { routeId: string; name: string; searches30: number; searches7: number; change: number }[];
+      recentSearches: { id: string; from: string; to: string; match: string; at: string; found: boolean }[];
+      analyticsSummary: { sessions30: number; sessions7: number; noResultRate30: number; noResultRate7: number };
+    }>('/admin/analytics/searches'),
+  },
+
   // Routes
   routes: {
     list: () => request<JeepneyRoute[]>('/admin/routes'),
@@ -246,6 +258,7 @@ export const api = {
   // Analytics
   analytics: {
     get: (days: number = 30) => request<AnalyticsData>(`/admin/analytics?days=${days}`),
+    getSearches: () => request<AnalyticsData & { analyticsSummary?: any }>('/admin/analytics/searches'),
   },
 
   // Admin Users
@@ -274,6 +287,16 @@ export const api = {
         activeDevices: number;
       }>('/admin/offline-stats'),
   },
+
+  // Settings
+  settings: {
+    get: () => request<SystemSettings>('/admin/settings'),
+    update: (patch: Partial<SystemSettings>) =>
+      request<{ ok: boolean }>('/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify(patch),
+      }),
+  },
 };
 
 export interface AnalyticsData {
@@ -300,6 +323,16 @@ export interface AdminTeamMember {
   status: string;
   createdAt?: string;
   lastActive?: string;
+}
+
+export interface SystemSettings {
+  systemName: string;
+  apiUrl: string;
+  timezone: string;
+  maintenanceMode: boolean;
+  reportNotify: boolean;
+  offlineNotify: boolean;
+}
 }
 
 // Types for the verification system

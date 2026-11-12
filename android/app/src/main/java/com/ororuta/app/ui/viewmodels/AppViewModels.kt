@@ -621,10 +621,10 @@ class RoutesViewModel @Inject constructor(
                             it.jeepneyType.isBlank() ||
                             it.jeepneyType.equals("Traditional", ignoreCase = true)
                         }
-                        val finalFiltered = if (selectedFilter == "Popular") {
-                            traditionalOnly.filter { isPopularRoute(it) }
-                        } else {
-                            traditionalOnly
+                        val finalFiltered = when (selectedFilter) {
+                            "Popular" -> traditionalOnly.filter { isPopularRoute(it) }
+                            "Updated" -> traditionalOnly.filter { it.hasUpdates || it.status != "Active" || it.announcements.isNotEmpty() }
+                            else -> traditionalOnly
                         }
                         Resource.Success(finalFiltered, res.isOffline)
                     }
@@ -1683,6 +1683,20 @@ class AnnouncementsViewModel @Inject constructor(
                     }
                 }
             }
+        }
+    }
+}
+
+@HiltViewModel
+class AnnouncementDetailViewModel @Inject constructor(
+    private val announcementRepo: AnnouncementRepository
+) : ViewModel() {
+    var announcementState by mutableStateOf<Resource<Announcement>>(Resource.Loading)
+
+    fun loadAnnouncement(id: String) {
+        viewModelScope.launch {
+            announcementState = Resource.Loading
+            announcementState = announcementRepo.getAnnouncement(id)
         }
     }
 }

@@ -963,10 +963,22 @@ class AnnouncementRepository @Inject constructor(
     private val json: Json
 ) {
     fun getAnnouncements(status: String? = null): Flow<Resource<List<Announcement>>> = flow {
-        emit(Resource.Loading)
+        // Emit cached first if available so UI renders immediately
+        val cached = if (status.isNullOrBlank()) dao.getAllSync() else dao.getByStatusSync(status)
+        if (cached.isNotEmpty()) {
+            val list = cached.mapNotNull { safeDecode(it) }
+            emit(Resource.Success(list, isOffline = true))
+        } else {
+            emit(Resource.Loading)
+        }
+
         val queryStatus = status?.takeIf { it.isNotBlank() } ?: ""
         try {
             val remote = api.getAnnouncements(queryStatus)
+            // When querying full list, clear stale cache so deleted announcements vanish!
+            if (queryStatus.isBlank()) {
+                dao.clearAll()
+            }
             dao.insertAll(remote.map {
                 CachedAnnouncement(
                     id = it.id,
@@ -977,29 +989,41 @@ class AnnouncementRepository @Inject constructor(
                     jsonData = json.encodeToString(it)
                 )
             })
-            emit(Resource.Success(remote))
+            emit(Resource.Success(remote, isOffline = false))
         } catch (e: IOException) {
-            val cached = if (queryStatus.isNotBlank()) dao.getByStatusSync(queryStatus) else dao.getAllSync()
-            if (cached.isNotEmpty()) {
-                val list = cached.mapNotNull { safeDecode(it) }
-                emit(Resource.Success(list, isOffline = true))
-            } else {
+            if (cached.isEmpty()) {
                 emit(Resource.Error("You are offline. Connect to the internet to load transportation updates.", isOffline = true))
             }
         } catch (e: Exception) {
-            val cached = if (queryStatus.isNotBlank()) dao.getByStatusSync(queryStatus) else dao.getAllSync()
-            if (cached.isNotEmpty()) {
-                val list = cached.mapNotNull { safeDecode(it) }
-                emit(Resource.Success(list, isOffline = true))
-            } else {
+            if (cached.isEmpty()) {
                 emit(Resource.Error(e.message ?: "Could not load updates"))
             }
         }
     }
 
     suspend fun getAnnouncement(id: String): Resource<Announcement> = try {
-        Resource.Success(api.getAnnouncement(id))
-    } catch (e: Exception) { Resource.Error(e.message ?: "Error") }
+        val remote = api.getAnnouncement(id)
+        dao.insert(
+            CachedAnnouncement(
+                id = remote.id,
+                title = remote.title,
+                date = remote.date,
+                category = remote.category,
+                status = remote.status,
+                jsonData = json.encodeToString(remote)
+            )
+        )
+        Resource.Success(remote, isOffline = false)
+    } catch (e: Exception) {
+        val cached = dao.getById(id)
+        if (cached != null) {
+            val decoded = safeDecode(cached)
+            if (decoded != null) Resource.Success(decoded, isOffline = true)
+            else Resource.Error(e.message ?: "Could not load advisory details")
+        } else {
+            Resource.Error(e.message ?: "Could not load advisory details")
+        }
+    }
 
     private fun safeDecode(cached: CachedAnnouncement): Announcement? {
         return try {

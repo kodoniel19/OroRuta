@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   RotateCcwIcon,
   Trash2Icon,
@@ -10,8 +10,6 @@ import {
   HandIcon,
   PenToolIcon,
   XIcon,
-  PlusIcon,
-  InfoIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '../ui/Modal';
@@ -59,7 +57,7 @@ export function RouteDrawModal({
   mode,
   route,
   path,
-  initialPins = [],
+  initialPins,
   onPathChange,
   onBack,
   backLabel = 'Back to details',
@@ -75,7 +73,6 @@ export function RouteDrawModal({
   const [drawTool, setDrawTool] = useState<DrawTool>('click');
 
   // Confirmation dialog state
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
   // Landmark pins state (loaded initially from initialPins)
@@ -93,17 +90,22 @@ export function RouteDrawModal({
 
   const [saving, setSaving] = useState(false);
 
-  // Sync state whenever modal opens or route/path changes
+  // Track modal open/close and route changes so stage/points only initialize on open
+  const prevOpenRef = useRef(false);
+  const currentRouteIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (open) {
+    const justOpened = open && !prevOpenRef.current;
+    const routeChanged = open && currentRouteIdRef.current !== (route.id || route.code);
+
+    if (justOpened || routeChanged) {
       setPoints(path || []);
       setHistory([]);
       setStage('draw');
       setPendingPin(null);
       setPinForm({ name: '', kind: 'landmark', address: '' });
 
-      // Reload existing saved pins for this route
-      const loaded: RoutePinItem[] = initialPins.map((loc) => ({
+      const loaded: RoutePinItem[] = (initialPins || []).map((loc) => ({
         id: loc.id,
         name: loc.name,
         kind: loc.kind,
@@ -112,8 +114,11 @@ export function RouteDrawModal({
         isNew: false,
       }));
       setPins(loaded);
+      currentRouteIdRef.current = route.id || route.code || null;
     }
-  }, [open, path, initialPins]);
+
+    prevOpenRef.current = open;
+  }, [open, route.id, route.code]);
 
   // Compute total route distance
   const distance = useMemo(() => pathDistanceKm(points), [points]);
@@ -202,22 +207,17 @@ export function RouteDrawModal({
   }, [points, pushHistory, onPathChange]);
 
   // ─────────────────────────────────────────────
-  // CONFIRM ROUTE GEOMETRY
+  // CONFIRM ROUTE GEOMETRY & PROCEED TO PINS
   // ─────────────────────────────────────────────
 
-  const handleOpenConfirmDialog = () => {
+  const handleConfirmGeometry = () => {
     if (points.length < 2) {
       toast.error('Please draw at least 2 points to define the route geometry.');
       return;
     }
-    setConfirmDialogOpen(true);
-  };
-
-  const handleConfirmGeometry = () => {
-    setConfirmDialogOpen(false);
     setStage('pins');
     setPendingPin(null);
-    toast.success('Route geometry confirmed! You can now place landmark pins and transit stops.');
+    toast.success('Route geometry confirmed! Click anywhere on the map to place landmark pins or transit stops.');
   };
 
   // ─────────────────────────────────────────────
@@ -360,7 +360,7 @@ export function RouteDrawModal({
                     size="md"
                     icon={<CheckIcon className="h-4 w-4" />}
                     disabled={points.length < 2}
-                    onClick={handleOpenConfirmDialog}
+                    onClick={handleConfirmGeometry}
                   >
                     Confirm Route Geometry
                   </Button>
@@ -393,10 +393,13 @@ export function RouteDrawModal({
           {/* Stage Progress Tabs / Indicator */}
           <div className="flex items-center justify-between rounded-lg bg-canvas px-3 py-2 text-xs border border-line">
             <div className="flex items-center gap-4">
-              <div
-                className={`flex items-center gap-1.5 font-medium ${
+              <button
+                type="button"
+                onClick={() => setStage('draw')}
+                className={`flex items-center gap-1.5 font-medium transition-colors hover:opacity-85 ${
                   stage === 'draw' ? 'text-primary-600 font-semibold' : 'text-fg-muted'
                 }`}
+                title="Switch to Route Drawing Mode"
               >
                 <span
                   className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
@@ -410,14 +413,23 @@ export function RouteDrawModal({
                   {points.length >= 2 && stage !== 'draw' ? '✓' : '1'}
                 </span>
                 <span>1. Draw Manual Route</span>
-              </div>
+              </button>
 
               <span className="text-fg-subtle">&rarr;</span>
 
-              <div
-                className={`flex items-center gap-1.5 font-medium ${
+              <button
+                type="button"
+                onClick={() => {
+                  if (points.length < 2) {
+                    toast.error('Please draw at least 2 points first before placing landmarks.');
+                    return;
+                  }
+                  handleConfirmGeometry();
+                }}
+                className={`flex items-center gap-1.5 font-medium transition-colors hover:opacity-85 ${
                   stage === 'pins' ? 'text-primary-600 font-semibold' : 'text-fg-muted'
                 }`}
+                title={points.length >= 2 ? 'Switch to Landmark Placement Mode' : 'Draw at least 2 points first'}
               >
                 <span
                   className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
@@ -429,7 +441,7 @@ export function RouteDrawModal({
                   2
                 </span>
                 <span>2. Place Landmark Pins & Stops ({pins.length})</span>
-              </div>
+              </button>
             </div>
 
             {/* Drawing tool selection in Draw Stage */}
@@ -680,31 +692,6 @@ export function RouteDrawModal({
           </div>
         </div>
       </Modal>
-
-      {/* Confirmation Dialog: Finalize Route Geometry */}
-      <ConfirmDialog
-        open={confirmDialogOpen}
-        onClose={() => setConfirmDialogOpen(false)}
-        tone="primary"
-        title="Confirm Route Geometry"
-        message={
-          <div className="space-y-2">
-            <p>
-              Is the drawn line the final route geometry for{' '}
-              <strong className="text-fg">{route.code || route.id} — {route.name}</strong>?
-            </p>
-            <div className="rounded-lg bg-canvas p-2.5 text-xs text-fg-muted">
-              <div>Total Distance: <strong className="text-fg">{distance} km</strong></div>
-              <div>Points in Polyline: <strong className="text-fg">{points.length} points</strong></div>
-            </div>
-            <p className="text-xs text-fg-subtle">
-              After confirming, you will proceed to placing landmark pins, terminals, loading/unloading points, and verified stops along this confirmed route path.
-            </p>
-          </div>
-        }
-        confirmLabel="Confirm & Place Landmark Pins →"
-        onConfirm={handleConfirmGeometry}
-      />
 
       {/* Confirmation Dialog: Clear All Points */}
       <ConfirmDialog

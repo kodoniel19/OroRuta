@@ -1074,6 +1074,24 @@ async function search(req, res, next) {
     }
 
     tripSearchMemoryCache.set(cacheKey, { results, timestamp: Date.now() });
+
+    // Anonymously record search activity for admin search analytics
+    try {
+      const { uuidv4 } = require("../utils");
+      const deviceId = req.deviceId || req.headers['x-device-id'] || 'app-commuter';
+      const topRouteId = results.length > 0 && results[0].segments && results[0].segments[0]
+        ? results[0].segments[0].route_id
+        : null;
+      const cleanFrom = from || (originPlace ? originPlace.name : 'Current Location');
+      const cleanTo = to || (destPlace ? destPlace.name : '');
+      if (cleanTo) {
+        db.execute(
+          "INSERT INTO searches (id, device_id, current_location, destination, route_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())",
+          [uuidv4(), String(deviceId).substring(0, 36), String(cleanFrom).substring(0, 190), String(cleanTo).substring(0, 190), topRouteId]
+        ).catch(() => {});
+      }
+    } catch (_) {}
+
     res.json(results);
   } catch (err) { next(err); }
 }

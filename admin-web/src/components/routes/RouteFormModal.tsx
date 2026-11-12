@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { SplineIcon } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Field, inputClass, errorInputClass } from '../ui/Field';
 import { Select } from '../ui/Select';
 import { Toggle } from '../ui/Toggle';
 import { routePalette } from '../../data/routes';
-import { RouteDrawModal } from './RouteDrawModal';
-import type { Direction, JeepneyRoute, LatLng, RecordStatus } from '../../types/transit';
+import { RouteDrawModal, type RoutePinItem } from './RouteDrawModal';
+import { useData } from '../../contexts/DataContext';
+import { api } from '../../services/api';
+import type { JeepneyRoute, LatLng, RecordStatus, TransitLocation } from '../../types/transit';
 import { delay, nextId } from '../../utils/async';
 import { toCoordinates } from '../../utils/geo';
 import { nowIso } from '../../utils/format';
@@ -52,11 +53,19 @@ function toForm(route: JeepneyRoute | null, routes: JeepneyRoute[]): FormState {
 }
 
 export function RouteFormModal({ open, onClose, initial, routes, onSave }: RouteFormModalProps) {
+  const { locations, setLocations } = useData();
   const [form, setForm] = useState<FormState>(() => toForm(initial, routes));
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<'details' | 'draw'>('details');
   const [drawnPath, setDrawnPath] = useState<LatLng[]>([]);
+
+  const initialPins = useMemo(() => {
+    if (!initial) return [];
+    return locations.filter((l) =>
+      l.routeIds.includes(initial.id) || (initial.code ? l.routeIds.includes(initial.code) : false)
+    );
+  }, [initial, locations]);
 
   useEffect(() => {
     if (open) {
@@ -101,11 +110,11 @@ export function RouteFormModal({ open, onClose, initial, routes, onSave }: Route
     name: form.name.trim(),
     origin: form.origin.trim(),
     destination: form.destination.trim(),
-    majorRoads: [],
+    majorRoads: roads,
     description: form.description.trim(),
     inboundDistanceKm: Number(form.inboundDistanceKm),
     outboundDistanceKm: Number(form.outboundDistanceKm),
-    verificationStatus: 'DRAFT',
+    verificationStatus: 'PUBLISHED',
     fare: 15,
     travelTime: 30,
     status: form.status,
@@ -134,7 +143,7 @@ export function RouteFormModal({ open, onClose, initial, routes, onSave }: Route
     onClose();
   };
 
-  const handleDrawSave = (path: LatLng[]) => {
+  const handleDrawSave = async (path: LatLng[], pins?: RoutePinItem[]) => {
     const e = validate();
     if (Object.keys(e).length) {
       setErrors(e);
@@ -142,7 +151,47 @@ export function RouteFormModal({ open, onClose, initial, routes, onSave }: Route
       toast.error('Please fix the route details before saving.');
       return;
     }
-    onSave(buildRoute(path));
+    const newRoute = buildRoute(path);
+    onSave(newRoute);
+
+    if (pins && pins.length > 0) {
+      for (const pin of pins) {
+        if (pin.isNew) {
+          try {
+            const res = await api.locations.create({
+              name: pin.name,
+              kind: pin.kind,
+              address: pin.address || '',
+              barangay: '',
+              lat: pin.point[0],
+              lng: pin.point[1],
+              routeIds: [newRoute.id, newRoute.code || ''].filter(Boolean),
+              status: 'Active',
+              notes: `Placed along route ${newRoute.code || newRoute.id}`,
+            });
+            if (res && (res as any).id) {
+              const createdLoc: TransitLocation = {
+                id: (res as any).id,
+                name: pin.name,
+                kind: pin.kind,
+                address: pin.address || '',
+                barangay: '',
+                lat: pin.point[0],
+                lng: pin.point[1],
+                routeIds: [newRoute.id, newRoute.code || ''].filter(Boolean),
+                status: 'Active',
+                notes: `Placed along route ${newRoute.code || newRoute.id}`,
+                lastUpdated: nowIso(),
+              };
+              setLocations((prev) => [...prev, createdLoc]);
+            }
+          } catch (err) {
+            console.error('Error saving pin in RouteFormModal:', err);
+          }
+        }
+      }
+    }
+
     onClose();
   };
 
@@ -162,6 +211,7 @@ export function RouteFormModal({ open, onClose, initial, routes, onSave }: Route
           color: routeColor,
         }}
         path={drawnPath}
+        initialPins={initialPins}
         onPathChange={setDrawnPath}
         onBack={() => setStep('details')}
         onSave={handleDrawSave}

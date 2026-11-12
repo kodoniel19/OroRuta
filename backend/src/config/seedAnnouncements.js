@@ -2,51 +2,54 @@ const db = require('./db');
 
 async function seedAnnouncements() {
   try {
-    await db.query(`
-      INSERT IGNORE INTO announcements (id, title, date, category, description, effective, status) VALUES
-      ('a-01','R5 Route Rerouting via National Highway','2024-09-01','Rerouting',
-       'Route R5 (Bulua – Cogon) is temporarily rerouted due to ongoing road rehabilitation along the original path. Jeepneys will now travel via an alternative segment of National Highway.',
-       'September 1 – October 15, 2024','Active'),
-      ('a-02','R8 Route Update: New Loading Points','2024-09-10','Loading point change',
-       'Route R8 (Carmen – Agora) now has updated loading and unloading designations near Limketkai Center. Please refer to the updated stop list.',
-       'Effective September 10, 2024','Updated'),
-      ('a-03','R10 Temporary Route: Patag – Cogon','2024-09-05','Route update',
-       'Route R10 is operating on a temporary route alignment due to flooding affecting Masterson Ave. Service may be limited during heavy rains.',
-       'Until further notice','Temporary'),
-      ('a-04','Terminal Consolidation at Cogon Market','2024-08-20','Terminal change',
-       'Loading and unloading designations at Cogon Market Terminal have been reorganized. Multiple routes are affected. Please observe updated signage.',
-       'Effective August 20, 2024','Updated'),
-      ('a-05','Expired Notice: Road Repairs at Gusa Rd','2024-07-01','Road closure',
-       'Road repairs along Gusa Rd have been completed. Route R12 has resumed normal operations.',
-       'Ended July 20, 2024','Expired');
-    `);
+    const [[{ annCount }]] = await db.query("SELECT COUNT(*) annCount FROM announcements");
+    if (annCount === 0) {
+      await db.query(`
+        INSERT IGNORE INTO announcements (id, title, date, category, description, effective, status) VALUES
+        ('a-01','R5 Route Rerouting via National Highway','2024-09-01','Rerouting',
+         'Route R5 (Bulua – Cogon) is temporarily rerouted due to ongoing road rehabilitation along the original path. Jeepneys will now travel via an alternative segment of National Highway.',
+         'September 1 – October 15, 2024','Active'),
+        ('a-02','R8 Route Update: New Loading Points','2024-09-10','Loading point change',
+         'Route R8 (Carmen – Agora) now has updated loading and unloading designations near Limketkai Center. Please refer to the updated stop list.',
+         'Effective September 10, 2024','Updated'),
+        ('a-03','R10 Temporary Route: Patag – Cogon','2024-09-05','Route update',
+         'Route R10 is operating on a temporary route alignment due to flooding affecting Masterson Ave. Service may be limited during heavy rains.',
+         'Until further notice','Temporary'),
+        ('a-04','Terminal Consolidation at Cogon Market','2024-08-20','Terminal change',
+         'Loading and unloading designations at Cogon Market Terminal have been reorganized. Multiple routes are affected. Please observe updated signage.',
+         'Effective August 20, 2024','Updated'),
+        ('a-05','Expired Notice: Road Repairs at Gusa Rd','2024-07-01','Road closure',
+         'Road repairs along Gusa Rd have been completed. Route R12 has resumed normal operations.',
+         'Ended July 20, 2024','Expired');
+      `);
 
-    await db.query(`
-      INSERT IGNORE INTO announcement_details (announcement_id, seq, text) VALUES
-      ('a-01',1,'All R5 jeepneys will use the detour via National Highway bypassing the usual segment.'),
-      ('a-01',2,'Expect longer travel time of approximately 10–15 additional minutes.'),
-      ('a-01',3,'Loading and unloading designations remain the same at both terminals.'),
-      ('a-02',1,'New loading zone is now 50 meters north of the previous stop near Limketkai Center.'),
-      ('a-02',2,'Unloading for Agora-bound passengers has been adjusted near the eastern gate.'),
-      ('a-03',1,'Alternative route avoids the flood-prone section of Masterson Ave.'),
-      ('a-03',2,'Service frequency may be reduced during typhoon season.'),
-      ('a-04',1,'Route R3, R5, R12, R2, and R1 are all affected by the terminal reorganization.'),
-      ('a-04',2,'New loading bays are designated per route at the terminal.'),
-      ('a-05',1,'Road repairs have been completed ahead of schedule.'),
-      ('a-05',2,'R12 now runs on its original path through Gusa Rd.');
-    `);
+      await db.query(`
+        INSERT IGNORE INTO announcement_details (announcement_id, seq, text) VALUES
+        ('a-01',1,'All R5 jeepneys will use the detour via National Highway bypassing the usual segment.'),
+        ('a-01',2,'Expect longer travel time of approximately 10–15 additional minutes.'),
+        ('a-01',3,'Loading and unloading designations remain the same at both terminals.'),
+        ('a-02',1,'New loading zone is now 50 meters north of the previous stop near Limketkai Center.'),
+        ('a-02',2,'Unloading for Agora-bound passengers has been adjusted near the eastern gate.'),
+        ('a-03',1,'Alternative route avoids the flood-prone section of Masterson Ave.'),
+        ('a-03',2,'Service frequency may be reduced during typhoon season.'),
+        ('a-04',1,'Route R3, R5, R12, R2, and R1 are all affected by the terminal reorganization.'),
+        ('a-04',2,'New loading bays are designated per route at the terminal.'),
+        ('a-05',1,'Road repairs have been completed ahead of schedule.'),
+        ('a-05',2,'R12 now runs on its original path through Gusa Rd.');
+      `);
 
-    const [[r5]] = await db.query("SELECT id FROM routes WHERE code='R5' LIMIT 1");
-    const [[r1]] = await db.query("SELECT id FROM routes WHERE code='R1' LIMIT 1");
-    const [[r2]] = await db.query("SELECT id FROM routes WHERE code='R2' LIMIT 1");
-    const [[r3]] = await db.query("SELECT id FROM routes WHERE code='R3' LIMIT 1");
+      const [[r5]] = await db.query("SELECT id FROM routes WHERE code='R5' LIMIT 1");
+      const [[r1]] = await db.query("SELECT id FROM routes WHERE code='R1' LIMIT 1");
+      const [[r2]] = await db.query("SELECT id FROM routes WHERE code='R2' LIMIT 1");
+      const [[r3]] = await db.query("SELECT id FROM routes WHERE code='R3' LIMIT 1");
 
-    if (r5) await db.query("INSERT IGNORE INTO announcement_routes (announcement_id, route_id) VALUES ('a-01', ?)", [r5.id]);
-    if (r1) await db.query("INSERT IGNORE INTO announcement_routes (announcement_id, route_id) VALUES ('a-04', ?)", [r1.id]);
-    if (r2) await db.query("INSERT IGNORE INTO announcement_routes (announcement_id, route_id) VALUES ('a-04', ?)", [r2.id]);
-    if (r3) {
-      await db.query("INSERT IGNORE INTO announcement_routes (announcement_id, route_id) VALUES ('a-04', ?)", [r3.id]);
-      await db.query("INSERT IGNORE INTO announcement_routes (announcement_id, route_id) VALUES ('a-05', ?)", [r3.id]);
+      if (r5) await db.query("INSERT IGNORE INTO announcement_routes (announcement_id, route_id) VALUES ('a-01', ?)", [r5.id]);
+      if (r1) await db.query("INSERT IGNORE INTO announcement_routes (announcement_id, route_id) VALUES ('a-04', ?)", [r1.id]);
+      if (r2) await db.query("INSERT IGNORE INTO announcement_routes (announcement_id, route_id) VALUES ('a-04', ?)", [r2.id]);
+      if (r3) {
+        await db.query("INSERT IGNORE INTO announcement_routes (announcement_id, route_id) VALUES ('a-04', ?)", [r3.id]);
+        await db.query("INSERT IGNORE INTO announcement_routes (announcement_id, route_id) VALUES ('a-05', ?)", [r3.id]);
+      }
     }
 
     // Also seed content pages, help topics, faqs from seed.sql if empty

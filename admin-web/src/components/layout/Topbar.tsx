@@ -1,6 +1,7 @@
 import React from 'react';
 import { MenuIcon } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
+import { NotificationsMenu } from './NotificationsMenu';
 import { UserMenu } from './UserMenu';
 
 export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
@@ -9,7 +10,9 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
       <IconButton label="Open navigation" onClick={onMenuClick} className="lg:hidden">
         <MenuIcon className="h-5 w-5" />
       </IconButton>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-3">
+        <NotificationsMenu />
+        <div className="h-6 w-px bg-line" aria-hidden="true" />
         <UserMenu />
       </div>
     </header>

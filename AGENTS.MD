@@ -1,17 +1,33 @@
-# AGENTS.md: OroRuta
+# AGENTS.md — OroRuta
 
-## Stack
-- backend/: Node 18/20, Express, mysql2 (promise), Zod, Jest + Supertest
-- database/: MySQL 8.0 (utf8mb4_unicode_ci), GeoJSON route geometry, bundled_routes.json (offline dataset)
-- android/: Kotlin, Compose, Hilt, Room, Retrofit
-- admin-web/: React 18 + TS + Vite + Tailwind + Leaflet
+OroRuta is an Android-based jeepney route guide for Cagayan de Oro City, designed to help commuters find routes, terminals, stops, destinations, and directions using maps.
 
-## Non-negotiable rules
-1. Run `git status` and `git diff` before editing. Never overwrite, stash, reset, or revert uncommitted changes.
-2. Investigate before changing code. Cite file paths for findings.
-3. No destructive operations: no DROP/DELETE/TRUNCATE, no `docker compose down -v`, no editing existing migrations. New migrations must be additive and reversible.
-4. No mock or invented data (route codes, fares, schedules, coordinates, geometry). Unknown fields stay NULL.
-5. Smallest clean change. No unrelated refactors or dependency changes.
-6. Parameterized queries only. No hardcoded credentials. Don't weaken validation or auth.
-7. If the schema can't represent something, stop and ask instead of working around it.
-8. Never claim success without showing command output.
+## Tech Stack
+- **Backend:** Node.js, Express, MySQL, mysql2, Zod, Jest, Supertest
+- **Android:** Kotlin, Jetpack Compose, Hilt, Room, Retrofit
+- **Admin Web:** React, TypeScript, Vite, Tailwind CSS, Leaflet
+- **Route Data:** MySQL, GeoJSON, `bundled_routes.json`
+
+## Core Requirements
+- Support traditional jeepneys only.
+- Use accurate, verified route data and real GPS coordinates.
+- Ensure route paths follow actual roads and bridges.
+- Support route search, route details, transfers, map navigation, and terminals.
+- Prevent duplicate routes and incorrect origin/destination results.
+- Preserve the existing UI, architecture, and working features.
+- Never invent route codes, fares, schedules, stops, coordinates, or geometry.
+- Mark missing or unverified data appropriately.
+
+## Development Rules
+1. Read `AGENTS.md`, then run `git status` and `git diff` before editing.
+2. Inspect the existing code, database schema, APIs, and relevant screens before making changes.
+3. Reuse existing project conventions and make the smallest necessary changes.
+4. Never overwrite or discard uncommitted work.
+5. Use parameterized SQL and never hardcode credentials.
+6. Never perform destructive database operations or edit existing migrations.
+7. Make new migrations additive and reversible.
+8. Test affected backend, Android, and admin-web functionality.
+9. Never claim success without actual command or test output.
+10. If required data, schema support, or external services are unavailable, explain the limitation instead of guessing.
+
+**Goal:** Maintain and improve OroRuta as a reliable, accurate, and user-friendly traditional jeepney route guide for Cagayan de Oro City.

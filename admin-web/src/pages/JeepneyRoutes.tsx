@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { BusFrontIcon, EyeIcon, PencilIcon, PlusIcon, RouteIcon, SearchXIcon, SplineIcon, Trash2Icon } from 'lucide-react';
+import { BusFrontIcon, PencilIcon, PlusIcon, SearchXIcon, SplineIcon, Trash2Icon } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { IconButton } from '../components/ui/IconButton';
@@ -19,7 +19,7 @@ import { useData } from '../contexts/DataContext';
 import { useSimulatedLoad } from '../hooks/useSimulatedLoad';
 import { api } from '../services/api';
 import type { Direction, JeepneyRoute, LatLng, RecordStatus, TransitLocation } from '../types/transit';
-import { formatRelative, nowIso, peso } from '../utils/format';
+import { formatRelative, nowIso } from '../utils/format';
 import { toCoordinates } from '../utils/geo';
 import { cn } from '../utils/cn';
 
@@ -101,6 +101,13 @@ export function JeepneyRoutes() {
     logActivity({ routeId: route.id, action: 'Deleted', detail: `${route.name} removed from system` });
     toast.success(`${route.id} deleted`);
   };
+
+  const mapRoutePins = useMemo(() => {
+    if (!mapRoute) return [];
+    return locations.filter((l) =>
+      l.routeIds.includes(mapRoute.id) || (mapRoute.code ? l.routeIds.includes(mapRoute.code) : false)
+    );
+  }, [mapRoute, locations]);
 
   const openMap = (route: JeepneyRoute) => {
     setMapRoute(route);
@@ -270,11 +277,7 @@ export function JeepneyRoutes() {
           mode="edit"
           route={mapRoute}
           path={mapPath}
-          initialPins={locations.filter((l) =>
-            mapRoute
-              ? l.routeIds.includes(mapRoute.id) || (mapRoute.code ? l.routeIds.includes(mapRoute.code) : false)
-              : false
-          )}
+          initialPins={mapRoutePins}
           onPathChange={setMapPath}
           onBack={() => setMapOpen(false)}
           onClose={() => setMapOpen(false)}

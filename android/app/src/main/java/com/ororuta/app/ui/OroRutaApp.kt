@@ -224,6 +224,10 @@ fun OroRutaApp(initialRoute: String? = null) {
                 val homeVm = hiltViewModel<HomeViewModel>()
                 val uiState by homeVm.uiState.collectAsState()
 
+                LaunchedEffect(Unit) {
+                    homeVm.refresh()
+                }
+
                 HomeScreen(
                     uiState = uiState,
                     onNavigateSearch = { navController.navigate("search") },
@@ -241,6 +245,11 @@ fun OroRutaApp(initialRoute: String? = null) {
             // 2. Routes Directory tab
             composable("routes") {
                 val routesVm = hiltViewModel<RoutesViewModel>()
+
+                LaunchedEffect(Unit) {
+                    routesVm.loadRoutes()
+                }
+
                 RoutesScreen(
                     viewModel = routesVm,
                     onSelectRoute = { routeId -> navController.navigate("route_info/$routeId") }
@@ -517,6 +526,9 @@ fun OroRutaApp(initialRoute: String? = null) {
 
             composable("announcements") {
                 val annVm = hiltViewModel<AnnouncementsViewModel>()
+                LaunchedEffect(Unit) {
+                    annVm.refresh()
+                }
                 AnnouncementsScreen(
                     viewModel = annVm,
                     onBack = { navController.popBackStack() },
@@ -529,8 +541,13 @@ fun OroRutaApp(initialRoute: String? = null) {
                 arguments = listOf(navArgument("announcementId") { type = NavType.StringType })
             ) { backStack ->
                 val announcementId = backStack.arguments?.getString("announcementId") ?: ""
+                val detailVm = hiltViewModel<AnnouncementDetailViewModel>()
+                LaunchedEffect(announcementId) {
+                    detailVm.loadAnnouncement(announcementId)
+                }
                 AnnouncementDetailScreen(
                     announcementId = announcementId,
+                    viewModel = detailVm,
                     onBack = { navController.popBackStack() },
                     onViewAffectedRoute = { rId -> navController.navigate("route_info/$rId") }
                 )
